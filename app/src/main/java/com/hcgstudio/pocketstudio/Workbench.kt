@@ -153,7 +153,7 @@ private val tools = listOf(
 )
 
 @Composable
-internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean, setTree: (Boolean) -> Unit, className: String, openEntry: (Project.Node) -> Unit) {
+internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean, setTree: (Boolean) -> Unit, className: String, openEntry: (Project.Node) -> Unit, openAgentAccount: () -> Unit) {
     val p = w.project ?: return
     val colors = MaterialTheme.colorScheme
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -190,7 +190,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    if (w.tool == Tool.Codex) CodexPane(w, p)
+                    if (w.tool == Tool.Codex) CodexPane(w, openAgentAccount)
                     if ((wide && w.tool != Tool.Codex) || w.tool == Tool.Editor) EditorPane(w, className, Modifier.fillMaxWidth().weight(1f)) {
                         if (wide) setTree(true)
                         w.tool = Tool.Project

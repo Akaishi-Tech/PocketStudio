@@ -26,13 +26,31 @@ object CodexAuthChecks {
         val worker = Executors.newSingleThreadExecutor()
         try {
             val key = "fixture-credential-only"
-            auth.saveApiKey(key)
-            auth.setUseChatGpt(false)
+            // Accounts saved before custom endpoints have only a key and a mode.
+            CodexAuthStorage(isolated).write(JSONObject().put("apiKey", key).put("useChatGpt", false))
             val reopened = CodexAuth(isolated)
-            check(reopened.credential(false) == key && !reopened.snapshot().useChatGpt)
+            val legacy = reopened.snapshot()
+            check(reopened.credential(legacy) == key && !legacy.useChatGpt && legacy.apiEndpoint == CodexAuthOAuth.RESOURCE)
             check(dir.listFiles().orEmpty().none { key in it.readText(Charsets.ISO_8859_1) })
-            reopened.saveApiKey("")
-            check(!auth.snapshot().hasApiKey && runCatching { auth.credential(false) }.isFailure)
+            val endpoint = "https://agent.example/v1"
+            for (invalid in listOf("agent.example/v1", "http://agent.example/v1", "https://user@agent.example/v1",
+                    "$endpoint?k=secret", "$endpoint#fragment", "https://agent.example:99999/v1")) {
+                check(runCatching { auth.saveApiConfiguration(invalid, "new-key") }.isFailure)
+            }
+            check(runCatching { auth.saveApiConfiguration(endpoint, "") }.isFailure)
+            check(auth.snapshot() == legacy && auth.credential(legacy) == key)
+            auth.saveApiConfiguration("HTTPS://Agent.Example:443/v1///", "new-key")
+            val custom = reopened.snapshot()
+            check(custom.apiEndpoint == endpoint && reopened.credential(custom) == "new-key")
+            check(runCatching { reopened.credential(legacy) }.isFailure)
+            auth.saveApiConfiguration("https://agent.example/service/v1", "")
+            check(reopened.credential(reopened.snapshot()) == "new-key")
+            auth.setUseChatGpt(true)
+            check(reopened.snapshot().responsesUrl == CodexAuthOAuth.RESOURCE)
+            auth.saveApiConfiguration("", key)
+            check(reopened.snapshot() == legacy)
+            reopened.removeApiKey()
+            check(!auth.snapshot().hasApiKey && runCatching { auth.credential(legacy) }.isFailure)
             check(CodexAuthOAuth.challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") ==
                 "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
             val browser = ArrayBlockingQueue<Uri>(1)

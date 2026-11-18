@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,8 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -39,12 +36,11 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-internal fun CodexPane(w: Workspace, project: Project) {
+internal fun CodexPane(w: Workspace, openAccount: () -> Unit) {
     val c = w.codex
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var settings by rememberSaveable { mutableStateOf(false) }
-    var updateDismissed by remember { mutableStateOf<String?>(null) }
+    var updateDismissed by rememberSaveable { mutableStateOf<String?>(null) }
     val installer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         c.refreshInstallation()
     }
@@ -60,7 +56,6 @@ internal fun CodexPane(w: Workspace, project: Project) {
         if (context.packageManager.canRequestPackageInstalls()) startInstall()
         else { c.installIntent = null; c.error = uiString(R.string.allow_pocket_studio_to_install_the_codex_runtime) }
     }
-    LaunchedEffect(project) { c.enter(project) }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) c.refreshInstallation(true)
@@ -91,7 +86,7 @@ internal fun CodexPane(w: Workspace, project: Project) {
             } catch (e: Exception) { c.installIntent = null; c.error = e.localizedMessage }
         }
     }
-    BackHandler(c.detail && !settings && c.approval == null) { c.back() }
+    BackHandler(c.detail && c.approval == null) { c.back() }
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().background(colors.surface)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (c.detail) 4.dp else 20.dp, end = 4.dp),
@@ -101,10 +96,11 @@ internal fun CodexPane(w: Workspace, project: Project) {
                 style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!c.detail && c.version != null && c.usable)
                 StudioIconButton(R.drawable.studio_add, uiString(R.string.new_chat), !c.working) { c.newChat() }
-            StudioIconButton(R.drawable.studio_account, uiString(R.string.account_and_usage)) { settings = true }
+            if (!c.detail && c.version != null) RuntimeMenu(c)
+            StudioIconButton(R.drawable.studio_account, uiString(R.string.account_and_usage), onClick = openAccount)
         }
         HorizontalDivider(color = colors.outlineVariant.copy(alpha = .55f))
-        c.error?.takeUnless { settings }?.let { message ->
+        c.error?.let { message ->
             Row(Modifier.fillMaxWidth().background(colors.errorContainer).padding(start = 16.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Text(message, Modifier.weight(1f).padding(vertical = 8.dp), style = MaterialTheme.typography.bodySmall,
@@ -133,7 +129,7 @@ internal fun CodexPane(w: Workspace, project: Project) {
                 Button(c::download) { Text(stringResource(R.string.download_codex)) }
             }
             !c.usable && (!c.detail && c.chats.isEmpty()) -> CenterAction(R.drawable.studio_chat, uiString(R.string.connect_to_codex)) {
-                Button({ settings = true }) { Text(stringResource(R.string.choose_a_sign_in_method)) }
+                Button(openAccount) { Text(stringResource(R.string.agent_sign_in)) }
             }
             c.detail -> BoxWithConstraints(Modifier.fillMaxSize()) {
                 if (maxWidth >= 680.dp && c.chats.isNotEmpty()) {
@@ -148,12 +144,12 @@ internal fun CodexPane(w: Workspace, project: Project) {
                             ChatList(c, Modifier.fillMaxSize(), compact = true)
                         }
                         VerticalDivider()
-                        Box(Modifier.weight(1f)) { CodexConversation(c, !w.running && !w.busy) { settings = true } }
+                        Box(Modifier.weight(1f)) { CodexConversation(c, !w.running && !w.busy, openAccount) }
                     }
-                } else CodexConversation(c, !w.running && !w.busy) { settings = true }
+                } else CodexConversation(c, !w.running && !w.busy, openAccount)
             }
             c.chats.isEmpty() && !c.loading -> CenterAction(R.drawable.studio_chat, uiString(R.string.no_chats_yet)) {
-                Button({ if (c.usable) c.newChat() else settings = true }) { Text(stringResource(R.string.new_chat)) }
+                Button({ if (c.usable) c.newChat() else openAccount() }) { Text(stringResource(R.string.new_chat)) }
             }
             else -> {
                 if (c.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -161,12 +157,33 @@ internal fun CodexPane(w: Workspace, project: Project) {
             }
         }
     }
-    if (settings) CodexAccountDialog(c) { settings = false }
+}
+
+@Composable
+internal fun CodexToolApproval(c: CodexController) {
     c.approval?.let { req ->
         AlertDialog(onDismissRequest = { req.decision.complete(false) }, title = { Text(req.title) },
             text = { SelectionContainer { Text(req.description, fontFamily = FontFamily.Monospace) } },
             confirmButton = { TextButton({ req.decision.complete(true) }) { Text(stringResource(R.string.allow_once)) } },
             dismissButton = { TextButton({ req.decision.complete(false) }) { Text(stringResource(R.string.decline)) } })
+    }
+}
+
+@Composable
+private fun RuntimeMenu(c: CodexController) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        StudioIconButton(R.drawable.studio_more_vert, stringResource(R.string.codex_runtime)) { expanded = true }
+        DropdownMenu(expanded, { expanded = false }) {
+            Text("Codex ${c.version}", Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleSmall)
+            c.updateError?.let { Text(stringResource(R.string.update_check_failed_format, it),
+                Modifier.widthIn(max = 280.dp).padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall) }
+            DropdownMenuItem(text = { Text(stringResource(R.string.check_for_updates)) },
+                onClick = { expanded = false; c.refreshInstallation(true) })
+            if (c.update != null && !c.downloading) DropdownMenuItem(text = { Text(stringResource(R.string.update_runtime)) },
+                enabled = !c.working, onClick = { expanded = false; c.download() })
+        }
     }
 }
 
@@ -244,6 +261,13 @@ private fun CodexConversation(c: CodexController, projectIdle: Boolean, settings
                         ChatKind.Assistant -> if (first.text.isNotBlank()) CodexMarkdown(first.text)
                         ChatKind.Status -> Text(first.text, style = MaterialTheme.typography.labelMedium,
                             color = if (first.failed) colors.error else colors.onSurfaceVariant)
+                        ChatKind.PlanUsageLimit -> Surface(shape = MaterialTheme.shapes.medium, color = colors.errorContainer) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(first.text, style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.chatgpt_limit_settings), style = MaterialTheme.typography.bodyMedium)
+                                ManageChatGptUsage(c, primary = true)
+                            }
+                        }
                     }
                 }
             }
@@ -262,6 +286,13 @@ private fun CodexConversation(c: CodexController, projectIdle: Boolean, settings
                         }
                     })
                 CodexModelControls(c)
+                if (c.account?.useChatGpt == true) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.using_chatgpt_plan), style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSurfaceVariant)
+                        ManageChatGptUsage(c)
+                    }
+                }
             }
         }
     }
@@ -406,90 +437,4 @@ private fun Activities(items: List<ChatLine>) {
             }
         }
     }
-}
-
-@Composable
-private fun CodexAccountDialog(c: CodexController, close: () -> Unit) {
-    val context = LocalContext.current
-    val state = c.account
-    var key by remember { mutableStateOf("") }
-    val enabled = !c.working && !c.accountBusy
-    LaunchedEffect(state?.selected?.id, state?.useChatGpt) {
-        if (state?.useChatGpt == true && state.selected?.planEnabled == true) {
-            do {
-                c.restoreQuota()
-                kotlinx.coroutines.delay(60_000)
-            } while (true)
-        }
-    }
-    fun browse(uri: Uri) { context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-    AlertDialog(onDismissRequest = close, title = { Text(stringResource(R.string.account_and_usage)) }, text = {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            c.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            if (state != null) {
-                if (!c.usable) Text(stringResource(R.string.sending_a_message_shares_your_prompt_and_the),
-                    style = MaterialTheme.typography.bodySmall)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(state.useChatGpt, { c.configure { it.setUseChatGpt(true) } },
-                        label = { Text(stringResource(R.string.chatgpt)) }, enabled = enabled)
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(!state.useChatGpt, { c.configure { it.setUseChatGpt(false) } },
-                        label = { Text(stringResource(R.string.api_key)) }, enabled = enabled)
-                }
-                if (state.useChatGpt) {
-                    if (state.accounts.isNotEmpty()) state.accounts.forEach { profile ->
-                        Row(Modifier.fillMaxWidth().clickable(enabled = enabled && state.selected?.id != profile.id) {
-                            c.configure { it.selectAccount(profile.id) }
-                        }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(profile.label, Modifier.weight(1f), maxLines = 2)
-                            if (state.selected?.id == profile.id) Symbol(R.drawable.studio_check, uiString(R.string.current_account))
-                        }
-                    }
-                    if (state.selected?.signedIn == true && state.selected.planEnabled) {
-                        Text(stringResource(R.string.use_chatgpt_plan), style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary)
-                        c.quota.forEach { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                        if (c.quota.isNotEmpty()) Text(stringResource(R.string.updated) + DateFormat.getDateTimeInstance(
-                            DateFormat.SHORT, DateFormat.SHORT).format(Date(c.quotaAsOf)), style = MaterialTheme.typography.bodySmall)
-                        if (c.quota.isEmpty()) Text(stringResource(R.string.view_your_remaining_allowance_on_the_chatgpt_usage),
-                            style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton({ runCatching { browse(Uri.parse(CodexAuth.USAGE_URL)) }.onFailure { c.error = it.localizedMessage } }) {
-                            Text(stringResource(R.string.view_usage))
-                        }
-                        TextButton({ c.logout() }, enabled = enabled) { Text(stringResource(R.string.sign_out)) }
-                    } else if (state.selected?.signedIn == true) {
-                        Text(stringResource(R.string.this_account_has_not_authorized_plan_access))
-                        TextButton({ runCatching { browse(Uri.parse(CodexAuth.USAGE_URL)) }.onFailure { c.error = it.localizedMessage } }) {
-                            Text(stringResource(R.string.manage_plan_authorization))
-                        }
-                        TextButton({ c.logout() }, enabled = enabled) { Text(stringResource(R.string.sign_out)) }
-                    }
-                    if (c.signingIn) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                        TextButton(c::cancelLogin) { Text(stringResource(R.string.cancel_sign_in)) }
-                    } else {
-                        Button({ c.login(if (state.selected?.signedIn == true && state.selected.planEnabled) null else state.selected?.id,
-                            ::browse) }, enabled = enabled) {
-                            Text(if (state.selected?.planEnabled == true) uiString(R.string.connect_another_account) else uiString(R.string.continue_with_chatgpt))
-                        }
-                    }
-                } else {
-                    Text(stringResource(R.string.usage_is_billed_separately_to_your_openai_api), style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(key, { key = it }, Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text(if (state.hasApiKey) uiString(R.string.replace_openai_api_key) else uiString(R.string.openai_api_key)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-                    Row {
-                        TextButton({ val value = key; key = ""; c.configure { it.saveApiKey(value) } },
-                            enabled = enabled && key.isNotBlank()) { Text(stringResource(R.string.save_key)) }
-                        if (state.hasApiKey) TextButton({ c.configure { it.saveApiKey("") } }, enabled = enabled) { Text(stringResource(R.string.remove_key)) }
-                    }
-                }
-            }
-            c.version?.let { Text("Codex $it", style = MaterialTheme.typography.bodySmall) }
-            c.updateError?.let { Text(stringResource(R.string.update_check_failed_format, it), style = MaterialTheme.typography.bodySmall)
-                TextButton({ c.refreshInstallation(true) }) { Text(stringResource(R.string.check_again)) } }
-            if (c.update != null && !c.downloading) TextButton({ close(); c.download() }, enabled = enabled) { Text(stringResource(R.string.update_runtime)) }
-        }
-    }, confirmButton = { TextButton(close) { Text(stringResource(R.string.done)) } })
 }

@@ -29,7 +29,9 @@
 
 打开项目后点「智能体 → 下载 Codex」。Studio 从本仓库 GitHub Release 的固定标签 `codex-runtime` 下载已签名的 `PocketStudio-Codex.apk`，核对文件大小、SHA-256、包名和签名证书后打开系统安装器。插件显示为「掌上Studio - Codex插件」，内含 ARM64 和 x86_64 的原生 Codex。也可以从同一版本的发布页下载两个 APK 并分别安装。再次进入「智能体」时会检查插件更新，由你选择何时安装。
 
-打开右上角「账户与用量」。可通过系统浏览器选择「Continue with ChatGPT」并授权使用套餐，或选择「API Key」填入自己的 OpenAI API 密钥。套餐模式使用当前账户的可用额度。服务返回额度窗口时，面板会显示剩余百分比，也可点「查看剩余用量」打开 ChatGPT。使用 API Key 时，费用计入对应的 API 账户。[套餐用量说明](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+在「智能体」右上角打开「账户与用量」，选择「使用 ChatGPT 继续」，在系统浏览器中授权使用套餐。ChatGPT 返回额度窗口时，账户页面会显示剩余百分比，也可前往 ChatGPT 查看用量。[套餐用量说明](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+
+选择「使用 API 密钥」可连接 API 服务。OpenAI 使用默认 Endpoint。若要连接兼容 Responses API 的其他服务，填写其 HTTPS 基础地址，例如 `https://example.com/v1`。输入该服务的 API 密钥，点「保存连接」。费用计入对应的 API 账户。
 
 点「新聊天」向智能体提问。它可以在当前工程中列出、读取和编辑文件，运行 Gradle 任务前会显示确认。对话中的工具摘要可以展开查看操作和结果。编辑器保留未保存的草稿，文件内容发生冲突时会提示处理。
 

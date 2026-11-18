@@ -4,7 +4,7 @@ import androidx.annotation.StringRes
 import org.json.JSONObject
 
 internal data class CodexChat(val id: String, val title: String, val updated: Long)
-internal enum class ChatKind { User, Assistant, Activity, Status }
+internal enum class ChatKind { User, Assistant, Activity, Status, PlanUsageLimit }
 internal data class ChatLine(val id: String, val kind: ChatKind, private val body: String = "",
     val detail: String = "", val category: Int = R.string.tools, val failed: Boolean = false,
     private val label: (() -> String)? = null) {
@@ -12,6 +12,15 @@ internal data class ChatLine(val id: String, val kind: ChatKind, private val bod
 }
 
 internal fun chatLabel(@StringRes id: Int, vararg args: String): () -> String = { uiString(id, *args) }
+
+internal fun turnFailure(turnId: String, error: JSONObject?, chatGptPlan: Boolean): ChatLine {
+    val id = "failure-$turnId"
+    if (chatGptPlan && error?.string("codexErrorInfo") == "usageLimitExceeded")
+        return ChatLine(id, ChatKind.PlanUsageLimit, failed = true, label = chatLabel(R.string.chatgpt_usage_limit_reached))
+    val message = error?.string("message").orEmpty()
+    return ChatLine(id, ChatKind.Status, message, failed = true,
+        label = if (message.isBlank()) chatLabel(R.string.request_failed) else null)
+}
 
 internal fun transcriptItem(item: JSONObject): ChatLine? {
     val id = item.string("id")

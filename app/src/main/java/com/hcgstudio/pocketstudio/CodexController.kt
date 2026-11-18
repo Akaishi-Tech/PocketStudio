@@ -16,8 +16,7 @@ internal data class CodexApproval(val title: String, val description: String, va
 private data class ModelSelection(val model: CodexModel, val effort: String?, val fast: Boolean)
 
 internal class CodexController(private val w: Workspace, private val scope: CoroutineScope,
-    private val responsesUrl: String = CodexAuthOAuth.RESOURCE,
-    private val historyRoot: File = w.app.noBackupFilesDir) {
+    private val fixtureHistory: File? = null) {
     private val runtime = CodexRuntime(w.app)
     private val auth = CodexAuth(w.app)
     private val prefs = w.app.getSharedPreferences("codex-ui", 0)
@@ -31,6 +30,8 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     var downloadProgress by mutableFloatStateOf(0f); private set
     var installIntent by mutableStateOf<Intent?>(null)
     var signingIn by mutableStateOf(false); private set
+    private var pendingPlanWelcome by mutableStateOf<String?>(null)
+    val showPlanWelcome get() = pendingPlanWelcome != null
     private var updatingAccount by mutableStateOf(false)
     val accountBusy get() = signingIn || updatingAccount
     var error by mutableStateOf<String?>(null)
@@ -120,7 +121,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     }
 
     private fun applyAccount(state: CodexAuthState, refreshCatalog: Boolean = false) {
-        val key = if (state.useChatGpt) "plan-${state.selected?.id.orEmpty()}" else "api"
+        val key = state.accountKey
         val accountChanged = key != accountKey
         val wasUsable = usable
         if (accountChanged) {
@@ -129,6 +130,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         }
         accountKey = key
         account = state
+        if (accountChanged || !usable) pendingPlanWelcome = null
         if (accountChanged || wasUsable != usable || refreshCatalog) {
             clearModels()
             if (detail) ensureModels()
@@ -151,7 +153,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
 
     fun refreshModels() {
         val project = selectedProject ?: return
-        val plan = account?.useChatGpt ?: return
+        val state = account ?: return
         if (!usable || version == null || working || modelsLoading) return
         modelsLoading = true
         modelsError = null
@@ -167,10 +169,10 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                     ensureActive()
                     // Plan tokens have an independent catalog. Without runtime metadata,
                     // it can still supply models and efforts, but Fast cannot be confirmed.
-                    if (!plan) throw e
+                    if (!state.useChatGpt) throw e
                     emptyList()
                 }
-                val available = io { auth.models(plan, responsesUrl, runtimeModels) }
+                val available = io { auth.models(state, runtimeModels) }
                 ensureActive()
                 models = available
                 val preferred = prefs.getString("model-$accountKey", null)
@@ -215,15 +217,19 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         selection = current.copy(fast = enabled)
         prefs.edit().putBoolean("fast-$accountKey-${current.model.id}", enabled).apply()
     }
-    fun configure(f: (CodexAuth) -> Unit) {
+    fun configure(onSaved: () -> Unit = {}, onInvalid: (ApiConfigurationError) -> Unit = ::failure,
+                  f: (CodexAuth) -> Unit) {
         if (working || accountBusy) return
         updatingAccount = true
+        error = null
         scope.launch {
             try {
                 val state = io { f(auth); auth.snapshot() }
                 applyAccount(state, refreshCatalog = true)
+                onSaved()
                 if (version != null && !detail) list()
-            } catch (e: Exception) { failure(e) }
+            } catch (e: ApiConfigurationError) { onInvalid(e) }
+            catch (e: Exception) { failure(e) }
             finally { updatingAccount = false }
         }
     }
@@ -232,16 +238,23 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         signingIn = true; error = null
         loginJob = scope.launch {
             try {
-                val state = io {
-                    auth.setUseChatGpt(true)
-                    auth.login(accountId, browser)
-                }
+                val state = io { auth.login(accountId, browser) }
                 applyAccount(state, refreshCatalog = true)
+                state.selected?.takeIf { state.useChatGpt && it.planEnabled }?.let { profile ->
+                    val user = java.util.UUID.nameUUIDFromBytes(profile.subject.toByteArray(Charsets.UTF_8))
+                    val welcome = "chatgpt-plan-welcome-$user"
+                    if (!prefs.getBoolean(welcome, false)) pendingPlanWelcome = welcome
+                }
                 if (version != null) list()
             } catch (e: Exception) { if (isActive) failure(e) }
             finally { signingIn = false }
         }
     }
+    fun markPlanWelcomeShown() {
+        val key = pendingPlanWelcome ?: return
+        prefs.edit().putBoolean(key, true).apply()
+    }
+    fun dismissPlanWelcome() { pendingPlanWelcome = null }
     fun cancelLogin() { loginJob?.cancel(); auth.cancelLogin() }
     fun logout() {
         if (working || accountBusy) return
@@ -279,22 +292,23 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         ensureModels()
     }
 
-    private fun home(p: Project): File {
+    private fun home(p: Project, accountKey: String): File {
         val key = (p.tree ?: p.root.uri).toString() + "|" + accountKey
         val hash = MessageDigest.getInstance("SHA-256").digest(key.toByteArray()).joinToString("") { "%02x".format(it) }
-        return File(historyRoot, "codex-projects/$hash").apply { mkdirs() }
+        return (fixtureHistory ?: File(w.app.noBackupFilesDir, "codex-projects/$hash")).apply { mkdirs() }
     }
 
     private suspend fun <T> withServer(p: Project, authenticate: Boolean, fn: suspend (CodexRpc, File) -> T): T {
-        val plan = account?.useChatGpt != false
-        val directory = io { home(p) }
+        val state = checkNotNull(account)
+        val plan = state.useChatGpt
+        val directory = io { home(p, state.accountKey) }
         val env = mutableMapOf("CODEX_HOME" to directory.absolutePath)
         val provider = if (plan) "chatgpt_plan" else "openai_byok"
         val envKey = if (plan) "ACCESS_TOKEN" else "OPENAI_API_KEY"
-        if (authenticate) env[envKey] = io { auth.credential(plan) }
+        if (authenticate) env[envKey] = io { auth.credential(state) }
         val settings = mapOf("model_provider" to JSONObject.quote(provider),
             "model_providers.$provider.name" to JSONObject.quote(if (plan) "ChatGPT plan" else "OpenAI API"),
-            "model_providers.$provider.base_url" to JSONObject.quote(responsesUrl),
+            "model_providers.$provider.base_url" to JSONObject.quote(state.responsesUrl),
             "model_providers.$provider.env_key" to JSONObject.quote(envKey),
             "model_providers.$provider.wire_api" to "\"responses\"",
             "model_providers.$provider.supports_websockets" to "false",
@@ -355,9 +369,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                         "sortDirection" to "asc", "itemsView" to "full", "limit" to 10)) { turn ->
                         for (item in turn.optJSONArray("items").objects()) transcriptItem(item)?.let(history::add)
                         if (turn.string("status") == "failed") {
-                            val message = turn.optJSONObject("error")?.string("message").orEmpty()
-                            history.add(ChatLine("failure-${turn.string("id")}", ChatKind.Status, message, failed = true,
-                                label = if (message.isBlank()) chatLabel(R.string.request_failed) else null))
+                            history.add(turnFailure(turn.string("id"), turn.optJSONObject("error"), account?.useChatGpt == true))
                         }
                     }
                 }
@@ -420,6 +432,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                         "input" to JSONArray().put(json("type" to "text", "text" to prompt))))
                     currentTurn = result.getJSONObject("turn").getString("id")
                     sent = true
+                    var terminalError: JSONObject? = null
                     for (message in rpc.events) {
                         val params = message.optJSONObject("params") ?: continue
                         val method = message.string("method")
@@ -437,11 +450,19 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                             }
                             "account/rateLimits/updated" -> if (account?.useChatGpt == true)
                                 params.optJSONObject("rateLimits")?.let(::updateQuota)
+                            "error" -> if (params.string("turnId") == currentTurn && !params.optBoolean("willRetry")) {
+                                terminalError = params.optJSONObject("error")
+                            }
                             "turn/completed" -> {
                                 val turn = params.getJSONObject("turn")
                                 if (turn.string("id") != currentTurn) continue
                                 when (turn.string("status")) {
-                                    "failed" -> throw IOException(turn.optJSONObject("error")?.string("message").orEmpty().ifBlank { uiString(R.string.request_failed) })
+                                    "failed" -> {
+                                        val line = turnFailure(currentTurn, turn.optJSONObject("error") ?: terminalError,
+                                            account?.useChatGpt == true)
+                                        if (line.kind == ChatKind.PlanUsageLimit) upsert(line)
+                                        else throw IOException(line.text)
+                                    }
                                     "interrupted" -> lines.add(ChatLine("stop-$currentTurn", ChatKind.Status, label = chatLabel(R.string.stopped)))
                                 }
                                 break

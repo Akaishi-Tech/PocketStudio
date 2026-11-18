@@ -9,6 +9,12 @@ from protocol import Responses, check_turn_settings, digest
 
 
 class AccountModelsAndResponses(Responses):
+    def do_POST(self):
+        if self.headers.get("Authorization") != "Bearer local-fixture-only":
+            self.send_error(401)
+            return
+        super().do_POST()
+
     def do_GET(self):
         if self.path != "/v1/models":
             self.send_error(404)
@@ -21,7 +27,7 @@ class AccountModelsAndResponses(Responses):
             self.send_error(503)
             return
         body = json.dumps({"object": "list", "data": [
-            {"id": model, "object": "model"} for model in ("gpt-5.5", "tts-1", "gpt-6.2-sol")
+            {"id": model, "object": "model"} for model in ("gpt-5.5", "my-deployment", "gpt-6.2-sol")
         ]}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

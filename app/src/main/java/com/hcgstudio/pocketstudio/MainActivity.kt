@@ -79,6 +79,7 @@ private fun StudioApp(w: Workspace) {
     val p = w.project
     val active = w.active
     var dialog by rememberSaveable(p?.root?.uri?.toString()) { mutableStateOf("") }
+    var showAgentAccount by rememberSaveable(p?.root?.uri?.toString()) { mutableStateOf(false) }
     var gradleTask by rememberSaveable { mutableStateOf("assembleDebug") }
     var showTree by rememberSaveable { mutableStateOf(true) }
     val newProjectVisible by w.newProjectVisible.collectAsState()
@@ -222,22 +223,33 @@ private fun StudioApp(w: Workspace) {
     LaunchedEffect(p) { rootFocus.requestFocus() }
     val notice = w.message
     LaunchedEffect(notice) { if (notice != null) { snack.showSnackbar(notice); if (w.message == notice) w.message = null } }
-    BackHandler(p != null && dialog.isEmpty() && !newProjectVisible) {
-        if (w.tool != Tool.Editor && active != null) w.tool = Tool.Editor
-        else if (idle) w.closeProject()
+    BackHandler(p != null && dialog.isEmpty() && !newProjectVisible && !showAgentAccount) {
+        if (active == null) showTree = true
+        w.tool = if (active != null) Tool.Editor else Tool.Project
     }
 
     Scaffold(
         modifier = Modifier.onPreviewKeyEvent { key ->
             val event = key.nativeKeyEvent
-            val action = if (dialog.isEmpty() && !newProjectVisible) actions.firstOrNull { it.enabled && it.matches(event) } else null
+            val action = if (dialog.isEmpty() && !newProjectVisible && !showAgentAccount) actions.firstOrNull { it.enabled && it.matches(event) } else null
             if (action == null) false else { action.run(); true }
         }.focusRequester(rootFocus).focusable(),
         contentWindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
         snackbarHost = { SnackbarHost(snack) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            if (p != null) Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry)
+            if (p != null && (w.tool == Tool.Codex || showAgentAccount)) {
+                LaunchedEffect(p) { w.codex.enter(p) }
+            }
+            if (p != null && showAgentAccount) CodexAccountPage(w.codex) {
+                showAgentAccount = false
+                w.tool = Tool.Codex
+            }
+            else if (p != null) Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
+                if (w.codex.account != null) w.codex.error = null
+                else w.codex.refreshInstallation()
+                showAgentAccount = true
+            }
             else Welcome(w, newProject, openTree, importZip, { dialog = "sdk" }, { dialog = "licenses" })
             if (w.busy && !newProjectVisible) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -259,6 +271,10 @@ private fun StudioApp(w: Workspace) {
             onDismiss = dismiss, replace = dialog == "replaceProject", beforeReplace = { w.saveDocuments() }, onChanged = w::reloadChanged)
         "preview" -> if (p != null && active != null) LayoutPreviewDialog(p, active.editor.text, active.node.path, dismiss)
         "gradle" -> if (p != null) GradleTaskDialog(p, gradleTask, dismiss, { w.tool = Tool.Output; w.log(it) }, w::recordApk) { w.action { w.refreshAfterExternalRun(p) } }
+    }
+    if (p != null) {
+        CodexPlanWelcome(w.codex)
+        if (w.tool == Tool.Codex || showAgentAccount) CodexToolApproval(w.codex)
     }
     if (newProjectVisible) CreateProject(w)
     DeviceDialogs(w.devices)

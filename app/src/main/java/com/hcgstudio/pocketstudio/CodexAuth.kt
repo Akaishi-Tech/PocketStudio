@@ -2,20 +2,33 @@ package com.hcgstudio.pocketstudio
 
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import org.json.JSONObject
 import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.URI
+import java.util.Locale
 import java.util.UUID
 
+internal class ApiConfigurationError(@get:StringRes val reason: Int) : IllegalArgumentException(uiString(reason))
+
 internal data class CodexAccount(
-    val id: String, val label: String, val signedIn: Boolean, val planEnabled: Boolean
+    val id: String, val label: String, val signedIn: Boolean, val planEnabled: Boolean, val subject: String = id
 )
 
 internal data class CodexAuthState(
-    val accounts: List<CodexAccount>, val selected: CodexAccount?, val hasApiKey: Boolean, val useChatGpt: Boolean
-)
+    val accounts: List<CodexAccount>, val selected: CodexAccount?, val hasApiKey: Boolean,
+    val useChatGpt: Boolean, val apiEndpoint: String
+) {
+    val responsesUrl get() = if (useChatGpt) CodexAuthOAuth.RESOURCE else apiEndpoint
+    val accountKey: String get() = when {
+        useChatGpt -> "plan-${selected?.id.orEmpty()}"
+        apiEndpoint == CodexAuthOAuth.RESOURCE -> "api"
+        else -> "api-$apiEndpoint"
+    }
+}
 
 /** Blocking operations belong on an IO dispatcher. The browser callback only needs to launch ACTION_VIEW. */
 internal class CodexAuth(context: Context) {
@@ -26,11 +39,12 @@ internal class CodexAuth(context: Context) {
         val profiles = state.optJSONObject("accounts") ?: JSONObject()
         val accounts = profiles.keys().asSequence().map { id ->
             val profile = profiles.getJSONObject(id)
-            val label = "${profile.getString("label")} · ${id.takeLast(6)}"
-            CodexAccount(id, label, profile.has("identity"), permitsPlan(profile))
+            val label = profile.getString("label")
+            CodexAccount(id, label, profile.has("identity"), permitsPlan(profile), profile.optString("sub", id))
         }.toList().sortedBy { it.label }
         CodexAuthState(accounts, accounts.find { it.id == state.optString("selected") },
-            state.optString("apiKey").isNotBlank(), state.optBoolean("useChatGpt", true))
+            state.optString("apiKey").isNotBlank(), state.optBoolean("useChatGpt", true),
+            state.optString("apiEndpoint", CodexAuthOAuth.RESOURCE))
     }
 
     fun setUseChatGpt(value: Boolean) {
@@ -38,11 +52,24 @@ internal class CodexAuth(context: Context) {
         synchronized(lock) { storage.write(storage.read().put("useChatGpt", value)) }
     }
 
-    fun saveApiKey(value: String) = synchronized(lock) {
-        val key = value.trim()
-        require(key.all { it.code in 33..126 }) { uiString(R.string.the_api_key_contains_invalid_characters) }
+    fun saveApiConfiguration(endpoint: String, key: String) = synchronized(lock) {
+        val url = normalizeApiEndpoint(endpoint)
+        val replacement = key.trim()
+        if (replacement.any { it.code !in 33..126 }) throw ApiConfigurationError(R.string.the_api_key_contains_invalid_characters)
         val state = storage.read()
-        if (key.isEmpty()) state.remove("apiKey") else state.put("apiKey", key)
+        if (replacement.isEmpty()) {
+            if (state.optString("apiKey").isBlank()) throw ApiConfigurationError(R.string.set_an_api_key_first)
+            val previous = URI(state.optString("apiEndpoint", CodexAuthOAuth.RESOURCE))
+            val next = URI(url)
+            if (previous.scheme != next.scheme || previous.rawAuthority != next.rawAuthority)
+                throw ApiConfigurationError(R.string.enter_key_for_new_endpoint)
+        } else state.put("apiKey", replacement)
+        storage.write(state.put("apiEndpoint", url).put("useChatGpt", false))
+    }
+
+    fun removeApiKey() = synchronized(lock) {
+        val state = storage.read()
+        state.remove("apiKey")
         storage.write(state)
     }
 
@@ -51,7 +78,7 @@ internal class CodexAuth(context: Context) {
         synchronized(lock) {
             val state = storage.read()
             require(state.optJSONObject("accounts")?.has(id) == true) { uiString(R.string.this_account_has_not_been_saved) }
-            storage.write(state.put("selected", id))
+            storage.write(state.put("selected", id).put("useChatGpt", true))
         }
     }
 
@@ -166,9 +193,15 @@ internal class CodexAuth(context: Context) {
     }
 
     /** Provide only the selected provider credential to its child process; callers must never log the value. */
-    fun credential(useChatGpt: Boolean): String = synchronized(lock) {
+    fun credential(state: CodexAuthState): String = synchronized(lock) {
         val stored = storage.read()
-        if (!useChatGpt) return@synchronized stored.optString("apiKey").ifBlank { throw IOException(uiString(R.string.set_an_api_key_first)) }
+        if (!state.useChatGpt) {
+            // A catalog fetch may still be running while a different provider is saved.
+            check(stored.optString("apiEndpoint", CodexAuthOAuth.RESOURCE) == state.apiEndpoint) {
+                uiString(R.string.api_endpoint_changed)
+            }
+            return@synchronized stored.optString("apiKey").ifBlank { throw IOException(uiString(R.string.set_an_api_key_first)) }
+        }
         val id = stored.optString("selected")
         val profile = stored.optJSONObject("accounts")?.optJSONObject(id) ?: throw IOException(uiString(R.string.sign_in_to_chatgpt_first))
         check(permitsPlan(profile)) { uiString(R.string.sign_in_and_authorize_access_to_your_chatgpt) }
@@ -193,9 +226,9 @@ internal class CodexAuth(context: Context) {
         profile.getString("access")
     }
 
-    fun models(plan: Boolean, baseUrl: String, runtimeModels: List<CodexModel> = emptyList()): List<CodexModel> {
-        val catalog = CodexAuthOAuth.json("${baseUrl.trimEnd('/')}/models", bearer = credential(plan))
-        if (plan) {
+    fun models(state: CodexAuthState, runtimeModels: List<CodexModel>): List<CodexModel> {
+        val catalog = CodexAuthOAuth.json("${state.responsesUrl}/models", bearer = credential(state))
+        if (state.useChatGpt) {
             // app-server drops priority when its own model descriptor lacks that tier.
             val runtimeFastModels = runtimeModels.filter { it.supportsFast }.map { it.id }.toSet()
             return catalog.getJSONArray("models").objects().mapNotNull { CodexModel.fromPlan(it, runtimeFastModels) }
@@ -204,8 +237,12 @@ internal class CodexAuth(context: Context) {
 
         // The API key catalog includes audio and embedding models. Use the runtime's
         // Codex catalog for compatibility, capabilities and ordering.
-        val available = catalog.getJSONArray("data").objects().map { it.string("id") }.toSet()
-        return runtimeModels.filter { it.id in available }.distinctBy { it.id }
+        val available = catalog.getJSONArray("data").objects().map { it.string("id") }.filter(String::isNotBlank).toSet()
+        val known = runtimeModels.filter { it.id in available }.distinctBy { it.id }
+        if (state.apiEndpoint == CodexAuthOAuth.RESOURCE) return known
+        // Other Responses providers can expose deployment IDs absent from the Codex catalog.
+        val otherIds = available - known.map { it.id }.toSet()
+        return known + otherIds.map { CodexModel(it, it, emptyList(), null, false) }
     }
 
     private fun updateTokens(profile: JSONObject, response: JSONObject, refreshing: Boolean) {
@@ -233,6 +270,20 @@ internal class CodexAuth(context: Context) {
     companion object {
         const val USAGE_URL = "https://chatgpt.com/settings/usage"
         const val APP_NAME = "Pocket Studio"
+        private fun normalizeApiEndpoint(value: String): String {
+            val uri = runCatching { URI(value.trim().ifEmpty { CodexAuthOAuth.RESOURCE }).parseServerAuthority() }.getOrNull()
+            val scheme = uri?.scheme?.lowercase(Locale.ROOT)
+            val host = uri?.host?.lowercase(Locale.ROOT)
+            val localFixture = BuildConfig.DEBUG && scheme == "http" && host == "127.0.0.1"
+            if (uri == null || host == null || (scheme != "https" && !localFixture) ||
+                uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null ||
+                (uri.port != -1 && uri.port !in 1..65535) || uri.rawAuthority.endsWith(':')) {
+                throw ApiConfigurationError(R.string.invalid_api_endpoint)
+            }
+            val defaultPort = if (scheme == "https") 443 else 80
+            val port = if (uri.port == -1 || uri.port == defaultPort) "" else ":${uri.port}"
+            return "$scheme://$host$port${uri.rawPath.trimEnd('/')}"
+        }
         private val lock = Any()
         private val loginLock = Any()
         private var pending: ServerSocket? = null

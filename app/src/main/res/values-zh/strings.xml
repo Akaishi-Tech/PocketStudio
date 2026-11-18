@@ -40,6 +40,9 @@
     <string name="annotations_and_case_labels_require_constant_expressions">"注解和 case 标签需要常量表达式"</string>
     <string name="another_source_set_or_module_has_a_type_with_this_name">"不同源集或模块存在同名类型：%1$s"</string>
     <string name="api_key">"API 密钥"</string>
+    <string name="invalid_api_endpoint">"请输入 HTTPS 基础地址，且不含凭据、查询参数或片段。"</string>
+    <string name="enter_key_for_new_endpoint">"请输入新端点的 API 密钥。"</string>
+    <string name="api_endpoint_changed">"API 端点已更改，请重试。"</string>
     <string name="apk_file_not_found">"找不到 APK 文件"</string>
     <string name="apk_installed">"APK 已安装"</string>
     <string name="apk_installed_unable_to_read_the_package_name">"APK 已安装，无法读取启动包名"</string>
@@ -81,14 +84,11 @@
     <string name="captured_local_variables_need_explicit_types">"捕获的局部变量需要显式类型"</string>
     <string name="change_method_signature">"更改方法签名"</string>
     <string name="changed_after_the_preview_search_again">"%1$s 在预览后已更改。请重新搜索。"</string>
-    <string name="chatgpt">"ChatGPT"</string>
     <string name="chatgpt_account">"ChatGPT 账户"</string>
     <string name="chatgpt_authorization_is_incomplete">"未完成 ChatGPT 授权"</string>
-    <string name="check_again">"重新检查"</string>
     <string name="check_static_calls_in_this_file_before_deleting">"检查当前文件中的静态调用后删除 private 方法。反射调用需要手动核对。"</string>
     <string name="children_are_arranged_vertically">" 的子控件按纵向排列"</string>
     <string name="children_could_not_be_displayed_format">"%1$s 的子控件未能显示"</string>
-    <string name="choose_a_sign_in_method">"选择登录方式"</string>
     <string name="choose_location">"选择位置"</string>
     <string name="choose_the_same_top_level_class_or_one">"目标需为同一顶层类或其静态成员类"</string>
     <string name="circular_reference_format">"循环引用 %1$s"</string>
@@ -112,7 +112,6 @@
     <string name="compiler_tools">"编译工具"</string>
     <string name="connect">"连接"</string>
     <string name="connect_account">"连接账户"</string>
-    <string name="connect_another_account">"连接其他账户"</string>
     <string name="connect_over_adb_tcp">"连接 ADB TCP"</string>
     <string name="connect_paired_device">"连接已配对设备"</string>
     <string name="connect_to_a_target_device_first">"请先连接目标设备"</string>
@@ -143,7 +142,6 @@
     <string name="could_not_start_the_app_s_private_wireless">"无法启动应用私有无线调试服务"</string>
     <string name="create">"创建"</string>
     <string name="create_directory">"创建目录"</string>
-    <string name="current_account">"当前账户"</string>
     <string name="current_frame_variables">"当前栈帧变量"</string>
     <string name="custom_gradle_tasks">"自定义 Gradle 任务…"</string>
     <string name="cut">"剪切"</string>
@@ -354,7 +352,6 @@
     <string name="logcat">"Logcat"</string>
     <string name="main_menu">"主菜单"</string>
     <string name="malformed_identity_token">"身份令牌格式错误"</string>
-    <string name="manage_plan_authorization">"管理套餐授权"</string>
     <string name="match_case">"区分大小写"</string>
     <string name="message_codex">"给 Codex 发消息"</string>
     <string name="minimum_log_level">"最低日志级别"</string>
@@ -410,7 +407,6 @@
     <string name="open_developer_options_in_system_settings_and_turn">"请手动打开系统设置中的开发者选项和无线调试。"</string>
     <string name="open_folder">"打开文件夹"</string>
     <string name="open_pairing_settings">"去设置配对"</string>
-    <string name="openai_api_key">"OpenAI API 密钥"</string>
     <string name="openai_identity_signature_verification_failed">"OpenAI 身份签名验证失败"</string>
     <string name="openai_request_failed_http">"OpenAI 请求失败 (HTTP %1$s)"</string>
     <string name="openai_request_failed_http_format">"OpenAI 请求失败 (HTTP %1$s, %2$s)"</string>
@@ -500,7 +496,6 @@
     <string name="replace_in_files">"在文件中替换"</string>
     <string name="replace_in_project">"在项目中替换"</string>
     <string name="replace_one">"替换一个"</string>
-    <string name="replace_openai_api_key">"替换 OpenAI API Key"</string>
     <string name="replace_references_to_the_local_variable_with_its">"将当前局部变量的引用替换为其字面量初值"</string>
     <string name="replace_with">"替换为"</string>
     <string name="replaced_one_match">"已替换一处"</string>
@@ -524,7 +519,6 @@
     <string name="safe_delete_private_method">"安全删除私有方法"</string>
     <string name="save_all">"保存全部"</string>
     <string name="save_file">"保存文件"</string>
-    <string name="save_key">"保存密钥"</string>
     <string name="save_your_editor_changes_then_try_again">"编辑器中有未保存的修改，请先保存再重试"</string>
     <string name="saved">"已保存 %1$s · %2$s"</string>
     <string name="saved_label">"已保存"</string>
@@ -570,7 +564,6 @@
     <string name="select_word_to_the_right">"向右选择一个词"</string>
     <string name="selected_build_output">"已选择构建产物 · %1$s"</string>
     <string name="send">"发送"</string>
-    <string name="sending_a_message_shares_your_prompt_and_the">"发送消息时，提示词和任务所需的项目内容会发给 OpenAI。凭据加密保存在本机。"</string>
     <string name="separate_multiple_tasks_with_spaces">"多个任务用空格分隔"</string>
     <string name="set">"设置"</string>
     <string name="set_an_api_key_first">"请先设置 API Key"</string>
@@ -809,10 +802,8 @@
     <string name="update_later">"稍后更新"</string>
     <string name="update_runtime">"更新运行时"</string>
     <string name="updated">"更新于 "</string>
-    <string name="usage_is_billed_separately_to_your_openai_api">"使用 OpenAI API 账户单独计费。"</string>
     <string name="usb_access_was_denied">"未获得 USB 访问权限"</string>
     <string name="use_at_least_two_package_segments_start_each">"包名至少需要两段，每段以字母开头，只能包含字母、数字或下划线"</string>
-    <string name="use_chatgpt_plan">"使用 ChatGPT 套餐"</string>
     <string name="use_only_lowercase_letters_digits_and_underscores_in">"资源名称仅支持小写字母、数字和下划线。"</string>
     <string name="use_sdk_manager_to_install_android_sdk_platform_format">"请在 SDK Manager 安装 Android SDK Platform %1$s"</string>
     <string name="variables">"变量"</string>
@@ -821,8 +812,6 @@
     <string name="view">"视图"</string>
     <string name="view_diff">"查看差异"</string>
     <string name="view_hierarchy">"控件列表"</string>
-    <string name="view_usage">"查看剩余用量"</string>
-    <string name="view_your_remaining_allowance_on_the_chatgpt_usage">"剩余额度可在 ChatGPT 用量页查看。"</string>
     <string name="waiting_for_logs">"等待日志…"</string>
     <string name="waiting_for_the_target_phone_to_authorize_usb">"等待目标手机确认 USB 调试授权…"</string>
     <string name="waiting_for_usb_access">"等待 USB 访问权限…"</string>
@@ -851,4 +840,15 @@
     <string name="local_discovery_unavailable">系统服务发现不可用。</string>
     <string name="local_discovery_failed">查找本机无线调试服务失败（%1$d）。</string>
     <string name="local_service_not_found">未找到本机的%1$s服务，请在设置中检查 Wi-Fi 和无线调试。</string>
+    <string name="agent_sign_in">登录</string>
+    <string name="sign_in_to_codex">登录 Codex</string>
+    <string name="api_connection">API 连接</string>
+    <string name="api_endpoint">Endpoint</string>
+    <string name="replace_api_key">更换 API 密钥</string>
+    <string name="save_api_connection">保存连接</string>
+    <string name="use_an_api_key">使用 API 密钥</string>
+    <string name="chatgpt_plan_sign_in_summary">符合条件的请求将使用你的 ChatGPT 套餐。掌上 Studio 会将提示词和相关项目内容发送给 OpenAI。</string>
+    <string name="api_connection_disclosure">提示词和任务所需的项目内容会发送到此 Endpoint，费用由 API 提供方结算。</string>
+    <string name="codex_runtime">Codex 运行时</string>
+    <string name="check_for_updates">检查更新</string>
 </resources>

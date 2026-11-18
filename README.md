@@ -33,7 +33,9 @@ The debug APK action runs the built-in quick builder. To run a task defined by t
 
 Open **Agents** in a project and choose **Download Codex**. Studio downloads the signed `PocketStudio-Codex.apk` from this repository’s `codex-runtime` GitHub Release, verifies its size, SHA-256 digest, package name and signing certificate, and opens the Android installer. The plugin is named **Pocket Studio - Codex Plugin** in English. It includes the native Codex runtime for ARM64 and x86_64. You can also install it alongside the main APK from the same app release. Studio checks for plugin updates when you open Agents and lets you decide when to install them.
 
-Open the account and usage panel in the top-right corner. Choose **Continue with ChatGPT** to authorize your plan in the system browser, or **API Key** to use your own OpenAI API account. In plan mode, the panel shows the remaining percentage when the service reports a usage window. You can also open ChatGPT from the panel to check usage. API key usage is billed to the associated API account. [ChatGPT plan usage](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+Open **Account and usage** in the top-right corner of Agents. Choose **Continue with ChatGPT** to authorize your plan in the system browser. The account page shows your remaining allowance when ChatGPT reports a usage window and links to your usage in ChatGPT. [ChatGPT plan usage](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+
+To connect with an API key, choose **Use an API key**. Keep the default endpoint for OpenAI or enter the HTTPS base URL of a Responses API–compatible service, such as `https://example.com/v1`. Enter the API key for that service and choose **Save connection**. API usage is billed to the associated API account.
 
 Start a new chat to work with the current project. Codex can list, read and edit files. It asks for confirmation before running Gradle tasks. Expand a tool summary to inspect its actions and results. The editor keeps unsaved drafts and reports conflicts when a file changes on disk.
 

@@ -40,6 +40,9 @@
     <string name="annotations_and_case_labels_require_constant_expressions">"Annotations and case labels require constant expressions"</string>
     <string name="another_source_set_or_module_has_a_type_with_this_name">"Another source set or module has a type with this name: %1$s"</string>
     <string name="api_key">"API key"</string>
+    <string name="invalid_api_endpoint">"Enter an HTTPS base URL without credentials, a query, or a fragment."</string>
+    <string name="enter_key_for_new_endpoint">"Enter an API key for the new endpoint."</string>
+    <string name="api_endpoint_changed">"The API endpoint changed. Try again."</string>
     <string name="apk_file_not_found">"APK file not found"</string>
     <string name="apk_installed">"APK installed"</string>
     <string name="apk_installed_unable_to_read_the_package_name">"APK installed. Unable to read the package name to launch it."</string>
@@ -81,14 +84,11 @@
     <string name="captured_local_variables_need_explicit_types">"Captured local variables need explicit types"</string>
     <string name="change_method_signature">"Change method signature"</string>
     <string name="changed_after_the_preview_search_again">"%1$s changed after the preview. Search again."</string>
-    <string name="chatgpt">"ChatGPT"</string>
     <string name="chatgpt_account">"ChatGPT account"</string>
     <string name="chatgpt_authorization_is_incomplete">"ChatGPT authorization is incomplete"</string>
-    <string name="check_again">"Check again"</string>
     <string name="check_static_calls_in_this_file_before_deleting">"Check static calls in this file before deleting the private method. Check reflective calls manually."</string>
     <string name="children_are_arranged_vertically">" children are arranged vertically"</string>
     <string name="children_could_not_be_displayed_format">"%1$s children could not be displayed"</string>
-    <string name="choose_a_sign_in_method">"Choose a sign-in method"</string>
     <string name="choose_location">"Choose location"</string>
     <string name="choose_the_same_top_level_class_or_one">"Choose the same top-level class or one of its static member classes"</string>
     <string name="circular_reference_format">"Circular reference: %1$s"</string>
@@ -112,7 +112,6 @@
     <string name="compiler_tools">"Compiler tools"</string>
     <string name="connect">"Connect"</string>
     <string name="connect_account">"Connect account"</string>
-    <string name="connect_another_account">"Connect another account"</string>
     <string name="connect_over_adb_tcp">"Connect over ADB TCP"</string>
     <string name="connect_paired_device">"Connect paired device"</string>
     <string name="connect_to_a_target_device_first">"Connect to a target device first"</string>
@@ -143,7 +142,6 @@
     <string name="could_not_start_the_app_s_private_wireless">"Could not start the app\'s private wireless debugging service"</string>
     <string name="create">"Create"</string>
     <string name="create_directory">"Create directory"</string>
-    <string name="current_account">"Current account"</string>
     <string name="current_frame_variables">"Current frame variables"</string>
     <string name="custom_gradle_tasks">"Custom Gradle tasks…"</string>
     <string name="cut">"Cut"</string>
@@ -354,7 +352,6 @@
     <string name="logcat">"Logcat"</string>
     <string name="main_menu">"Main menu"</string>
     <string name="malformed_identity_token">"Malformed identity token"</string>
-    <string name="manage_plan_authorization">"Manage plan authorization"</string>
     <string name="match_case">"Match case"</string>
     <string name="message_codex">"Message Codex"</string>
     <string name="minimum_log_level">"Minimum log level"</string>
@@ -410,7 +407,6 @@
     <string name="open_developer_options_in_system_settings_and_turn">"Open Developer options in system settings and turn on wireless debugging."</string>
     <string name="open_folder">"Open folder"</string>
     <string name="open_pairing_settings">"Open pairing settings"</string>
-    <string name="openai_api_key">"OpenAI API key"</string>
     <string name="openai_identity_signature_verification_failed">"OpenAI identity signature verification failed"</string>
     <string name="openai_request_failed_http">"OpenAI request failed (HTTP %1$s)"</string>
     <string name="openai_request_failed_http_format">"OpenAI request failed (HTTP %1$s, %2$s)"</string>
@@ -500,7 +496,6 @@
     <string name="replace_in_files">"Replace in files"</string>
     <string name="replace_in_project">"Replace in project"</string>
     <string name="replace_one">"Replace one"</string>
-    <string name="replace_openai_api_key">"Replace OpenAI API key"</string>
     <string name="replace_references_to_the_local_variable_with_its">"Replace references to the local variable with its literal initializer"</string>
     <string name="replace_with">"Replace with"</string>
     <string name="replaced_one_match">"Replaced one match"</string>
@@ -524,7 +519,6 @@
     <string name="safe_delete_private_method">"Safe delete private method"</string>
     <string name="save_all">"Save all"</string>
     <string name="save_file">"Save file"</string>
-    <string name="save_key">"Save key"</string>
     <string name="save_your_editor_changes_then_try_again">"Save your editor changes, then try again"</string>
     <string name="saved">"Saved %1$s · %2$s"</string>
     <string name="saved_label">"Saved"</string>
@@ -570,7 +564,6 @@
     <string name="select_word_to_the_right">"Select word to the right"</string>
     <string name="selected_build_output">"Selected build output · %1$s"</string>
     <string name="send">"Send"</string>
-    <string name="sending_a_message_shares_your_prompt_and_the">"Sending a message shares your prompt and the project content needed for the task with OpenAI. Credentials are encrypted on this device."</string>
     <string name="separate_multiple_tasks_with_spaces">"Separate multiple tasks with spaces"</string>
     <string name="set">"Set"</string>
     <string name="set_an_api_key_first">"Set an API key first"</string>
@@ -809,10 +802,8 @@
     <string name="update_later">"Update later"</string>
     <string name="update_runtime">"Update runtime"</string>
     <string name="updated">"Updated "</string>
-    <string name="usage_is_billed_separately_to_your_openai_api">"Usage is billed separately to your OpenAI API account."</string>
     <string name="usb_access_was_denied">"USB access was denied"</string>
     <string name="use_at_least_two_package_segments_start_each">"Use at least two package segments. Start each with a letter and use only letters, digits or underscores."</string>
-    <string name="use_chatgpt_plan">"Use ChatGPT plan"</string>
     <string name="use_only_lowercase_letters_digits_and_underscores_in">"Use only lowercase letters, digits and underscores in resource names."</string>
     <string name="use_sdk_manager_to_install_android_sdk_platform_format">"Use SDK Manager to install Android SDK Platform %1$s"</string>
     <string name="variables">"Variables"</string>
@@ -821,8 +812,6 @@
     <string name="view">"View"</string>
     <string name="view_diff">"View diff"</string>
     <string name="view_hierarchy">"View hierarchy"</string>
-    <string name="view_usage">"View usage"</string>
-    <string name="view_your_remaining_allowance_on_the_chatgpt_usage">"View your remaining allowance on the ChatGPT usage page."</string>
     <string name="waiting_for_logs">"Waiting for logs…"</string>
     <string name="waiting_for_the_target_phone_to_authorize_usb">"Waiting for the target phone to authorize USB debugging…"</string>
     <string name="waiting_for_usb_access">"Waiting for USB access…"</string>
@@ -851,4 +840,15 @@
     <string name="local_discovery_unavailable">System service discovery is unavailable.</string>
     <string name="local_discovery_failed">Could not discover local wireless debugging services (%1$d).</string>
     <string name="local_service_not_found">Could not find the %1$s service on this device. Check Wi-Fi and Wireless debugging in Settings.</string>
+    <string name="agent_sign_in">Sign in</string>
+    <string name="sign_in_to_codex">Sign in to Codex</string>
+    <string name="api_connection">API connection</string>
+    <string name="api_endpoint">Endpoint</string>
+    <string name="replace_api_key">Replace API key</string>
+    <string name="save_api_connection">Save connection</string>
+    <string name="use_an_api_key">Use an API key</string>
+    <string name="chatgpt_plan_sign_in_summary">Eligible requests use your ChatGPT plan. Pocket Studio sends your prompts and relevant project content to OpenAI.</string>
+    <string name="api_connection_disclosure">Your prompts and relevant project files are sent to this endpoint. Your API provider handles billing.</string>
+    <string name="codex_runtime">Codex runtime</string>
+    <string name="check_for_updates">Check for updates</string>
 </resources>

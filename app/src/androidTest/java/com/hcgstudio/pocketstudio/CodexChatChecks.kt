@@ -36,18 +36,20 @@ object CodexChatChecks {
         val uri = Uri.fromFile(directory.canonicalFile)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val workspace = withContext(Dispatchers.Main) { Workspace(app, SavedStateHandle()) }
-        // Rollout and database entries include absolute paths. Kept histories must start in
-        // their final project partition. Credentials and all other test state stay isolated.
+        // A kept demo belongs in the default API partition so it remains visible after the
+        // loopback server is gone. Its rollout/database must use the final path from the start.
+        val endpoint = "http://127.0.0.1:$port/v1"
         val historyRoot = if (keep) ctx.noBackupFilesDir else app.state
-        val partition = MessageDigest.getInstance("SHA-256").digest(("$uri|api").toByteArray())
+        val provider = if (keep) "api" else "api-$endpoint"
+        val partition = MessageDigest.getInstance("SHA-256").digest(("$uri|$provider").toByteArray())
             .joinToString("") { "%02x".format(it) }
         val history = File(historyRoot, "codex-projects/$partition")
         check(!history.exists())
-        val controller = CodexController(workspace, scope, "http://127.0.0.1:$port/v1", historyRoot)
+        val controller = CodexController(workspace, scope, fixtureHistory = history.takeIf { keep })
         var retained = false
         try {
             // This storage resolves exclusively inside the per-run test directory.
-            CodexAuth(app).apply { setUseChatGpt(false); saveApiKey("local-fixture-only") }
+            CodexAuth(app).saveApiConfiguration(endpoint, "local-fixture-only")
             withContext(Dispatchers.Main) {
                 workspace.openProject(uri)
                 await("project open") { !workspace.busy }
@@ -66,7 +68,9 @@ object CodexChatChecks {
                     check(controller.modelsError == null) { controller.modelsError.orEmpty() }
                     controller.selectedModel != null && !controller.modelsLoading
                 }
-                check(controller.models.map { it.id }.toSet() == setOf("gpt-5.5", "gpt-6.2-sol"))
+                check(controller.models.map { it.id }.toSet() == setOf("gpt-5.5", "gpt-6.2-sol", "my-deployment"))
+                controller.chooseModel("my-deployment")
+                check(controller.selectedModel?.id == "my-deployment" && controller.effort == null && !controller.fast)
                 controller.chooseModel("gpt-6.2-sol")
                 check(controller.selectedModel?.supportsFast == true)
                 controller.chooseModel("tts-1")
@@ -108,9 +112,10 @@ object CodexChatChecks {
                 check(controller.error == null && controller.chatId == id) { controller.error.orEmpty() }
             }
             check(sample.readText() == "two") { "The selected project's file did not change" }
+            check(File(history, "sessions").isDirectory)
             if (keep) {
                 val rootUri = Project(ctx, uri).root.uri
-                check(rootUri == uri && File(history, "sessions").isDirectory)
+                check(rootUri == uri)
                 withContext(Dispatchers.Main) {
                     val library = Workspace(ctx.applicationContext as Application, SavedStateHandle())
                     try { library.rememberProject(rootUri, directory.name) }
