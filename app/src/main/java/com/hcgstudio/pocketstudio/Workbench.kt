@@ -7,6 +7,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -40,23 +44,31 @@ internal fun StudioIconButton(icon: Int, label: String, enabled: Boolean = true,
     IconButton(onClick, enabled = enabled) { Symbol(icon, label) }
 }
 @Composable
-private fun Brand() {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun Brand(modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Image(painterResource(R.drawable.ic_studio), null, Modifier.size(32.dp))
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, sdk: () -> Unit, licenses: () -> Unit) {
+internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, sdk: () -> Unit,
+                     licenses: () -> Unit, settings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().background(colors.surface)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Brand()
-            Spacer(Modifier.weight(1f))
-            OutlinedButton(sdk, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                Symbol(R.drawable.studio_inventory_2, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.sdk_manager))
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            val showSdkLabel = maxWidth >= 360.dp * (LocalDensity.current.fontScale * LocalStudioSettings.current.uiFontSize / 14f)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Brand(Modifier.weight(1f))
+                if (showSdkLabel) {
+                    OutlinedButton(sdk, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                        Symbol(R.drawable.studio_inventory_2, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.sdk_manager))
+                    }
+                } else StudioIconButton(R.drawable.studio_inventory_2, stringResource(R.string.sdk_manager), onClick = sdk)
+                StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = settings)
             }
         }
         HorizontalDivider(color = colors.outlineVariant.copy(alpha = .5f))
@@ -156,9 +168,10 @@ private val tools = listOf(
 internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean, setTree: (Boolean) -> Unit, className: String, openEntry: (Project.Node) -> Unit, openAgentAccount: () -> Unit) {
     val p = w.project ?: return
     val colors = MaterialTheme.colorScheme
+    val settings = LocalStudioSettings.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
-        val desktop = maxWidth >= 940.dp
+        val desktop = maxWidth >= 940.dp * (LocalDensity.current.fontScale * settings.uiFontSize / 14f).coerceAtLeast(1f)
         val sideWidth = if (desktop) 260.dp else if (maxWidth >= 760.dp) 220.dp else 182.dp
         val height = maxHeight
         fun select(tool: Tool) {
@@ -182,6 +195,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                         }
                         Spacer(Modifier.weight(1f))
                         StudioIconButton(R.drawable.studio_inventory_2, uiString(R.string.sdk_manager), onClick = actions.first { it.id == "sdk" }.run)
+                        StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = actions.first { it.id == "settings" }.run)
                     }
                     VerticalDivider(color = colors.outlineVariant)
                     if (tree && w.tool != Tool.Codex) {
@@ -204,18 +218,22 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                     }
                 }
             }
-            if (!wide) NavigationBar(containerColor = colors.surfaceContainerLow, windowInsets = WindowInsets(0,0,0,0)) {
-                tools.forEach { item -> NavigationBarItem(w.tool == item.tool, { select(item.tool) },
-                    icon = { Symbol(item.icon, stringResource(item.label)) }, label = { Text(stringResource(item.label), maxLines = 1, overflow = TextOverflow.Ellipsis) }, alwaysShowLabel = true) }
-            }
-            else if (w.tool != Tool.Codex) {
+            if (settings.showStatusBar && ((wide && w.tool != Tool.Codex) || (w.tool == Tool.Editor && w.active != null))) {
                 HorizontalDivider(color = colors.outlineVariant)
-                Row(Modifier.fillMaxWidth().height(28.dp).background(colors.surfaceContainerLow).padding(horizontal = 14.dp),
+                Row(Modifier.fillMaxWidth().heightIn(min = if (settings.compactMode) 22.dp else 28.dp)
+                    .background(colors.surfaceContainerLow).padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     val file = w.active
                     Text(file?.node?.path ?: p.root.name, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (file != null) Text("${file.editor.line}:${file.editor.column}     UTF-8", fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                    if (file != null) Text("${file.editor.line}:${file.editor.column}     UTF-8", fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
+            }
+            if (!wide) NavigationBar(modifier = if (settings.compactMode) Modifier.height(56.dp) else Modifier,
+                containerColor = colors.surfaceContainerLow, windowInsets = WindowInsets(0,0,0,0)) {
+                tools.forEach { item -> NavigationBarItem(w.tool == item.tool, { select(item.tool) },
+                    icon = { Symbol(item.icon, if (settings.compactMode) stringResource(item.label) else null) },
+                    label = if (settings.compactMode) null else { { Text(stringResource(item.label), maxLines = 1, overflow = TextOverflow.Ellipsis) } }) }
             }
         }
     }
@@ -226,7 +244,13 @@ private fun WorkspaceBar(w: Workspace, actions: List<StudioAction>, desktop: Boo
     val groups = actions.map { it.group }.distinct()
     var menu by remember { mutableStateOf<Int?>(null) }
     val theme = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth().height(if (desktop) 52.dp else 56.dp).background(theme.surfaceContainerLow).padding(horizontal = 8.dp),
+    val settings = LocalStudioSettings.current
+    val height = when {
+        settings.compactMode -> 48.dp
+        desktop -> 52.dp
+        else -> 56.dp
+    }
+    Row(Modifier.fillMaxWidth().heightIn(min = height).background(theme.surfaceContainerLow).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (desktop) {
             Image(painterResource(R.drawable.ic_studio), null, Modifier.padding(horizontal = 8.dp).size(28.dp))
@@ -249,14 +273,18 @@ private fun WorkspaceBar(w: Workspace, actions: List<StudioAction>, desktop: Boo
         }
         Text(w.project?.root?.name.orEmpty(), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = if (desktop) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium)
-        val build = actions.first { it.id == "build" }
         if (w.running) CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
-        else StudioIconButton(R.drawable.studio_build, build.label, build.enabled, build.run)
-        if (w.devices.connected) {
-            val run = actions.first { it.id == "run" }
-            StudioIconButton(R.drawable.studio_play_arrow, run.label, run.enabled, run.run)
+        if (settings.showMainToolbarActions) {
+            if (!w.running) {
+                val build = actions.first { it.id == "build" }
+                StudioIconButton(R.drawable.studio_build, build.label, build.enabled, build.run)
+            }
+            if (w.devices.connected) {
+                val run = actions.first { it.id == "run" }
+                StudioIconButton(R.drawable.studio_play_arrow, run.label, run.enabled, run.run)
+            }
+            StudioIconButton(R.drawable.studio_search, uiString(R.string.find_action), onClick = actions.first { it.id == "palette" }.run)
         }
-        StudioIconButton(R.drawable.studio_search, uiString(R.string.find_action), onClick = actions.first { it.id == "palette" }.run)
     }
 }
 @Composable
@@ -272,6 +300,7 @@ private fun ActionsMenu(open: Boolean, close: () -> Unit, actions: List<StudioAc
 @Composable
 private fun ProjectPane(w: Workspace, actions: List<StudioAction>, modifier: Modifier, openEntry: (Project.Node) -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val compact = LocalStudioSettings.current.compactMode
     var add by remember { mutableStateOf(false) }
     val p = w.project ?: return
     Column(modifier.background(colors.surfaceContainerLow)) {
@@ -312,7 +341,7 @@ private fun ProjectPane(w: Workspace, actions: List<StudioAction>, modifier: Mod
                 }
                 Row(Modifier.fillMaxWidth().background(if (selected) colors.secondaryContainer else Color.Transparent)
                     .clickable { openEntry(node) }
-                    .padding(start = (6 + minOf(level, 6) * 12).dp, end = 6.dp).heightIn(min = 38.dp),
+                    .padding(start = (6 + minOf(level, 6) * 12).dp, end = 6.dp).heightIn(min = if (compact) 30.dp else 38.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     if (node.folder) Symbol(if (expanded) R.drawable.studio_expand_more else R.drawable.studio_chevron_right, null, Modifier.size(16.dp))
                     else Spacer(Modifier.width(16.dp))
@@ -330,31 +359,43 @@ private fun EditorPane(w: Workspace, className: String, modifier: Modifier, show
     val colors = MaterialTheme.colorScheme
     Column(modifier.background(colors.surface)) {
         if (doc != null) {
-            val scroll = rememberScrollState()
-            Row(Modifier.fillMaxWidth().horizontalScroll(scroll).background(colors.surfaceContainerLow)) {
-                w.tabs.forEach { tab ->
-                    val active = tab === doc
-                    Column(Modifier.background(if (active) colors.surface else colors.surfaceContainerLow)) {
-                        Row(Modifier.height(44.dp).clickable { w.select(tab) }.padding(start = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Symbol(R.drawable.studio_code, null, Modifier.size(15.dp), colors.primary)
-                            Text(tab.node.name, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
-                            if (tab.dirty) {
-                                Symbol(R.drawable.studio_fiber_manual_record, stringResource(R.string.unsaved_changes),
-                                    Modifier.padding(start = 4.dp).size(10.dp), colors.primary)
-                            }
-                            IconButton({ w.closeTab(tab) }, modifier = Modifier.size(40.dp)) { Symbol(R.drawable.studio_close, uiString(R.string.close_format, tab.node.name), Modifier.size(14.dp)) }
-                        }
-                        if (active) HorizontalDivider(thickness = 2.dp, color = colors.primary)
-                    }
-                }
-            }
-            HorizontalDivider(color = colors.outlineVariant)
+            if (LocalStudioSettings.current.showEditorTabs) EditorTabs(w)
             StudioEditor(doc.editor, Modifier.fillMaxSize(), w.devices.markersFor(className)) { line -> w.devices.toggleBreakpoint(className, line) }
         } else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             TextButton(showProject) { Symbol(R.drawable.studio_folder_open, null); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.select_a_project_file)) }
         }
     }
+}
+@Composable
+private fun EditorTabs(w: Workspace) {
+    val colors = MaterialTheme.colorScheme
+    val settings = LocalStudioSettings.current
+    Row(Modifier.fillMaxWidth().background(colors.surfaceContainerLow)
+        .horizontalScroll(rememberScrollState()).selectableGroup()) {
+        w.tabs.forEach { tab ->
+            val active = tab === w.active
+            Column(Modifier.width(IntrinsicSize.Max).background(if (active) colors.surface else colors.surfaceContainerLow)) {
+                Row(Modifier.selectable(active, role = Role.Tab) { w.select(tab) }
+                    .heightIn(min = if (settings.compactMode) 36.dp else 44.dp)
+                    .padding(start = 12.dp, end = if (settings.showTabCloseButtons) 0.dp else 12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Symbol(R.drawable.studio_code, null, Modifier.size(15.dp), colors.primary)
+                    Text(tab.node.name, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
+                    if (tab.dirty) {
+                        Symbol(R.drawable.studio_fiber_manual_record, stringResource(R.string.unsaved_changes),
+                            Modifier.padding(start = 4.dp).size(10.dp), colors.primary)
+                    }
+                    if (settings.showTabCloseButtons) {
+                        IconButton({ w.closeTab(tab) }, modifier = Modifier.size(if (settings.compactMode) 32.dp else 40.dp)) {
+                            Symbol(R.drawable.studio_close, stringResource(R.string.close_format, tab.node.name), Modifier.size(14.dp))
+                        }
+                    }
+                }
+                if (active) HorizontalDivider(thickness = 2.dp, color = colors.primary)
+            }
+        }
+    }
+    HorizontalDivider(color = colors.outlineVariant)
 }
 @Composable
 private fun OutputPane(w: Workspace, actions: List<StudioAction>, modifier: Modifier) {
@@ -381,12 +422,17 @@ private fun OutputPane(w: Workspace, actions: List<StudioAction>, modifier: Modi
         val emptyOutput = stringResource(R.string.no_output_yet)
         val lines = remember(w.output, emptyOutput) { w.output.trimEnd().ifBlank { emptyOutput }.lines() }
         val diagnostics = remember { Regex("""([\w.-]+/src/(?:main|debug|test|androidTest)/[^:()]+?\.(?:java|kt|xml|aidl))(?::|\s+\(at line )(\d+)""") }
-        LazyColumn(contentPadding = PaddingValues(12.dp)) {
+        val settings = LocalStudioSettings.current
+        val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace,
+            fontSize = settings.consoleFontSize.sp, lineHeight = (settings.consoleFontSize * 1.42f).sp)
+        val scroll = rememberScrollState()
+        val console = if (settings.consoleSoftWraps) Modifier else Modifier.horizontalScroll(scroll)
+        LazyColumn(Modifier.fillMaxSize().then(console), contentPadding = PaddingValues(12.dp)) {
             items(lines) { line ->
                 val match = diagnostics.find(line)
                 if (match != null) Text(line, Modifier.clickable { w.diagnostic(match.groupValues[1], match.groupValues[2].toIntOrNull() ?: 1) },
-                    color = colors.primary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                else SelectionContainer { Text(line, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 17.sp) }
+                    color = colors.primary, style = textStyle, softWrap = settings.consoleSoftWraps)
+                else SelectionContainer { Text(line, style = textStyle, softWrap = settings.consoleSoftWraps) }
             }
         }
     }

@@ -1,0 +1,20 @@
+<resources>
+    <string name="editor_scheme_theme">Follow IDE theme</string>
+    <string name="editor_scheme_darcula">Darcula</string>
+    <string name="editor_scheme_light">IntelliJ Light</string>
+    <string name="editor_scheme_contrast">High contrast</string>
+    <string name="editor_scheme_solarized_dark">Solarized Dark</string>
+    <string name="editor_scheme_solarized_light">Solarized Light</string>
+    <string name="editor_color_background">Background</string>
+    <string name="editor_color_text">Default text</string>
+    <string name="editor_color_gutter">Gutter background</string>
+    <string name="editor_color_line_number">Line numbers</string>
+    <string name="editor_color_current_line">Current line</string>
+    <string name="editor_color_caret">Caret</string>
+    <string name="editor_color_selection">Selection</string>
+    <string name="editor_color_comment">Comments</string>
+    <string name="editor_color_string">Strings</string>
+    <string name="editor_color_keyword">Keywords</string>
+    <string name="editor_color_type">Type names</string>
+    <string name="editor_color_number">Numbers</string>
+</resources>

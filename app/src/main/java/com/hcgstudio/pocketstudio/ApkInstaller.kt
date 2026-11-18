@@ -32,7 +32,8 @@ class ApkProvider : FileProvider()
 internal fun prepareInstallApk(context: Context, source: Uri): File {
     val cache = Files.createDirectories(File(context.cacheDir, "install-apks").toPath())
     val cutoff = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)
-    cache.toFile().listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.deleteRecursively() }
+    cache.toFile().listFiles()?.filter { it.name.startsWith("install-") && it.lastModified() < cutoff }
+        ?.forEach { it.deleteRecursively() }
     val directory = Files.createTempDirectory(cache, "install-").toFile()
     val apk = File(directory, "app.apk")
     try {

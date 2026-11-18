@@ -26,6 +26,7 @@ private data class Component(val name: String, val license: String, val files: L
 
 private val bundledComponents = listOf(
     Component("Inter", "SIL Open Font License 1.1", listOf("Inter.txt")),
+    Component("JetBrains Mono", "SIL Open Font License 1.1", listOf("JetBrainsMono.txt")),
     Component("Pocket Studio", "MIT", listOf("PocketStudio.txt")),
     Component("Android Studio · ddmlib, sdk-common, annotations", "Apache 2.0", listOf("AOSP-tools.txt", "AOSP-annotations.txt")),
     Component("AAPT2", "AOSP / Iconify", listOf("TOOLS.txt", "AAPT2.txt", "Iconify.txt")),

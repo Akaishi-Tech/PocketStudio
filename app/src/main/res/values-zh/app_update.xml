@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_update_checking">正在检查 GitHub Releases…</string>
+    <string name="app_update_current">掌上 Studio %1$s 已是最新版本。</string>
+    <string name="app_update_unpublished">掌上 Studio 暂无已发布的正式版本。</string>
+    <string name="app_update_available">掌上 Studio %1$s 可供更新，下载大小为 %2$s。</string>
+    <string name="app_update_downloading">正在下载掌上 Studio %1$s · %2$d%%</string>
+    <string name="app_update_verifying">正在校验更新包…</string>
+    <string name="app_update_ready">掌上 Studio %1$s 已准备就绪。点「安装更新」后，请在 Android 系统提示中确认。</string>
+    <string name="app_update_install">安装更新</string>
+    <string name="app_update_retry">重试</string>
+    <string name="app_update_download_failed">更新包准备失败。%1$s</string>
+</resources>

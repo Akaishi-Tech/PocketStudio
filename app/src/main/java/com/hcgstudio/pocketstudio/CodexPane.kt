@@ -264,7 +264,6 @@ private fun CodexConversation(c: CodexController, projectIdle: Boolean, settings
                         ChatKind.PlanUsageLimit -> Surface(shape = MaterialTheme.shapes.medium, color = colors.errorContainer) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(first.text, style = MaterialTheme.typography.titleMedium)
-                                Text(stringResource(R.string.chatgpt_limit_settings), style = MaterialTheme.typography.bodyMedium)
                                 ManageChatGptUsage(c, primary = true)
                             }
                         }
@@ -276,6 +275,7 @@ private fun CodexConversation(c: CodexController, projectIdle: Boolean, settings
         Column(Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             if (!c.usable) Button(settings) { Text(stringResource(R.string.connect_account)) }
             else {
+                CodexModelControls(c)
                 OutlinedTextField(c.input, { c.input = it }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
                     placeholder = { Text(stringResource(R.string.message_codex)) }, maxLines = 5,
                     trailingIcon = {
@@ -285,14 +285,6 @@ private fun CodexConversation(c: CodexController, projectIdle: Boolean, settings
                             Symbol(R.drawable.studio_send, uiString(R.string.send))
                         }
                     })
-                CodexModelControls(c)
-                if (c.account?.useChatGpt == true) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.using_chatgpt_plan), style = MaterialTheme.typography.labelMedium,
-                            color = colors.onSurfaceVariant)
-                        ManageChatGptUsage(c)
-                    }
-                }
             }
         }
     }

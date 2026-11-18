@@ -1,0 +1,20 @@
+<resources>
+    <string name="editor_scheme_theme">跟随 IDE 主题</string>
+    <string name="editor_scheme_darcula">Darcula</string>
+    <string name="editor_scheme_light">IntelliJ 浅色</string>
+    <string name="editor_scheme_contrast">高对比度</string>
+    <string name="editor_scheme_solarized_dark">Solarized 深色</string>
+    <string name="editor_scheme_solarized_light">Solarized 浅色</string>
+    <string name="editor_color_background">背景</string>
+    <string name="editor_color_text">默认文本</string>
+    <string name="editor_color_gutter">行号栏背景</string>
+    <string name="editor_color_line_number">行号</string>
+    <string name="editor_color_current_line">当前行</string>
+    <string name="editor_color_caret">光标</string>
+    <string name="editor_color_selection">选区</string>
+    <string name="editor_color_comment">注释</string>
+    <string name="editor_color_string">字符串</string>
+    <string name="editor_color_keyword">关键字</string>
+    <string name="editor_color_type">类型名</string>
+    <string name="editor_color_number">数值</string>
+</resources>

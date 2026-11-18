@@ -6,6 +6,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.AtomicFile
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.TextRange
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import com.hcgstudio.pocketstudio.build.EmbeddedBuilder
@@ -33,6 +36,11 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val storage = Mutex()
     private val prefs = app.getSharedPreferences("studio", 0)
+    private val saves = Mutex()
+    private val settingsPrefs = StudioSettings.preferences(app)
+    var settings by mutableStateOf(StudioSettings.read(settingsPrefs))
+        private set
+    val updates = AppUpdates(app, scope)
     val devices = DeviceController(app)
     val codex = CodexController(this, scope)
     var project by mutableStateOf<Project?>(null)
@@ -63,6 +71,22 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         for (i in 0 until entries.length()) {
             entries.optJSONArray(i)?.let { recent.add(it.getString(0) to it.getString(1)) }
         }
+    }
+
+    fun updateSettings(value: StudioSettings) {
+        val autoUpdateChanged = settings.autoUpdate != value.autoUpdate
+        value.save(settingsPrefs)
+        settings = value
+        if (autoUpdateChanged) {
+            if (value.autoUpdate) updates.check(automatic = true) else updates.disableAutomatic()
+        }
+    }
+
+    fun reopenLastProject() {
+        if (!settings.reopenLastProject || project != null) return
+        // Older versions recorded recent projects but had no explicit closed-project marker.
+        val location = prefs.getString("openProject", recent.firstOrNull()?.first)
+        if (!location.isNullOrEmpty()) openProject(location.toUri())
     }
 
     private suspend fun <T> io(block: () -> T): T =
@@ -156,6 +180,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 project = next; selectedDir = next.root; folders[""] = roots
                 val location = next.tree ?: next.root.uri
                 rememberProject(location, next.root.name)
+                prefs.edit { putString("openProject", location.toString()) }
                 if (creating) newProjectVisible.value = false
                 apk = resultFile(next).takeIf { it.isFile }
                 val last = restoreFile ?: prefs.getString("tab:$location", null)
@@ -174,6 +199,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         if (busy || running || codex.working) return
         flushDrafts()
         reset(); project = null
+        prefs.edit { putString("openProject", "") }
     }
     fun select(d: OpenFile) {
         active = d; selectedNode = d.node; tool = Tool.Editor
@@ -292,20 +318,37 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
 
     suspend fun saveDocuments(files: List<OpenFile> = tabs.toList()): Boolean {
         val p = project ?: return false
-        try {
-            for (d in files) {
-                if (!d.dirty) continue
-                val text = d.editor.text
-                val baseline = d.saved
-                io {
-                    if (p.read(d.node) != baseline) throw java.io.IOException(app.getString(R.string.file_external_change, d.node.name))
-                    p.write(d.node, text.toByteArray())
+        return saves.withLock {
+            try {
+                for (d in files) {
+                    if (project !== p) return@withLock false
+                    if (!d.dirty || d !in tabs) continue
+                    val original = d.editor.text
+                    val baseline = d.saved
+                    val options = settings
+                    val cleaned = io {
+                        val text = prepareForSave(original, options)
+                        if (p.read(d.node) != baseline) throw java.io.IOException(app.getString(R.string.file_external_change, d.node.name))
+                        p.write(d.node, text.toByteArray())
+                        text
+                    }
+                    d.saved = cleaned
+                    if (d.editor.text == original && cleaned != original) {
+                        val selection = d.editor.value.selection
+                        val start = savedOffset(original, cleaned, selection.start)
+                        val end = savedOffset(original, cleaned, selection.end)
+                        d.editor.replace(0, original.length, cleaned, TextRange(start, end))
+                    }
+                    persist(p, d)
                 }
-                d.saved = text
-                persist(p, d)
+                project === p
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                report(e)
+                false
             }
-        } catch (e: Exception) { if (e is CancellationException) throw e; report(e); return false }
-        return project === p
+        }
     }
     suspend fun reloadChanged(nodes: List<Project.Node>) {
         val p = project ?: return

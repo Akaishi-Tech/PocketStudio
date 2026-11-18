@@ -25,7 +25,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -111,6 +110,7 @@ internal fun ActionPalette(actions: List<StudioAction>, onDismiss: () -> Unit) {
 @Composable
 internal fun editorActions(state: StudioEditorState?): List<StudioAction> {
     val context = LocalContext.current
+    val settings = LocalStudioSettings.current
     val clipboardLabel = androidx.compose.ui.res.stringResource(R.string.source_code)
     val clipboard = remember(context) { context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
     var dialog by remember(state) { mutableStateOf("") }
@@ -154,12 +154,12 @@ internal fun editorActions(state: StudioEditorState?): List<StudioAction> {
     action("moveUp", uiString(R.string.move_line_up), edit, "Alt+Shift+Up") { moveLines(false) }
     action("moveDown", uiString(R.string.move_line_down), edit, "Alt+Shift+Down") { moveLines(true) }
     action("join", uiString(R.string.join_lines), edit, "Ctrl+Shift+J") { joinLines() }
-    action("split", uiString(R.string.split_line), edit, "Ctrl+Enter") { newLine(false) }
-    action("startLine", uiString(R.string.insert_line_below), edit, "Shift+Enter") { newLine(true) }
-    action("lineAbove", uiString(R.string.insert_line_above), edit, "Ctrl+Alt+Enter") { newLine(false, true) }
+    action("split", uiString(R.string.split_line), edit, "Ctrl+Enter") { newLine(false, settings = settings) }
+    action("startLine", uiString(R.string.insert_line_below), edit, "Shift+Enter") { newLine(true, settings = settings) }
+    action("lineAbove", uiString(R.string.insert_line_above), edit, "Ctrl+Alt+Enter") { newLine(false, true, settings) }
     action("case", uiString(R.string.toggle_case), edit, "Ctrl+Shift+U") { changeCase() }
-    action("indent", uiString(R.string.indent), code, "Tab") { indent(false) }
-    action("unindent", uiString(R.string.unindent), code, "Shift+Tab") { indent(true) }
+    action("indent", uiString(R.string.indent), code, "Tab") { indent(false, settings) }
+    action("unindent", uiString(R.string.unindent), code, "Shift+Tab") { indent(true, settings) }
     action("lineComment", uiString(R.string.toggle_line_comment), code, "Ctrl+/") { commentLines() }
     action("blockComment", uiString(R.string.toggle_block_comment), code, "Ctrl+Shift+/") { blockComment() }
     action("complete", uiString(R.string.code_completion), code, "Ctrl+Space") { dialog = "complete" }
@@ -298,13 +298,14 @@ private fun CompletionDialog(state: StudioEditorState, close: () -> Unit) {
             LazyColumn(Modifier.heightIn(max = 340.dp)) {
                 if (options.isEmpty()) item { Text(stringResource(R.string.no_matching_identifiers)) }
                 items(options) { token -> Text(token, Modifier.fillMaxWidth().clickable { state.complete(range, token); close() }
-                    .padding(vertical = 12.dp), fontFamily = FontFamily.Monospace) }
+                    .padding(vertical = 12.dp), fontFamily = LocalStudioSettings.current.editorFont.family) }
             }
         })
 }
 
 @Composable
 private fun RefactorDialog(state: StudioEditorState, kind: String, label: String, close: () -> Unit) {
+    val settings = LocalStudioSettings.current
     val original = remember { state.text }
     val from = remember { state.start }
     val to = remember { state.end }
@@ -320,7 +321,11 @@ private fun RefactorDialog(state: StudioEditorState, kind: String, label: String
             error = ""
             try {
                 val after = withContext(Dispatchers.Default) {
-                    if (state.isJava) JavaRefactor(original, from, to).run(kind, name.trim(), "")
+                    if (state.isJava) {
+                        val refactor = JavaRefactor(original, from, to)
+                        if (kind == "format") refactor.format(settings.indentSize, settings.useTabs)
+                        else refactor.run(kind, name.trim(), "")
+                    }
                     else KotlinLocalRefactor(original, from, to).run(kind, name.trim())
                 }
                 if (after == original) error = uiString(R.string.the_file_already_matches_the_requested_changes) else preview = after
@@ -381,7 +386,7 @@ private fun RefactorDialog(state: StudioEditorState, kind: String, label: String
                 }
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
                     items(changes) { row ->
-                        Text(row, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall,
+                        Text(row, fontFamily = LocalStudioSettings.current.editorFont.family, style = MaterialTheme.typography.bodySmall,
                             color = if (row.startsWith("−")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -422,7 +427,7 @@ private fun LocationsDialog(state: StudioEditorState, kind: String, label: Strin
                                 Text(location.label, Modifier.fillMaxWidth().clickable {
                                     if (state.text == original) state.select(location.start, location.end)
                                     close()
-                                }.padding(vertical = 12.dp), fontFamily = FontFamily.Monospace)
+                                }.padding(vertical = 12.dp), fontFamily = LocalStudioSettings.current.editorFont.family)
                             }
                         }
                     }

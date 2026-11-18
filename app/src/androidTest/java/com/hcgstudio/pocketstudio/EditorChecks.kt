@@ -1,8 +1,62 @@
 package com.hcgstudio.pocketstudio
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+
 /** Regression checks for editing boundaries and source binding; runs on ART with the shipped parser. */
 object EditorChecks {
+    private fun settingsChecks() {
+        val tabs = EditorTabStops("\ta\tb\nxy\t\t", 4)
+        check(tabs.display == "    a   b\nxy      ")
+        for (index in 0..tabs.source.length) {
+            check(tabs.transformedToOriginal(tabs.originalToTransformed(index)) == index)
+        }
+        check(tabs.transformedToOriginal(2) == 0 && tabs.transformedToOriginal(6) == 2)
+
+        val settings = StudioSettings(indentSize = 2)
+        val state = StudioEditorState("  fun f() {}\r\n", "Test.kt", 11)
+        fun type(ch: String, options: StudioSettings = settings) {
+            val next = state.text.replaceRange(state.start, state.end, ch)
+            state.type(TextFieldValue(next, TextRange(state.start + ch.length)), options)
+        }
+        type("\n")
+        check(state.text == "  fun f() {\r\n    \r\n  }\r\n" && state.line == 2 && state.column == 5)
+        state.undo()
+        check(state.text == "  fun f() {}\r\n")
+        type("\n", settings.copy(autoIndent = false))
+        check(state.text == "  fun f() {\r\n}\r\n")
+        state.undo()
+        state.select(0, state.text.length)
+        type("x")
+        type("(")
+        check(state.text == "x()" && state.cursor == 2)
+        type(")")
+        check(state.text == "x()" && state.cursor == 3)
+        type("\"", settings.copy(pairQuotes = false))
+        check(state.text == "x()\"")
+        type("[", settings.copy(pairBrackets = false))
+        check(state.text.endsWith("["))
+        type("paste{")
+        check(state.text.endsWith("paste{"))
+        val composing = state.text + "("
+        state.type(TextFieldValue(composing, TextRange(composing.length),
+            TextRange(composing.length - 1, composing.length)), settings)
+        check(state.text == composing)
+        val indent = StudioEditorState("a\nb", "Test.kt")
+        indent.select(0, 3)
+        indent.indent(false, settings)
+        check(indent.text == "  a\n  b")
+        indent.indent(true, settings)
+        check(indent.text == "a\nb")
+        indent.indent(false, settings.copy(useTabs = true))
+        check(indent.text == "\ta\n\tb")
+        val java = JavaRefactor("class X{int x;}\r\n", 0, 0)
+        check(java.format(2, false).contains("\r\n  int x;"))
+        check(java.format(4, true).contains("\r\n\tint x;"))
+    }
+
     @JvmStatic fun run() {
+        settingsChecks()
         val edits = mutableListOf<String>()
         val state = StudioEditorState("one\r\ntwo\r\nthree", "Sample.kt", onTextChanged = edits::add)
         state.go(2, 2)

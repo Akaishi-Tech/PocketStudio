@@ -1,9 +1,4 @@
 <resources>
-    <string name="chatgpt_plan_connected">已启用 ChatGPT 套餐</string>
-    <string name="chatgpt_plan_confirmation">掌上 Studio 中符合条件的请求将使用你的套餐。你可以在 ChatGPT 设置中管理用量。</string>
-    <string name="chatgpt_plan_got_it">知道了</string>
-    <string name="using_chatgpt_plan">正在使用 ChatGPT 套餐</string>
     <string name="manage_chatgpt_usage">管理用量</string>
     <string name="chatgpt_usage_limit_reached">已达到 ChatGPT 用量上限</string>
-    <string name="chatgpt_limit_settings">在 ChatGPT 设置中查看套餐和应用的用量限制。</string>
 </resources>

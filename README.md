@@ -25,6 +25,10 @@ The template uses Java and XML. On Android 11 or later, install SDK Platform 34 
 | Devices | Select a target, install an APK, launch an app, run shell commands, filter live Logcat output by text or level, and inspect the target's screen and view hierarchy. |
 | Debugger | List debuggable processes, attach to ART, add and remove source breakpoints, inspect the stack and current frame variables, step, resume and detach. |
 
+Open Settings with the gear on the welcome screen or **File → Settings** (`Ctrl+Alt+S`) in a project. Choose interface and editor fonts independently, preview JetBrains Mono and ligatures, and customize colors for each editor scheme. Search settings to adjust indentation, save actions, Gradle offline mode or console wrapping.
+
+Under **Settings → App updates**, choose **Check for updates** to check GitHub Releases at any time. Automatic updates are enabled by default. When you open or return to the app, Studio checks at most once a day and downloads a newer release on an unmetered network. On a metered network, you choose whether to download it. Studio verifies the APK before you confirm installation in Android.
+
 The debug APK action runs the built-in quick builder. To run a task defined by the project, select a Gradle task in the Build menu and run it locally. Its log appears in the build output. [On-device build guide](build-support/README.md)
 
 [Phone workspace](docs/screenshots/phone.png) · [Debugger](docs/screenshots/debugger.png)
@@ -33,7 +37,9 @@ The debug APK action runs the built-in quick builder. To run a task defined by t
 
 Open **Agents** in a project and choose **Download Codex**. Studio downloads the signed `PocketStudio-Codex.apk` from this repository’s `codex-runtime` GitHub Release, verifies its size, SHA-256 digest, package name and signing certificate, and opens the Android installer. The plugin is named **Pocket Studio - Codex Plugin** in English. It includes the native Codex runtime for ARM64 and x86_64. You can also install it alongside the main APK from the same app release. Studio checks for plugin updates when you open Agents and lets you decide when to install them.
 
-Open **Account and usage** in the top-right corner of Agents. Choose **Continue with ChatGPT** to authorize your plan in the system browser. The account page shows your remaining allowance when ChatGPT reports a usage window and links to your usage in ChatGPT. [ChatGPT plan usage](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+Open **Account and usage** in the top-right corner of Agents and choose the Codex CLI sign-in option. The CLI supplies a verification link and a one-time code. Open the verification link in your browser, sign in to ChatGPT and enter the code. Return to Studio to use the account. If device-code login is disabled, enable it in your ChatGPT security settings or ask your workspace admin to enable it. [Codex device-code sign-in](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
+
+If you previously used **Continue with ChatGPT** in Studio, sign in once through the CLI. The account page shows the remaining allowance when Codex reports a usage window. You can also check it on the [Codex usage dashboard](https://chatgpt.com/codex/settings/usage).
 
 To connect with an API key, choose **Use an API key**. Keep the default endpoint for OpenAI or enter the HTTPS base URL of a Responses API–compatible service, such as `https://example.com/v1`. Enter the API key for that service and choose **Save connection**. API usage is billed to the associated API account.
 

@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_update_checking">Checking GitHub Releases…</string>
+    <string name="app_update_current">Pocket Studio %1$s is up to date.</string>
+    <string name="app_update_unpublished">There are no published Pocket Studio releases yet.</string>
+    <string name="app_update_available">Pocket Studio %1$s is available. Download size: %2$s.</string>
+    <string name="app_update_downloading">Downloading Pocket Studio %1$s · %2$d%%</string>
+    <string name="app_update_verifying">Verifying the update…</string>
+    <string name="app_update_ready">Pocket Studio %1$s is ready to install. Android will ask you to confirm the update.</string>
+    <string name="app_update_install">Install update</string>
+    <string name="app_update_retry">Try again</string>
+    <string name="app_update_download_failed">Could not prepare the update. %1$s</string>
+</resources>

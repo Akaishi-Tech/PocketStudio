@@ -116,15 +116,18 @@ final class LocalGradle {
     }
 
     private static ProcessBuilder wrapper(Context context, GradleWorkspace workspace, LocalJava java, LocalAndroidSdk sdk, String tasks) throws IOException {
+        StudioSettings settings = StudioSettings.load(context);
         List<String> command = new ArrayList<>(Arrays.asList(
                 "/system/bin/setsid", "/system/bin/sh", "-c", "echo $$; read -r ready || exit 1; exec \"$@\"", "gradle-session",
                 // Android toybox xargs does not implement the quoting used in generated gradlew scripts.
                 java.executable.getAbsolutePath(), "-Xmx128m", "-Dorg.gradle.appname=gradlew",
                 "-classpath", "gradle/wrapper/gradle-wrapper.jar", "org.gradle.wrapper.GradleWrapperMain",
-                "--no-daemon", "--console=plain", "--max-workers=2",
+                "--no-daemon", "--console=plain", "--max-workers=" + settings.getGradleWorkers(),
                 "-Dorg.gradle.native=false", "-Dorg.gradle.vfs.watch=false",
                 "-Dorg.gradle.internal.instrumentation.agent=false",
                 "-Pandroid.builder.sdkDownload=false", "-Pandroid.aapt2FromMavenOverride=" + sdk.aapt2));
+        if (settings.getGradleOffline()) command.add("--offline");
+        if (settings.getGradleStacktrace()) command.add("--stacktrace");
         if (workspace.projectCache != null) {
             // Gradle file locks require POSIX semantics; these are internal caches, not build outputs.
             command.add("--project-cache-dir");

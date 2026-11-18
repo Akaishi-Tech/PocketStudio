@@ -126,7 +126,9 @@
     <string name="connection_service">"连接"</string>
     <string name="contains_an_assignment_or_named_argument_with_the">"包含赋值或同名命名实参"</string>
     <string name="contains_invalid_java_syntax_format">"%1$s 含有无法解析的 Java 语法"</string>
-    <string name="continue_with_chatgpt">"使用 ChatGPT 继续"</string>
+    <string name="codex_cli_sign_in">通过 Codex CLI 登录</string>
+    <string name="codex_enter_device_code">请在验证页面输入下方验证码。</string>
+    <string name="codex_open_verification_page">打开验证页面</string>
     <string name="conversation_context_compacted">"已整理对话上下文"</string>
     <string name="copy">"复制"</string>
     <string name="copy_code">"复制代码"</string>
@@ -300,7 +302,6 @@
     <string name="installing_android_sdk_build_tools_format">"正在安装 Android SDK Build Tools %1$s"</string>
     <string name="installing_apk">"正在安装 APK…"</string>
     <string name="invalid_adb_request">"无效的 ADB 请求"</string>
-    <string name="invalid_credential_expiration">"授权有效期无效"</string>
     <string name="invalid_file_name">"无效的文件名"</string>
     <string name="invalid_input">"输入无效"</string>
     <string name="invalid_jdk_file_path">"JDK 文件路径无效"</string>
@@ -351,7 +352,6 @@
     <string name="log_stream_disconnected">"日志流已断开"</string>
     <string name="logcat">"Logcat"</string>
     <string name="main_menu">"主菜单"</string>
-    <string name="malformed_identity_token">"身份令牌格式错误"</string>
     <string name="match_case">"区分大小写"</string>
     <string name="message_codex">"给 Codex 发消息"</string>
     <string name="minimum_log_level">"最低日志级别"</string>
@@ -394,11 +394,9 @@
     <string name="no_matching_loaded_classes">"没有匹配的已加载类"</string>
     <string name="no_models_available_for_this_account">"该账户没有可用模型"</string>
     <string name="no_output_yet">"尚无输出"</string>
-    <string name="no_plan_access_token_received">"未收到套餐访问凭据"</string>
     <string name="no_platforms_installed_import_an_android_sdk_platform">"尚未安装平台。可导入 Android SDK Platform ZIP。"</string>
     <string name="no_stack_frames">"没有栈帧"</string>
     <string name="no_unstaged_changes">"没有未暂存的更改"</string>
-    <string name="no_valid_authorization_code_received">"未收到有效授权码"</string>
     <string name="no_visible_variables_in_this_scope">"当前作用域没有可见变量"</string>
     <string name="nthe_content_before_the_write_is_saved_in">"\n写回前的内容保存在 before-write。\n"</string>
     <string name="nworking_tree_clean">"\n工作区干净"</string>
@@ -407,7 +405,6 @@
     <string name="open_developer_options_in_system_settings_and_turn">"请手动打开系统设置中的开发者选项和无线调试。"</string>
     <string name="open_folder">"打开文件夹"</string>
     <string name="open_pairing_settings">"去设置配对"</string>
-    <string name="openai_identity_signature_verification_failed">"OpenAI 身份签名验证失败"</string>
     <string name="openai_request_failed_http">"OpenAI 请求失败 (HTTP %1$s)"</string>
     <string name="openai_request_failed_http_format">"OpenAI 请求失败 (HTTP %1$s, %2$s)"</string>
     <string name="openai_returned_unreadable_data">"OpenAI 返回了无法读取的数据"</string>
@@ -572,12 +569,8 @@
     <string name="setting_breakpoint">"正在设置断点…"</string>
     <string name="shown_as_a_placeholder">" 显示为占位符"</string>
     <string name="shrink_selection">"缩小选区"</string>
-    <string name="sign_in_and_authorize_access_to_your_chatgpt">"请登录并授权使用 ChatGPT 套餐"</string>
-    <string name="sign_in_canceled">"登录已取消"</string>
     <string name="sign_in_timed_out_try_again">"登录等待超时，请重试"</string>
-    <string name="sign_in_to_chatgpt_first">"请先登录 ChatGPT"</string>
     <string name="sign_out">"退出当前账户"</string>
-    <string name="signed_out_on_this_device_you_can_revoke">"已退出本机账户，可在 ChatGPT 设置中断开连接。"</string>
     <string name="single_quotes">"单引号"</string>
     <string name="six_digit_pairing_code">"六位配对码"</string>
     <string name="some_content_could_not_be_previewed">"还有其他未预览的内容"</string>
@@ -621,7 +614,6 @@
     <string name="termux_returned_a_repository_index_older_than_the">"Termux 返回了比上次验证更早的软件源索引"</string>
     <string name="text_file_exceeds_768_kib">"文本文件超过 768 KiB"</string>
     <string name="that_name_is_already_in_use_in_this">"该名称已在作用域内使用"</string>
-    <string name="the_account_identity_expiration_or_issuer_does_not">"登录账户的身份、有效期或来源不匹配"</string>
     <string name="the_android_codex_runtime_installation_is_incomplete_update">"此设备未能安装完整的 Android 版 Codex 运行时，请更新或重新安装。"</string>
     <string name="the_api_key_contains_invalid_characters">"API Key 中包含无效字符"</string>
     <string name="the_apk_cache_was_cleared_open_the_apk">"APK 缓存已清除，请重新打开 APK"</string>
@@ -649,7 +641,6 @@
     <string name="the_file_changed_read_again">"文件已变更，请先重新读取 %1$s"</string>
     <string name="the_file_changed_read_it_again">"文件已变更，请重新读取"</string>
     <string name="the_file_changed_reopen_this_action">"文件已更改，请重新打开操作"</string>
-    <string name="the_identity_returned_by_the_authorization_provider_does">"授权返回的注册身份不匹配"</string>
     <string name="the_import_section_contains_comments_organize_it_manually">"导入区包含注释，请手动整理"</string>
     <string name="the_imported_project_is_no_longer_available">"导入的项目已不可用"</string>
     <string name="the_initializer_must_be_a_single_literal">"初值需要是单个字面量"</string>
@@ -680,7 +671,6 @@
     <string name="the_selection_contains_a_comment_terminator">"选区含有注释终止标记"</string>
     <string name="the_selection_contains_a_nested_scope">"选区包含嵌套作用域"</string>
     <string name="the_selection_is_inside_a_nested_type_or">"选区位于嵌套类型或 Lambda 中"</string>
-    <string name="the_signed_in_account_does_not_match_the">"登录账户与已保存的账户不匹配"</string>
     <string name="the_signed_index_is_missing_the_package_list">"签名索引中缺少 %1$s 的软件包清单"</string>
     <string name="the_source_directory_contains_build_with_gradle">"源目录包含 %1$s，请使用 Gradle 构建。"</string>
     <string name="the_storage_provider_contains_duplicate_names_format">"存储服务包含重名文件 %1$s"</string>
@@ -710,8 +700,6 @@
     <string name="the_working_copy_is_missing_sync_paused_to">"工作副本目录丢失，已暂停同步以保留所选目录中的文件"</string>
     <string name="the_zip_contains_no_project_files">"ZIP 中没有项目文件"</string>
     <string name="there_is_a_nested_scope_or_a_parameter">"存在嵌套作用域或同名参数"</string>
-    <string name="this_account_has_not_authorized_access_to_its">"此账户未授权使用 ChatGPT 套餐"</string>
-    <string name="this_account_has_not_authorized_plan_access">"此账户尚未授权使用套餐。"</string>
     <string name="this_account_has_not_been_saved">"未保存此账户"</string>
     <string name="this_action_is_unavailable_here">"此处无法执行该操作"</string>
     <string name="this_client_does_not_support_the_request">"此客户端不支持该请求"</string>
@@ -778,7 +766,6 @@
     <string name="unknown_parameter_format">"未知参数：%1$s"</string>
     <string name="unknown_project_tool">"未知项目工具"</string>
     <string name="unmatched_braces">"花括号不匹配"</string>
-    <string name="unrecognized_openai_signing_key">"无法识别 OpenAI 身份签名密钥"</string>
     <string name="unrecognized_reference_format">"无法分类引用：%1$s"</string>
     <string name="unresolved_alignment_format">"未解析对齐方式 %1$s"</string>
     <string name="unresolved_color_format">"未解析颜色 %1$s"</string>
@@ -787,11 +774,9 @@
     <string name="unresolved_scaletype_format">"未解析 scaleType %1$s"</string>
     <string name="unresolved_text_format">"未解析文本 %1$s"</string>
     <string name="unresolved_variable_or_type">"缺少依赖，无法判断 %1$s 是变量还是类型"</string>
-    <string name="unsupported_authorization_credential_type">"不支持的授权凭据类型"</string>
     <string name="unsupported_codex_dependency_package">"不支持的 Codex 依赖包 %1$s"</string>
     <string name="unsupported_codex_version">"不支持的 Codex 版本 %1$s。"</string>
     <string name="unsupported_codex_version_label">"Codex 版本超出支持范围。"</string>
-    <string name="unsupported_identity_signature_algorithm">"身份签名算法不受支持"</string>
     <string name="unsupported_qualified_name_reference_format">"不支持此限定名引用：%1$s"</string>
     <string name="unsupported_tool">"不支持此工具"</string>
     <string name="unterminated_block_comment">"块注释未结束"</string>
@@ -828,11 +813,7 @@
     <string name="xml_exceeds_768_kib">"XML 超过 768 KiB"</string>
     <string name="xml_resources_require_an_xml_or_xsd_extension">"XML 资源需要 .xml 或 .xsd 扩展名。"</string>
     <string name="you_can_reinstall_it_here_later">"之后可从此处重新安装。"</string>
-    <string name="your_chatgpt_session_is_no_longer_valid_sign">"ChatGPT 登录已失效，请重新授权"</string>
-    <string name="your_session_expired_sign_in_again">"登录已到期，请重新授权"</string>
     <string name="zip_contains_too_many_files">"ZIP 文件数量过多"</string>
-    <string name="oauth_return_to_app">请返回掌上 Studio 完成登录。</string>
-    <string name="oauth_invalid_callback">登录回调无效。</string>
     <string name="local_pairing_search">正在查找本机的配对码弹窗…</string>
     <string name="local_pairing_retry">配对失败，请在无线调试中重新打开配对码弹窗并重试。</string>
     <string name="local_pairing_expired">配对已超时，请返回掌上 Studio 重试。</string>
@@ -847,7 +828,6 @@
     <string name="replace_api_key">更换 API 密钥</string>
     <string name="save_api_connection">保存连接</string>
     <string name="use_an_api_key">使用 API 密钥</string>
-    <string name="chatgpt_plan_sign_in_summary">符合条件的请求将使用你的 ChatGPT 套餐。掌上 Studio 会将提示词和相关项目内容发送给 OpenAI。</string>
     <string name="api_connection_disclosure">提示词和任务所需的项目内容会发送到此 Endpoint，费用由 API 提供方结算。</string>
     <string name="codex_runtime">Codex 运行时</string>
     <string name="check_for_updates">检查更新</string>

@@ -1,9 +1,4 @@
 <resources>
-    <string name="chatgpt_plan_connected">You’re using your ChatGPT plan</string>
-    <string name="chatgpt_plan_confirmation">Eligible requests in Pocket Studio use your plan. You can manage usage in ChatGPT settings.</string>
-    <string name="chatgpt_plan_got_it">Got it</string>
-    <string name="using_chatgpt_plan">Using ChatGPT plan</string>
     <string name="manage_chatgpt_usage">Manage usage</string>
     <string name="chatgpt_usage_limit_reached">ChatGPT usage limit reached</string>
-    <string name="chatgpt_limit_settings">Check your plan and app limits in ChatGPT settings.</string>
 </resources>

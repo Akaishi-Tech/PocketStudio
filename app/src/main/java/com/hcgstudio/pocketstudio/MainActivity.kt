@@ -17,13 +17,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,18 +37,9 @@ class MainActivity : ComponentActivity() {
         savedInstanceState?.getString("location")?.let {
             if (workspace.project == null) workspace.openProject(Uri.parse(it), restoreFile = savedInstanceState.getString("document"))
         }
+        if (savedInstanceState == null) workspace.reopenLastProject()
         setContent {
-            val dark = isSystemInDarkTheme()
-            val colors = if (dark) darkColorScheme(background = Color(0xff111512), primary = Color(0xff8ed5b7), secondary = Color(0xffb3ccbf),
-                surface = Color(0xff111512), surfaceContainer = Color(0xff1e2421), primaryContainer = Color(0xff15513c),
-                onPrimaryContainer = Color(0xffa5f2cc), secondaryContainer = Color(0xff30453a), onSecondaryContainer = Color(0xffd6ecdf))
-            else lightColorScheme(background = Color(0xfffbfcf8), primary = Color(0xff25694e), onPrimary = Color.White,
-                secondary = Color(0xff506459), tertiary = Color(0xff805333), surface = Color(0xfffbfcf8),
-                surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xfff4f6f1), surfaceContainer = Color(0xffecf0ea),
-                surfaceContainerHigh = Color(0xffe7ebe5), primaryContainer = Color(0xffbcebd0), onPrimaryContainer = Color(0xff0d452d),
-                secondaryContainer = Color(0xffdbe8dd), onSecondaryContainer = Color(0xff1c3426),
-                onSurface = Color(0xff18211b), onSurfaceVariant = Color(0xff47534a), outlineVariant = Color(0xffc6cfc6))
-            MaterialTheme(colorScheme = colors) {
+            StudioTheme(workspace.settings) {
                 StudioApp(workspace)
             }
         }
@@ -65,7 +55,17 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    override fun onStop() { workspace.flushDrafts(); super.onStop() }
+    override fun onResume() {
+        super.onResume()
+        if (workspace.settings.autoUpdate) workspace.updates.check(automatic = true)
+    }
+    override fun onStop() {
+        workspace.flushDrafts()
+        if (!isChangingConfigurations && workspace.settings.saveOnBackground) {
+            workspace.action { workspace.saveDocuments() }
+        }
+        super.onStop()
+    }
     override fun onSaveInstanceState(outState: Bundle) {
         workspace.project?.let { outState.putString("location", (it.tree ?: it.root.uri).toString()) }
         outState.putString("document", workspace.active?.node?.path)
@@ -79,6 +79,7 @@ private fun StudioApp(w: Workspace) {
     val p = w.project
     val active = w.active
     var dialog by rememberSaveable(p?.root?.uri?.toString()) { mutableStateOf("") }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     var showAgentAccount by rememberSaveable(p?.root?.uri?.toString()) { mutableStateOf(false) }
     var gradleTask by rememberSaveable { mutableStateOf("assembleDebug") }
     var showTree by rememberSaveable { mutableStateOf(true) }
@@ -148,6 +149,7 @@ private fun StudioApp(w: Workspace) {
         add(act("newProject", context.getString(R.string.new_project), R.string.file, enabled = !w.running && !w.busy, run = newProject))
         add(act("open", context.getString(R.string.open_folder), R.string.file, "Ctrl+O", !w.running && !w.busy, openTree))
         add(act("import", context.getString(R.string.import_zip), R.string.file, enabled = !w.running && !w.busy, run = importZip))
+        add(act("settings", context.getString(R.string.settings), R.string.file, "Ctrl+Alt+S") { showSettings = true })
         add(act("newFile", context.getString(R.string.new_file), R.string.file, "Alt+Insert", canEdit) { dialog = "file" })
         add(act("newDir", context.getString(R.string.new_folder), R.string.file, enabled = canEdit) { dialog = "folder" })
         add(act("save", context.getString(R.string.save_file), R.string.file, "Ctrl+S", active != null) { w.action { if (w.saveDocuments(listOfNotNull(active))) w.message = context.getString(R.string.saved_label) } })
@@ -220,10 +222,10 @@ private fun StudioApp(w: Workspace) {
     }
     val actions = defaults.map(keymap::apply)
     val rootFocus = remember { FocusRequester() }
-    LaunchedEffect(p) { rootFocus.requestFocus() }
+    LaunchedEffect(p, showSettings) { if (!showSettings) rootFocus.requestFocus() }
     val notice = w.message
     LaunchedEffect(notice) { if (notice != null) { snack.showSnackbar(notice); if (w.message == notice) w.message = null } }
-    BackHandler(p != null && dialog.isEmpty() && !newProjectVisible && !showAgentAccount) {
+    BackHandler(p != null && dialog.isEmpty() && !newProjectVisible && !showAgentAccount && !showSettings) {
         if (active == null) showTree = true
         w.tool = if (active != null) Tool.Editor else Tool.Project
     }
@@ -231,7 +233,7 @@ private fun StudioApp(w: Workspace) {
     Scaffold(
         modifier = Modifier.onPreviewKeyEvent { key ->
             val event = key.nativeKeyEvent
-            val action = if (dialog.isEmpty() && !newProjectVisible && !showAgentAccount) actions.firstOrNull { it.enabled && it.matches(event) } else null
+            val action = if (dialog.isEmpty() && !newProjectVisible && !showAgentAccount && !showSettings) actions.firstOrNull { it.enabled && it.matches(event) } else null
             if (action == null) false else { action.run(); true }
         }.focusRequester(rootFocus).focusable(),
         contentWindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
@@ -241,16 +243,21 @@ private fun StudioApp(w: Workspace) {
             if (p != null && (w.tool == Tool.Codex || showAgentAccount)) {
                 LaunchedEffect(p) { w.codex.enter(p) }
             }
-            if (p != null && showAgentAccount) CodexAccountPage(w.codex) {
+            val workbenchState = key(p?.root?.uri) { rememberSaveableStateHolder() }
+            if (showSettings) SettingsPage(w.settings, w::updateSettings, { showSettings = false },
+                { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) })
+            else if (p != null && showAgentAccount) CodexAccountPage(w.codex) {
                 showAgentAccount = false
                 w.tool = Tool.Codex
             }
-            else if (p != null) Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
-                if (w.codex.account != null) w.codex.error = null
-                else w.codex.refreshInstallation()
-                showAgentAccount = true
+            else if (p != null) workbenchState.SaveableStateProvider("workbench") {
+                Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
+                    if (w.codex.account != null) w.codex.error = null
+                    else w.codex.refreshInstallation()
+                    showAgentAccount = true
+                }
             }
-            else Welcome(w, newProject, openTree, importZip, { dialog = "sdk" }, { dialog = "licenses" })
+            else Welcome(w, newProject, openTree, importZip, { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
             if (w.busy && !newProjectVisible) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
     }
@@ -273,11 +280,11 @@ private fun StudioApp(w: Workspace) {
         "gradle" -> if (p != null) GradleTaskDialog(p, gradleTask, dismiss, { w.tool = Tool.Output; w.log(it) }, w::recordApk) { w.action { w.refreshAfterExternalRun(p) } }
     }
     if (p != null) {
-        CodexPlanWelcome(w.codex)
         if (w.tool == Tool.Codex || showAgentAccount) CodexToolApproval(w.codex)
     }
     if (newProjectVisible) CreateProject(w)
     DeviceDialogs(w.devices)
+    AppUpdateDialog(w.updates)
 }
 
 @Composable

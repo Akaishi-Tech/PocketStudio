@@ -23,13 +23,19 @@
 | 设备 | 选择目标、安装 APK、启动应用、执行 Shell、流式 Logcat 及文本和级别过滤、目标设备屏幕与控件检查 |
 | 调试器 | 列出可调试进程、附加 ART、设置和移除多个源码行断点、检查栈和当前帧变量、单步执行、继续和分离 |
 
+在欢迎页点齿轮，或从工作区打开「文件 → 设置」（`Ctrl+Alt+S`）。界面和编辑器可分别选择字体。编辑器支持 JetBrains Mono、字体连字和配色预览，每种方案单独保存自定义颜色。设置页还可搜索缩进、保存时清理、Gradle 离线模式和控制台换行等选项。
+
+在「设置 → 应用更新」中，点「检查更新」可随时查询 GitHub Releases 正式版。自动更新默认开启，打开应用或返回前台时每天最多检查一次。发现新版后，Studio 会在非计费网络上自动下载，在计费网络上会先询问。安装包校验通过后，由你在 Android 系统界面确认安装。
+
 「构建调试 APK」使用手机内置的快速构建器。需要执行项目定义的任务时，打开「构建」，选择 Gradle 任务并点击「在本机运行」。任务日志显示在「构建输出」。[本机构建说明](build-support/README.zh-CN.md)
 
 ## 在项目中使用智能体
 
 打开项目后点「智能体 → 下载 Codex」。Studio 从本仓库 GitHub Release 的固定标签 `codex-runtime` 下载已签名的 `PocketStudio-Codex.apk`，核对文件大小、SHA-256、包名和签名证书后打开系统安装器。插件显示为「掌上Studio - Codex插件」，内含 ARM64 和 x86_64 的原生 Codex。也可以从同一版本的发布页下载两个 APK 并分别安装。再次进入「智能体」时会检查插件更新，由你选择何时安装。
 
-在「智能体」右上角打开「账户与用量」，选择「使用 ChatGPT 继续」，在系统浏览器中授权使用套餐。ChatGPT 返回额度窗口时，账户页面会显示剩余百分比，也可前往 ChatGPT 查看用量。[套餐用量说明](https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites)
+在「智能体」右上角打开「账户与用量」，选择通过 Codex CLI 登录。Codex CLI 会提供验证链接和一次性验证码。在浏览器中打开验证链接，登录 ChatGPT 并输入验证码，然后返回 Studio 即可使用该账户。如果设备码登录已停用，请在 ChatGPT 的安全设置中开启，或请工作区管理员开启。[Codex 设备码登录说明](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
+
+如果之前在 Studio 用过「使用 ChatGPT 继续」，请通过 CLI 重新登录一次。Codex 返回用量数据后，账户页面会显示当前时段的剩余额度。也可以直接查看 [Codex 用量面板](https://chatgpt.com/codex/settings/usage)。
 
 选择「使用 API 密钥」可连接 API 服务。OpenAI 使用默认 Endpoint。若要连接兼容 Responses API 的其他服务，填写其 HTTPS 基础地址，例如 `https://example.com/v1`。输入该服务的 API 密钥，点「保存连接」。费用计入对应的 API 账户。
 

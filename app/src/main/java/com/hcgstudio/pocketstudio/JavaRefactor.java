@@ -9,6 +9,10 @@ import com.github.javaparser.ast.*;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.*;
+import com.github.javaparser.printer.DefaultPrettyPrinter;
+import com.github.javaparser.printer.configuration.DefaultConfigurationOption;
+import com.github.javaparser.printer.configuration.DefaultPrinterConfiguration;
+import com.github.javaparser.printer.configuration.Indentation;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -423,6 +427,16 @@ final class JavaRefactor {
         return list;
     }
 
+    String format(int indentSize, boolean useTabs) {
+        var indent = new Indentation(useTabs ? Indentation.IndentType.TABS : Indentation.IndentType.SPACES,
+                useTabs ? 1 : indentSize);
+        var config = new DefaultPrinterConfiguration()
+                .addOption(new DefaultConfigurationOption(DefaultPrinterConfiguration.ConfigOption.INDENTATION, indent))
+                .addOption(new DefaultConfigurationOption(DefaultPrinterConfiguration.ConfigOption.END_OF_LINE_CHARACTER, eol()));
+        var result = new DefaultPrettyPrinter(config).print(unit);
+        return source.endsWith("\n") ? result : result.replaceFirst("[\r\n]+$", "");
+    }
+
     String run(String kind, String name, String type) {
         switch (kind) {
             case "rename": rename(name); break;
@@ -438,10 +452,7 @@ final class JavaRefactor {
                 String sorted = imports.stream().map(this::raw).distinct().sorted().collect(Collectors.joining(eol()));
                 return source.substring(0, first) + sorted + source.substring(last);
             }
-            case "format": {
-                String result = unit.toString().replace("\r\n", "\n").replace("\n", eol());
-                return source.endsWith("\n") ? result : result.replaceFirst("[\\r\\n]+$", "");
-            }
+            case "format": return format(4, false);
             default: extract(kind, name, type);
         }
         StringBuilder edited = new StringBuilder(source);

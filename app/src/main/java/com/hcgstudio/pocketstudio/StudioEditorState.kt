@@ -46,6 +46,50 @@ internal class StudioEditorState(
         val size get() = old.length + new.length
     }
 
+    /** Apply typing assistance only to a single committed character replacing the current selection. */
+    fun type(next: TextFieldValue, settings: StudioSettings) {
+        val insertedLength = next.text.length - (text.length - (end - start))
+        val typedAtSelection = next.text != text && next.composition == null && value.composition == null &&
+            next.selection.collapsed && next.selection.end == start + 1 && insertedLength == 1 &&
+            next.text.regionMatches(0, text, 0, start) &&
+            next.text.regionMatches(start + 1, text, end, text.length - end)
+        if (!typedAtSelection) {
+            input(next)
+            return
+        }
+        val ch = next.text[start]
+        when (ch) {
+            '\n' -> newLine(false, settings = settings)
+            '\t' -> indent(false, settings)
+            else -> {
+                val quote = ch == '\'' || ch == '"'
+                val pairing = if (quote) settings.pairQuotes && !escapedAt(start) else settings.pairBrackets
+                val following = text.getOrNull(end)
+                val close = when (ch) {
+                    '(' -> ')'
+                    '{' -> '}'
+                    '[' -> ']'
+                    '\'', '"' -> ch
+                    else -> null
+                }
+                when {
+                    pairing && start == end && ch == following && (quote || ch in ")]}") -> select(cursor + 1)
+                    pairing && close != null && (start != end || following == null || !Character.isJavaIdentifierPart(following)) -> {
+                        val body = selected
+                        replace(start, end, "$ch$body$close", TextRange(start + 1, start + 1 + body.length))
+                    }
+                    else -> input(next)
+                }
+            }
+        }
+    }
+
+    private fun escapedAt(at: Int): Boolean {
+        var pos = at
+        while (pos > 0 && text[pos - 1] == '\\') pos--
+        return (at - pos) % 2 != 0
+    }
+
     fun input(next: TextFieldValue) {
         val before = value
         if (before == next) return
@@ -101,7 +145,9 @@ internal class StudioEditorState(
     }
 
     fun insert(insertion: String) = replace(start, end, insertion)
-    private fun lineAt(at: Int): Int {
+    val lineCount get() = lineStarts.size
+
+    fun lineAt(at: Int): Int {
         val index = lineStarts.binarySearch(at)
         return if (index >= 0) index + 1 else -index - 1
     }
@@ -175,9 +221,25 @@ internal class StudioEditorState(
         replace(from, to, changed, sel)
     }
 
-    fun indent(outdent: Boolean) {
-        if (!outdent && start == end) { insert(" ".repeat(4 - (column - 1) % 4)); return }
-        transformLines { if (outdent) it.replaceFirst(Regex("^(?:\t| {1,4})"), "") else "    " + it }
+    fun indent(outdent: Boolean, settings: StudioSettings) {
+        val width = settings.indentSize
+        val unit = if (settings.useTabs) "\t" else " ".repeat(width)
+        if (!outdent && start == end) {
+            if (settings.useTabs) insert(unit)
+            else {
+                var visualColumn = 0
+                for (i in lineStart(cursor) until cursor) {
+                    visualColumn += if (text[i] == '\t') width - visualColumn % width else 1
+                }
+                insert(" ".repeat(width - visualColumn % width))
+            }
+        } else transformLines { line ->
+            when {
+                !outdent -> unit + line
+                line.startsWith('\t') -> line.drop(1)
+                else -> line.drop(line.take(width).takeWhile { it == ' ' }.length)
+            }
+        }
     }
 
     fun commentLines() {
@@ -252,12 +314,26 @@ internal class StudioEditorState(
         replace(r.min, r.max, changed, TextRange(r.min, r.min + changed.length))
     }
 
-    fun newLine(below: Boolean, above: Boolean = false) {
-        val a = lineStart(cursor)
-        val indent = text.substring(a, lineEnd(cursor)).takeWhile { it == ' ' || it == '\t' }
-        if (above) replace(a, a, indent + eol, TextRange(a + indent.length))
-        else if (below) { val b = lineEnd(cursor); replace(b, b, eol + indent) }
-        else insert(eol + indent)
+    fun newLine(below: Boolean, above: Boolean = false, settings: StudioSettings) {
+        val at = if (above || below) cursor else start
+        val a = lineStart(at)
+        val b = lineEnd(at)
+        val splitAt = if (above || below) b else at
+        val prefix = text.substring(a, splitAt)
+        val leading = if (settings.autoIndent) prefix.takeWhile { it == ' ' || it == '\t' } else ""
+        if (above) {
+            replace(a, a, leading + eol, TextRange(a + leading.length))
+            return
+        }
+        val opening = prefix.trimEnd().lastOrNull()
+        val extraLevel = settings.autoIndent && opening != null && opening in "{[("
+        val indent = leading + if (!extraLevel) "" else if (settings.useTabs) "\t" else " ".repeat(settings.indentSize)
+        if (below) replace(b, b, eol + indent)
+        else {
+            val closing = when (opening) { '{' -> '}'; '[' -> ']'; '(' -> ')'; else -> null }
+            val tail = if (extraLevel && closing == text.getOrNull(end)) eol + leading else ""
+            replace(start, end, eol + indent + tail, TextRange(start + eol.length + indent.length))
+        }
     }
 
     fun joinLines() {

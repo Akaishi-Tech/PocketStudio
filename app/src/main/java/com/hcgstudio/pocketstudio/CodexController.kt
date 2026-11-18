@@ -1,7 +1,6 @@
 package com.hcgstudio.pocketstudio
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.*
 import com.hcgstudio.pocketstudio.codex.CodexRelease
 import com.hcgstudio.pocketstudio.codex.CodexRuntime
@@ -19,6 +18,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     private val fixtureHistory: File? = null) {
     private val runtime = CodexRuntime(w.app)
     private val auth = CodexAuth(w.app)
+    private val cli = CodexCliSession(runtime)
     private val prefs = w.app.getSharedPreferences("codex-ui", 0)
     var account by mutableStateOf<CodexAuthState?>(null); private set
     var version by mutableStateOf<String?>(null); private set
@@ -30,8 +30,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     var downloadProgress by mutableFloatStateOf(0f); private set
     var installIntent by mutableStateOf<Intent?>(null)
     var signingIn by mutableStateOf(false); private set
-    private var pendingPlanWelcome by mutableStateOf<String?>(null)
-    val showPlanWelcome get() = pendingPlanWelcome != null
+    var deviceCode by mutableStateOf<CodexDeviceCode?>(null); private set
     private var updatingAccount by mutableStateOf(false)
     val accountBusy get() = signingIn || updatingAccount
     var error by mutableStateOf<String?>(null)
@@ -59,12 +58,13 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     private var modelsJob: Job? = null
     private var turnJob: Job? = null
     private var loginJob: Job? = null
+    private var installationJob: Job? = null
     private var updateJob: Job? = null
     private var currentTurn = ""
     private var connection: CodexRpc? = null
     private var accountKey: String? = null
     private var loadedList = false
-    val usable get() = account?.let { if (it.useChatGpt) it.selected?.planEnabled == true else it.hasApiKey } == true
+    val usable get() = account?.let { if (it.useChatGpt) it.selected?.signedIn == true else it.hasApiKey } == true
     val update get() = release?.takeIf { version != null && (legacyInstalled || it.versionCode > installedVersionCode) }
 
     private suspend fun <T> io(f: () -> T) = withContext(Dispatchers.IO) { f() }
@@ -78,7 +78,9 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     }
     fun refreshInstallation(checkUpdate: Boolean = false) {
         val p = selectedProject ?: return
-        scope.launch {
+        if (accountBusy) return
+        installationJob?.cancel()
+        installationJob = scope.launch {
             try {
                 val (installed, state) = io { runtime.installedVersion() to auth.snapshot() }
                 if (p !== selectedProject) return@launch
@@ -90,9 +92,18 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                 applyAccount(state, refreshCatalog = changed)
                 if (installed != null && (checkUpdate || changed)) checkRelease()
                 if (installed != null && !loadedList && !detail && !loading) list()
-            } catch (e: Exception) { checked = true; failure(e) }
+                if (installed != null) checkCliAccount(state)
+            } catch (e: CancellationException) { failure(e) }
+            catch (e: Exception) { checked = true; failure(e) }
         }
     }
+    private suspend fun checkCliAccount(state: CodexAuthState) {
+        val profile = state.selected?.takeIf { state.useChatGpt && it.signedIn } ?: return
+        val home = io { auth.cliHome(profile) }
+        if (home != null && cli.account(home) != null) return
+        applyAccount(io { auth.markSignedOut(profile.id); auth.snapshot() })
+    }
+
     private fun checkRelease() {
         if (updateJob?.isActive == true) return
         updateJob = scope.launch {
@@ -130,12 +141,11 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         }
         accountKey = key
         account = state
-        if (accountChanged || !usable) pendingPlanWelcome = null
         if (accountChanged || wasUsable != usable || refreshCatalog) {
             clearModels()
             if (detail) ensureModels()
         }
-        if (state.useChatGpt && state.selected?.planEnabled == true) restoreQuota()
+        if (state.useChatGpt && state.selected?.signedIn == true) restoreQuota()
         else { quota = emptyList(); quotaAsOf = 0L }
     }
     private fun clearModels() {
@@ -159,20 +169,12 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         modelsError = null
         modelsJob = scope.launch {
             try {
-                val runtimeModels = try {
-                    withServer(project, false) { rpc, _ ->
-                        buildList {
-                            pages(rpc, "model/list", json("limit" to 100)) { row -> CodexModel.fromRuntime(row)?.let(::add) }
-                        }
+                val runtimeModels = withServer(project, false) { rpc, _ ->
+                    buildList {
+                        pages(rpc, "model/list", json("limit" to 100)) { row -> CodexModel.fromRuntime(row)?.let(::add) }
                     }
-                } catch (e: Exception) {
-                    ensureActive()
-                    // Plan tokens have an independent catalog. Without runtime metadata,
-                    // it can still supply models and efforts, but Fast cannot be confirmed.
-                    if (!state.useChatGpt) throw e
-                    emptyList()
                 }
-                val available = io { auth.models(state, runtimeModels) }
+                val available = if (state.useChatGpt) runtimeModels else io { auth.apiModels(state, runtimeModels) }
                 ensureActive()
                 models = available
                 val preferred = prefs.getString("model-$accountKey", null)
@@ -220,6 +222,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     fun configure(onSaved: () -> Unit = {}, onInvalid: (ApiConfigurationError) -> Unit = ::failure,
                   f: (CodexAuth) -> Unit) {
         if (working || accountBusy) return
+        installationJob?.cancel()
         updatingAccount = true
         error = null
         scope.launch {
@@ -233,37 +236,50 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
             finally { updatingAccount = false }
         }
     }
-    fun login(accountId: String?, browser: (Uri) -> Unit) {
+    fun login() {
         if (accountBusy || working) return
-        signingIn = true; error = null
-        loginJob = scope.launch {
+        if (version == null) {
+            error = uiString(R.string.install_the_codex_runtime_first)
+            return
+        }
+        installationJob?.cancel()
+        signingIn = true
+        error = null
+        loginJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            var home: File? = null
             try {
-                val state = io { auth.login(accountId, browser) }
-                applyAccount(state, refreshCatalog = true)
-                state.selected?.takeIf { state.useChatGpt && it.planEnabled }?.let { profile ->
-                    val user = java.util.UUID.nameUUIDFromBytes(profile.subject.toByteArray(Charsets.UTF_8))
-                    val welcome = "chatgpt-plan-welcome-$user"
-                    if (!prefs.getBoolean(welcome, false)) pendingPlanWelcome = welcome
+                val candidate = io { auth.newLoginHome().also { home = it } }
+                val identity = cli.login(candidate) { deviceCode = it }
+                deviceCode = null
+                ensureActive()
+                // Once confirmed, finish recording the account even if the page closes.
+                withContext(NonCancellable) {
+                    applyAccount(io { auth.acceptCliLogin(candidate, identity) }, refreshCatalog = true)
+                    if (selectedProject != null) list()
                 }
-                if (version != null) list()
-            } catch (e: Exception) { if (isActive) failure(e) }
-            finally { signingIn = false }
+            } catch (_: TimeoutCancellationException) {
+                error = uiString(R.string.sign_in_timed_out_try_again)
+            } catch (e: Exception) { failure(e) }
+            finally {
+                withContext(NonCancellable + Dispatchers.IO) { home?.deleteRecursively() }
+                deviceCode = null
+                signingIn = false
+            }
         }
     }
-    fun markPlanWelcomeShown() {
-        val key = pendingPlanWelcome ?: return
-        prefs.edit().putBoolean(key, true).apply()
-    }
-    fun dismissPlanWelcome() { pendingPlanWelcome = null }
-    fun cancelLogin() { loginJob?.cancel(); auth.cancelLogin() }
+
+    fun cancelLogin() { loginJob?.cancel() }
+
     fun logout() {
+        val profile = account?.selected ?: return
         if (working || accountBusy) return
+        installationJob?.cancel()
         updatingAccount = true
+        error = null
         scope.launch {
             try {
-                val revoked = io { auth.signOut() }
-                applyAccount(io { auth.snapshot() })
-                if (!revoked) error = uiString(R.string.signed_out_on_this_device_you_can_revoke)
+                io { auth.cliHome(profile) }?.let { cli.logout(it) }
+                applyAccount(io { auth.markSignedOut(profile.id); auth.snapshot() })
             } catch (e: Exception) { failure(e) }
             finally { updatingAccount = false }
         }
@@ -275,12 +291,14 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         lines.clear()
     }
     fun reset() {
+        installationJob?.cancel()
+        cancelLogin()
         turnJob?.cancel(); turnJob = null
         clearModels()
         clearChat(); chats.clear(); loadedList = false; quota = emptyList(); error = null
         selectedProject = null
     }
-    fun dispose() { cancelLogin(); reset() }
+    fun dispose() { reset() }
     fun back() {
         if (working) { detail = false; return }
         clearChat()
@@ -302,20 +320,30 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         val state = checkNotNull(account)
         val plan = state.useChatGpt
         val directory = io { home(p, state.accountKey) }
-        val env = mutableMapOf("CODEX_HOME" to directory.absolutePath)
-        val provider = if (plan) "chatgpt_plan" else "openai_byok"
-        val envKey = if (plan) "ACCESS_TOKEN" else "OPENAI_API_KEY"
-        if (authenticate) env[envKey] = io { auth.credential(state) }
-        val settings = mapOf("model_provider" to JSONObject.quote(provider),
-            "model_providers.$provider.name" to JSONObject.quote(if (plan) "ChatGPT plan" else "OpenAI API"),
-            "model_providers.$provider.base_url" to JSONObject.quote(state.responsesUrl),
-            "model_providers.$provider.env_key" to JSONObject.quote(envKey),
-            "model_providers.$provider.wire_api" to "\"responses\"",
-            "model_providers.$provider.supports_websockets" to "false",
-            "model_providers.$provider.requires_openai_auth" to "false",
+        val cliHome = if (plan) state.selected?.let { io { auth.cliHome(it) } } else null
+        val env = mutableMapOf("CODEX_HOME" to (cliHome ?: directory).absolutePath)
+        val settings = mutableMapOf(
             "features.code_mode.direct_only_tool_namespaces" to "[\"studio\"]",
             "features.shell_tool" to "false", "features.incremental_tools" to "false",
             "shell_environment_policy.exclude" to "[\"ACCESS_TOKEN\",\"OPENAI_API_KEY\"]")
+        if (plan) {
+            settings["cli_auth_credentials_store"] = "\"file\""
+            settings["sqlite_home"] = JSONObject.quote(directory.absolutePath)
+            // Existing threads record their original provider name. Let Codex
+            // authenticate them with the same managed account as new threads.
+            settings["model_providers.chatgpt_plan.name"] = "\"OpenAI\""
+            settings["model_providers.chatgpt_plan.wire_api"] = "\"responses\""
+            settings["model_providers.chatgpt_plan.requires_openai_auth"] = "true"
+        } else {
+            if (authenticate) env["OPENAI_API_KEY"] = io { auth.credential(state) }
+            settings["model_provider"] = "\"openai_byok\""
+            settings["model_providers.openai_byok.name"] = "\"OpenAI API\""
+            settings["model_providers.openai_byok.base_url"] = JSONObject.quote(state.apiEndpoint)
+            settings["model_providers.openai_byok.env_key"] = "\"OPENAI_API_KEY\""
+            settings["model_providers.openai_byok.wire_api"] = "\"responses\""
+            settings["model_providers.openai_byok.supports_websockets"] = "false"
+            settings["model_providers.openai_byok.requires_openai_auth"] = "false"
+        }
         var opened: CodexRpc? = null
         try {
             val rpc = io {
@@ -344,9 +372,12 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         viewJob = scope.launch {
             try {
                 val found = mutableListOf<CodexChat>()
-                withServer(p, false) { rpc, _ ->
+                withServer(p, false) { rpc, directory ->
                     pages(rpc, "thread/list", json("sortKey" to "updated_at", "modelProviders" to JSONArray(),
                         "sourceKinds" to JSONArray(listOf("appServer","cli","unknown","vscode")), "limit" to 50)) {
+                        // A CLI account shares its rollout directory across projects.
+                        // Original project-specific rollouts can also be indexed here.
+                        if (it.string("cwd") != directory.absolutePath) return@pages
                         found.add(CodexChat(it.getString("id"), it.string("name").ifBlank {
                             it.string("preview").lineSequence().firstOrNull().orEmpty().take(90)
                         }, it.optLong("updatedAt")))
@@ -478,8 +509,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
             } catch (e: Exception) {
                 failure(e)
                 if (selectedProject === p) {
-                    val accountAfterFailure = runCatching { io { auth.snapshot() } }.getOrNull()
-                    if (accountAfterFailure != null) applyAccount(accountAfterFailure)
+                    account?.let { runCatching { checkCliAccount(it) } }
                 }
             }
             finally {
@@ -497,7 +527,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
 
     private fun updateQuota(snapshot: JSONObject) {
         val key = accountKey ?: return
-        if (account?.selected?.planEnabled != true) return
+        if (account?.selected?.signedIn != true) return
         val now = System.currentTimeMillis()
         val stored = prefs.getString("quota-$key", null)?.let(::JSONObject) ?: JSONObject()
         var changed = false
@@ -513,7 +543,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     }
 
     fun restoreQuota() {
-        if (account?.useChatGpt != true || account?.selected?.planEnabled != true) {
+        if (account?.useChatGpt != true || account?.selected?.signedIn != true) {
             quota = emptyList(); quotaAsOf = 0L
             return
         }

@@ -23,16 +23,6 @@ internal data class CodexModel(
                 row.optBoolean("isDefault"))
         }
 
-        fun fromPlan(row: JSONObject, runtimeFastModels: Set<String>): CodexModel? {
-            if (row.string("visibility") != "list") return null
-            val id = row.string("slug")
-            if (id.isBlank()) return null
-            val efforts = row.optJSONArray("supported_reasoning_levels").efforts("effort")
-            return CodexModel(id, row.string("display_name").ifBlank { id }, efforts,
-                row.string("default_reasoning_level").takeIf { it in efforts },
-                id in runtimeFastModels && supportsFast(row.optJSONArray("service_tiers"), row.optJSONArray("additional_speed_tiers")))
-        }
-
         private fun JSONArray?.efforts(field: String): List<String> =
             objects().map { it.string(field) }.filter { it.isNotBlank() }.distinct()
 

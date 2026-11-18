@@ -12,6 +12,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun DeviceToolWindow(
@@ -86,6 +88,9 @@ internal fun DeviceToolWindow(
                 }
             } else if (controller.output.isNotEmpty() || controller.logging) {
                 val scroll = rememberScrollState()
+                val settings = LocalStudioSettings.current
+                val horizontal = rememberScrollState()
+                val wrap = if (settings.consoleSoftWraps) Modifier else Modifier.horizontalScroll(horizontal)
                 LaunchedEffect(controller.output, controller.logging, scroll.maxValue) {
                     if (controller.logging) scroll.scrollTo(scroll.maxValue)
                 }
@@ -94,8 +99,10 @@ internal fun DeviceToolWindow(
                     SelectionContainer {
                         Text(controller.output.ifEmpty { stringResource(R.string.waiting_for_logs) },
                             Modifier.heightIn(min = 96.dp, max = (panelHeight - 156.dp).coerceAtLeast(96.dp))
-                                .verticalScroll(scroll).padding(16.dp),
-                            style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                                .verticalScroll(scroll).then(wrap).padding(16.dp),
+                            style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
+                            fontSize = settings.consoleFontSize.sp, lineHeight = (settings.consoleFontSize * 1.42f).sp,
+                            softWrap = settings.consoleSoftWraps)
                     }
                 }
             }

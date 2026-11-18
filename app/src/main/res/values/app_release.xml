@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="github_apk_invalid_release">The GitHub release has incomplete or invalid package information. Try again later.</string>
+    <string name="github_apk_http_error">GitHub returned HTTP %1$d. Try again later.</string>
+    <string name="github_apk_verification_failed">The downloaded APK failed verification. Try downloading it again.</string>
+    <string name="app_release_already_installed">Pocket Studio is already running this version or a newer one.</string>
+    <string name="app_release_incompatible_signer">This copy of Pocket Studio uses a different signing key. Install updates from the same source as this copy.</string>
+</resources>

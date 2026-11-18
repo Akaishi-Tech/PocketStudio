@@ -43,6 +43,13 @@ public final class DeviceDebugTest extends Instrumentation {
             } else if ("apkOpen".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.ApkInstallerChecks.run(getTargetContext());
                 result.putString("result", "PASS APK snapshots and provider scope");
+            } else if ("appUpdates".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.AppReleaseChecks.run(getTargetContext(), arguments.getString("verifyArchive", "false").equals("true"));
+                com.hcgstudio.pocketstudio.AppUpdateFlowChecks.run(getTargetContext());
+                result.putString("result", "PASS app release selection, verification and update flow");
+            } else if ("settings".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.SettingsChecks.run(getTargetContext());
+                result.putString("result", "PASS settings persistence, scheme overrides and save actions");
             } else if ("editor".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.EditorChecks.run();
                 result.putString("result", "PASS editor and refactoring");

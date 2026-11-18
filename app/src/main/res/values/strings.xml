@@ -126,7 +126,9 @@
     <string name="connection_service">"connection"</string>
     <string name="contains_an_assignment_or_named_argument_with_the">"Contains an assignment or named argument with the same name"</string>
     <string name="contains_invalid_java_syntax_format">"%1$s contains invalid Java syntax"</string>
-    <string name="continue_with_chatgpt">"Continue with ChatGPT"</string>
+    <string name="codex_cli_sign_in">Sign in with Codex CLI</string>
+    <string name="codex_enter_device_code">Enter this code on the verification page.</string>
+    <string name="codex_open_verification_page">Open verification page</string>
     <string name="conversation_context_compacted">"Conversation context compacted"</string>
     <string name="copy">"Copy"</string>
     <string name="copy_code">"Copy code"</string>
@@ -300,7 +302,6 @@
     <string name="installing_android_sdk_build_tools_format">"Installing Android SDK Build Tools %1$s"</string>
     <string name="installing_apk">"Installing APK…"</string>
     <string name="invalid_adb_request">"Invalid ADB request"</string>
-    <string name="invalid_credential_expiration">"Invalid credential expiration"</string>
     <string name="invalid_file_name">"Invalid file name"</string>
     <string name="invalid_input">"Invalid input"</string>
     <string name="invalid_jdk_file_path">"Invalid JDK file path"</string>
@@ -351,7 +352,6 @@
     <string name="log_stream_disconnected">"Log stream disconnected"</string>
     <string name="logcat">"Logcat"</string>
     <string name="main_menu">"Main menu"</string>
-    <string name="malformed_identity_token">"Malformed identity token"</string>
     <string name="match_case">"Match case"</string>
     <string name="message_codex">"Message Codex"</string>
     <string name="minimum_log_level">"Minimum log level"</string>
@@ -394,11 +394,9 @@
     <string name="no_matching_loaded_classes">"No matching loaded classes"</string>
     <string name="no_models_available_for_this_account">"No models available for this account"</string>
     <string name="no_output_yet">"No output yet"</string>
-    <string name="no_plan_access_token_received">"No plan access token received"</string>
     <string name="no_platforms_installed_import_an_android_sdk_platform">"No platforms installed. Import an Android SDK Platform ZIP."</string>
     <string name="no_stack_frames">"No stack frames"</string>
     <string name="no_unstaged_changes">"No unstaged changes"</string>
-    <string name="no_valid_authorization_code_received">"No valid authorization code received"</string>
     <string name="no_visible_variables_in_this_scope">"No visible variables in this scope"</string>
     <string name="nthe_content_before_the_write_is_saved_in">"\nThe content before the write is saved in before-write.\n"</string>
     <string name="nworking_tree_clean">"\nWorking tree clean"</string>
@@ -407,7 +405,6 @@
     <string name="open_developer_options_in_system_settings_and_turn">"Open Developer options in system settings and turn on wireless debugging."</string>
     <string name="open_folder">"Open folder"</string>
     <string name="open_pairing_settings">"Open pairing settings"</string>
-    <string name="openai_identity_signature_verification_failed">"OpenAI identity signature verification failed"</string>
     <string name="openai_request_failed_http">"OpenAI request failed (HTTP %1$s)"</string>
     <string name="openai_request_failed_http_format">"OpenAI request failed (HTTP %1$s, %2$s)"</string>
     <string name="openai_returned_unreadable_data">"OpenAI returned unreadable data"</string>
@@ -572,12 +569,8 @@
     <string name="setting_breakpoint">"Setting breakpoint…"</string>
     <string name="shown_as_a_placeholder">" shown as a placeholder"</string>
     <string name="shrink_selection">"Shrink selection"</string>
-    <string name="sign_in_and_authorize_access_to_your_chatgpt">"Sign in and authorize access to your ChatGPT plan"</string>
-    <string name="sign_in_canceled">"Sign-in canceled"</string>
     <string name="sign_in_timed_out_try_again">"Sign-in timed out. Try again."</string>
-    <string name="sign_in_to_chatgpt_first">"Sign in to ChatGPT first"</string>
     <string name="sign_out">"Sign out"</string>
-    <string name="signed_out_on_this_device_you_can_revoke">"Signed out on this device. You can revoke access in ChatGPT settings."</string>
     <string name="single_quotes">"Single quotes"</string>
     <string name="six_digit_pairing_code">"Six-digit pairing code"</string>
     <string name="some_content_could_not_be_previewed">"Some content could not be previewed"</string>
@@ -621,7 +614,6 @@
     <string name="termux_returned_a_repository_index_older_than_the">"Termux returned a repository index older than the last verified index"</string>
     <string name="text_file_exceeds_768_kib">"Text file exceeds 768 KiB"</string>
     <string name="that_name_is_already_in_use_in_this">"That name is already in use in this scope"</string>
-    <string name="the_account_identity_expiration_or_issuer_does_not">"The account identity, expiration or issuer does not match"</string>
     <string name="the_android_codex_runtime_installation_is_incomplete_update">"The Android Codex runtime installation is incomplete. Update or reinstall it."</string>
     <string name="the_api_key_contains_invalid_characters">"The API key contains invalid characters"</string>
     <string name="the_apk_cache_was_cleared_open_the_apk">"The APK cache was cleared. Open the APK again."</string>
@@ -649,7 +641,6 @@
     <string name="the_file_changed_read_again">"The file changed. Read %1$s again."</string>
     <string name="the_file_changed_read_it_again">"The file changed. Read it again."</string>
     <string name="the_file_changed_reopen_this_action">"The file changed. Reopen this action."</string>
-    <string name="the_identity_returned_by_the_authorization_provider_does">"The identity returned by the authorization provider does not match"</string>
     <string name="the_import_section_contains_comments_organize_it_manually">"The import section contains comments. Organize it manually."</string>
     <string name="the_imported_project_is_no_longer_available">"The imported project is no longer available"</string>
     <string name="the_initializer_must_be_a_single_literal">"The initializer must be a single literal"</string>
@@ -680,7 +671,6 @@
     <string name="the_selection_contains_a_comment_terminator">"The selection contains a comment terminator"</string>
     <string name="the_selection_contains_a_nested_scope">"The selection contains a nested scope"</string>
     <string name="the_selection_is_inside_a_nested_type_or">"The selection is inside a nested type or lambda"</string>
-    <string name="the_signed_in_account_does_not_match_the">"The signed-in account does not match the saved account"</string>
     <string name="the_signed_index_is_missing_the_package_list">"The signed index is missing the package list for %1$s"</string>
     <string name="the_source_directory_contains_build_with_gradle">"The source directory contains %1$s. Build with Gradle."</string>
     <string name="the_storage_provider_contains_duplicate_names_format">"The storage provider contains duplicate names: %1$s"</string>
@@ -710,8 +700,6 @@
     <string name="the_working_copy_is_missing_sync_paused_to">"The working copy is missing. Sync paused to preserve files in the selected directory."</string>
     <string name="the_zip_contains_no_project_files">"The ZIP contains no project files"</string>
     <string name="there_is_a_nested_scope_or_a_parameter">"There is a nested scope or a parameter with the same name"</string>
-    <string name="this_account_has_not_authorized_access_to_its">"This account has not authorized access to its ChatGPT plan"</string>
-    <string name="this_account_has_not_authorized_plan_access">"This account has not authorized plan access."</string>
     <string name="this_account_has_not_been_saved">"This account has not been saved"</string>
     <string name="this_action_is_unavailable_here">"This action is unavailable here"</string>
     <string name="this_client_does_not_support_the_request">"This client does not support the request"</string>
@@ -778,7 +766,6 @@
     <string name="unknown_parameter_format">"Unknown parameter: %1$s"</string>
     <string name="unknown_project_tool">"Unknown project tool"</string>
     <string name="unmatched_braces">"Unmatched braces"</string>
-    <string name="unrecognized_openai_signing_key">"Unrecognized OpenAI signing key"</string>
     <string name="unrecognized_reference_format">"Unrecognized reference: %1$s"</string>
     <string name="unresolved_alignment_format">"Unresolved alignment: %1$s"</string>
     <string name="unresolved_color_format">"Unresolved color: %1$s"</string>
@@ -787,11 +774,9 @@
     <string name="unresolved_scaletype_format">"Unresolved scaleType: %1$s"</string>
     <string name="unresolved_text_format">"Unresolved text: %1$s"</string>
     <string name="unresolved_variable_or_type">"Missing dependencies prevent determining whether %1$s is a variable or a type"</string>
-    <string name="unsupported_authorization_credential_type">"Unsupported authorization credential type"</string>
     <string name="unsupported_codex_dependency_package">"Unsupported Codex dependency package %1$s"</string>
     <string name="unsupported_codex_version">"Unsupported Codex version %1$s."</string>
     <string name="unsupported_codex_version_label">"Unsupported Codex version."</string>
-    <string name="unsupported_identity_signature_algorithm">"Unsupported identity signature algorithm"</string>
     <string name="unsupported_qualified_name_reference_format">"Unsupported qualified name reference: %1$s"</string>
     <string name="unsupported_tool">"Unsupported tool"</string>
     <string name="unterminated_block_comment">"Unterminated block comment"</string>
@@ -828,11 +813,7 @@
     <string name="xml_exceeds_768_kib">"XML exceeds 768 KiB"</string>
     <string name="xml_resources_require_an_xml_or_xsd_extension">"XML resources require an .xml or .xsd extension."</string>
     <string name="you_can_reinstall_it_here_later">"You can reinstall it here later."</string>
-    <string name="your_chatgpt_session_is_no_longer_valid_sign">"Your ChatGPT session is no longer valid. Sign in again."</string>
-    <string name="your_session_expired_sign_in_again">"Your session expired. Sign in again."</string>
     <string name="zip_contains_too_many_files">"ZIP contains too many files"</string>
-    <string name="oauth_return_to_app">Return to Pocket Studio to finish signing in.</string>
-    <string name="oauth_invalid_callback">Invalid callback.</string>
     <string name="local_pairing_search">Looking for this device’s pairing code dialog…</string>
     <string name="local_pairing_retry">Pairing failed. Open a new pairing code in Wireless debugging and try again.</string>
     <string name="local_pairing_expired">Pairing timed out. Return to Studio to try again.</string>
@@ -847,7 +828,6 @@
     <string name="replace_api_key">Replace API key</string>
     <string name="save_api_connection">Save connection</string>
     <string name="use_an_api_key">Use an API key</string>
-    <string name="chatgpt_plan_sign_in_summary">Eligible requests use your ChatGPT plan. Pocket Studio sends your prompts and relevant project content to OpenAI.</string>
     <string name="api_connection_disclosure">Your prompts and relevant project files are sent to this endpoint. Your API provider handles billing.</string>
     <string name="codex_runtime">Codex runtime</string>
     <string name="check_for_updates">Check for updates</string>

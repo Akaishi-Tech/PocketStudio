@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="github_apk_invalid_release">GitHub 发布的安装包信息不完整或无效，请稍后重试。</string>
+    <string name="github_apk_http_error">GitHub 返回 HTTP %1$d，请稍后重试。</string>
+    <string name="github_apk_verification_failed">下载的 APK 未通过校验，请重新下载。</string>
+    <string name="app_release_already_installed">当前已安装相同或更高版本的掌上 Studio。</string>
+    <string name="app_release_incompatible_signer">当前安装的掌上 Studio 使用了不同的签名密钥，请从原安装来源获取更新。</string>
+</resources>
