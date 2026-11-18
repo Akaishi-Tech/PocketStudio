@@ -55,19 +55,21 @@ internal fun CodexAccountPage(c: CodexController, close: () -> Unit) {
                 StudioIconButton(R.drawable.studio_arrow_back, stringResource(R.string.back), onClick = back)
             }, windowInsets = WindowInsets(0, 0, 0, 0))
             if (state == null && c.error == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Column(Modifier.weight(1f).widthIn(max = 448.dp).fillMaxWidth()
-                .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (state != null) {
-                    if (apiForm) ApiConnectionForm(c, state, close)
-                    else AccountMethods(c, state) {
-                        c.error = null
-                        apiForm = true
+            val accountScroll = rememberScrollState()
+            StudioPageTransition(apiForm, { if (it) 1 else 0 }, Modifier.weight(1f).widthIn(max = 448.dp).fillMaxWidth()) { form ->
+                Column(Modifier.fillMaxSize().verticalScroll(if (form) rememberScrollState() else accountScroll)
+                    .padding(horizontal = 24.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (state != null) {
+                        if (form) ApiConnectionForm(c, state, close)
+                        else AccountMethods(c, state) {
+                            c.error = null
+                            apiForm = true
+                        }
                     }
-                }
-                c.error?.let {
-                    Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    c.error?.let {
+                        Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }

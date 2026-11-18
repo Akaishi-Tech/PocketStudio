@@ -44,30 +44,31 @@ internal fun LayoutPreviewDialog(project: Project, xml: String, path: String, on
         }
     }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (details) details = false else onDismiss() },
         title = { Text(if (details) uiString(R.string.preview_diff) else uiString(R.string.layout_preview)) },
         text = {
             val loaded = preview
             when {
                 error.isNotEmpty() -> Text(error, color = MaterialTheme.colorScheme.error)
                 loaded == null -> CircularProgressIndicator()
-                details -> Column(Modifier.verticalScroll(rememberScrollState())) {
-                    notes.forEach { Text(it, Modifier.padding(vertical = 4.dp)) }
-                }
-                else -> key(loaded) {
-                    AndroidView(
-                        factory = { ctx ->
-                            FrameLayout(ctx).apply {
-                                try {
-                                    loaded.drawInto(this)
-                                    notes = loaded.differences()
-                                } catch (e: RuntimeException) {
-                                    error = e.localizedMessage ?: e.javaClass.simpleName
+                else -> StudioPageTransition(details, { if (it) 1 else 0 }) { showDifferences ->
+                    if (showDifferences) Column(Modifier.verticalScroll(rememberScrollState())) {
+                        notes.forEach { Text(it, Modifier.padding(vertical = 4.dp)) }
+                    } else key(loaded) {
+                        AndroidView(
+                            factory = { ctx ->
+                                FrameLayout(ctx).apply {
+                                    try {
+                                        loaded.drawInto(this)
+                                        notes = loaded.differences()
+                                    } catch (e: RuntimeException) {
+                                        error = e.localizedMessage ?: e.javaClass.simpleName
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight(.62f)
-                    )
+                            },
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(.62f)
+                        )
+                    }
                 }
             }
         },

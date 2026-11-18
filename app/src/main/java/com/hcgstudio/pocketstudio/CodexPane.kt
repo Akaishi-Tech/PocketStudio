@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
@@ -128,32 +129,43 @@ internal fun CodexPane(w: Workspace, openAccount: () -> Unit) {
                 Text(stringResource(R.string.download_and_install_the_runtime_to_use_codex), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                 Button(c::download) { Text(stringResource(R.string.download_codex)) }
             }
-            !c.usable && (!c.detail && c.chats.isEmpty()) -> CenterAction(R.drawable.studio_chat, uiString(R.string.connect_to_codex)) {
-                Button(openAccount) { Text(stringResource(R.string.agent_sign_in)) }
-            }
-            c.detail -> BoxWithConstraints(Modifier.fillMaxSize()) {
-                if (maxWidth >= 680.dp && c.chats.isNotEmpty()) {
-                    Row(Modifier.fillMaxSize()) {
-                        Column(Modifier.width(224.dp).fillMaxHeight()) {
-                            if (c.usable) TextButton(c::newChat, enabled = !c.working,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                                Symbol(R.drawable.studio_add, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.new_chat))
-                            }
-                            ChatList(c, Modifier.fillMaxSize(), compact = true)
-                        }
-                        VerticalDivider()
-                        Box(Modifier.weight(1f)) { CodexConversation(c, !w.running && !w.busy, openAccount) }
+            else -> ChatBrowser(c, !w.running && !w.busy, openAccount)
+        }
+    }
+}
+
+@Composable
+private fun ChatBrowser(c: CodexController, projectIdle: Boolean, openAccount: () -> Unit) {
+    val listState = rememberLazyListState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 680.dp
+        Row(Modifier.fillMaxSize()) {
+            if (wide && c.detail && c.chats.isNotEmpty()) {
+                Column(Modifier.width(224.dp).fillMaxHeight()) {
+                    if (c.usable) TextButton(c::newChat, enabled = !c.working,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                        Symbol(R.drawable.studio_add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.new_chat))
                     }
-                } else CodexConversation(c, !w.running && !w.busy, openAccount)
+                    ChatList(c, listState, compact = true)
+                }
+                VerticalDivider()
             }
-            c.chats.isEmpty() && !c.loading && !c.working -> CenterAction(R.drawable.studio_chat, uiString(R.string.no_chats_yet)) {
-                Button({ if (c.usable) c.newChat() else openAccount() }) { Text(stringResource(R.string.new_chat)) }
-            }
-            else -> {
-                if (c.loading || (c.working && c.chats.isEmpty())) LinearProgressIndicator(Modifier.fillMaxWidth())
-                ChatList(c, Modifier.fillMaxSize())
+            StudioPageTransition(c.detail, { if (it && !wide) 1 else 0 }, Modifier.weight(1f).fillMaxHeight()) { detail ->
+                when {
+                    detail -> CodexConversation(c, projectIdle, openAccount)
+                    !c.usable && c.chats.isEmpty() -> CenterAction(R.drawable.studio_chat, uiString(R.string.connect_to_codex)) {
+                        Button(openAccount) { Text(stringResource(R.string.agent_sign_in)) }
+                    }
+                    c.chats.isEmpty() && !c.loading && !c.working -> CenterAction(R.drawable.studio_chat, uiString(R.string.no_chats_yet)) {
+                        Button({ if (c.usable) c.newChat() else openAccount() }) { Text(stringResource(R.string.new_chat)) }
+                    }
+                    else -> Column {
+                        if (c.loading || (c.working && c.chats.isEmpty())) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        ChatList(c, listState)
+                    }
+                }
             }
         }
     }
@@ -188,9 +200,9 @@ private fun RuntimeMenu(c: CodexController) {
 }
 
 @Composable
-private fun ChatList(c: CodexController, modifier: Modifier, compact: Boolean = false) {
+private fun ChatList(c: CodexController, state: LazyListState, compact: Boolean = false) {
     val colors = MaterialTheme.colorScheme
-    LazyColumn(modifier, contentPadding = PaddingValues(vertical = 8.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), state = state, contentPadding = PaddingValues(vertical = 8.dp)) {
         items(c.chats, key = { it.id }) { chat ->
             Row(Modifier.fillMaxWidth().background(
                 if (compact && chat.id == c.chatId) colors.secondaryContainer else colors.surface

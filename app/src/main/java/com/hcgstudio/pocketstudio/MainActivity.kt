@@ -78,6 +78,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class StudioPage(val depth: Int) {
+    Welcome(0), Workbench(1), Settings(2), NewProject(2), Git(2), AgentAccount(2)
+}
+
 @Composable
 private fun StudioApp(w: Workspace) {
     val context = w.app
@@ -260,22 +264,35 @@ private fun StudioApp(w: Workspace) {
             }
             val workbenchState = key(p?.root?.uri) { rememberSaveableStateHolder() }
             val git = w.git
-            if (newProjectVisible) NewProjectPage(w)
-            else if (git != null) GitPage(git)
-            else if (showSettings) SettingsPage(LocalStudioSettings.current, w::updateSettings, { showSettings = false },
-                { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) })
-            else if (p != null && showAgentAccount) CodexAccountPage(w.codex) {
-                showAgentAccount = false
-                w.tool = Tool.Codex
+            val page = when {
+                newProjectVisible -> StudioPage.NewProject
+                git != null -> StudioPage.Git
+                showSettings -> StudioPage.Settings
+                p != null && showAgentAccount -> StudioPage.AgentAccount
+                p != null -> StudioPage.Workbench
+                else -> StudioPage.Welcome
             }
-            else if (p != null) workbenchState.SaveableStateProvider("workbench") {
-                Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
-                    if (w.codex.account != null) w.codex.error = null
-                    else w.codex.refreshInstallation()
-                    showAgentAccount = true
+            StudioPageTransition(page, StudioPage::depth, Modifier.fillMaxSize()) { destination ->
+                when (destination) {
+                    StudioPage.Welcome -> Welcome(w, newProject, openTree, importZip, { dialog = "gitClone" },
+                        { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
+                    StudioPage.Workbench -> workbenchState.SaveableStateProvider("workbench") {
+                        Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
+                            if (w.codex.account != null) w.codex.error = null
+                            else w.codex.refreshInstallation()
+                            showAgentAccount = true
+                        }
+                    }
+                    StudioPage.Settings -> SettingsPage(LocalStudioSettings.current, w::updateSettings, { showSettings = false },
+                        { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) })
+                    StudioPage.NewProject -> NewProjectPage(w)
+                    StudioPage.Git -> git?.let { GitPage(it) }
+                    StudioPage.AgentAccount -> CodexAccountPage(w.codex) {
+                        showAgentAccount = false
+                        w.tool = Tool.Codex
+                    }
                 }
             }
-            else Welcome(w, newProject, openTree, importZip, { dialog = "gitClone" }, { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
             if (w.busy && !newProjectVisible) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
     }

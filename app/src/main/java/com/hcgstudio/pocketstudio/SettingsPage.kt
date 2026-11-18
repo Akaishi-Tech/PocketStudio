@@ -8,7 +8,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -21,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +65,8 @@ internal fun SettingsPage(
 ) {
     val groups = settingsGroups(settings, editorPalette(settings), onChange, onKeymap, onSdk, onCheckUpdates)
     var selected by rememberSaveable { mutableStateOf<Int?>(null) }
+    val categoryListState = rememberLazyListState()
+    val categoryState = rememberSaveableStateHolder()
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var resetMenu by remember { mutableStateOf(false) }
@@ -117,49 +122,29 @@ internal fun SettingsPage(
                     }
                 }
                 HorizontalDivider()
-                if (searching) {
-                    val resources = LocalResources.current
-                    val context = LocalContext.current
-                    val configuration = LocalConfiguration.current
-                    val english = remember(context, configuration) {
-                        context.createConfigurationContext(Configuration(configuration).apply {
-                            setLocale(Locale.ENGLISH)
-                        }).resources
-                    }
-                    val term = query.trim()
-                    fun matchesLabel(@StringRes id: Int) =
-                        resources.getString(id).contains(term, ignoreCase = true) || english.getString(id).contains(term, ignoreCase = true)
-                    val matches = groups.mapNotNull { group ->
-                        val entries = if (matchesLabel(group.title)) group.entries
-                        else group.entries.filter { matchesLabel(it.title) || it.options.any(::matchesLabel) }
-                        group.copy(entries = entries, preview = false).takeIf { entries.isNotEmpty() }
-                    }
-                    if (matches.isEmpty()) Text(stringResource(R.string.no_matches),
-                        Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else SettingsContent(matches, settings, headings = true)
-                } else Row(Modifier.fillMaxSize()) {
-                    if (wide || current == null) {
-                        val width = if (wide) Modifier.width(sidebarWidth) else Modifier.fillMaxWidth()
-                        LazyColumn(width.fillMaxHeight().selectableGroup(), contentPadding = PaddingValues(8.dp)) {
-                            items(groups, key = { it.title }) { group ->
-                                val active = wide && current?.title == group.title
-                                val shape = RoundedCornerShape(10.dp)
-                                Row(Modifier.fillMaxWidth().clip(shape)
-                                    .background(if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                                    .then(if (wide) Modifier.selectable(active, onClick = { selected = group.title })
-                                        else Modifier.clickable(role = Role.Button) { selected = group.title })
-                                    .heightIn(min = if (wide) 48.dp else 56.dp).padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(group.title), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
-                                        color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface)
-                                    if (!wide) Symbol(R.drawable.studio_chevron_right, null)
+                StudioPageTransition(searching, { 0 }, Modifier.fillMaxSize()) { showResults ->
+                    if (showResults) SettingsSearchResults(groups, settings, query)
+                    else Row(Modifier.fillMaxSize()) {
+                        if (wide) {
+                            SettingsCategoryList(groups, current?.title, true, categoryListState, Modifier.width(sidebarWidth)) {
+                                selected = it
+                            }
+                            VerticalDivider()
+                        }
+                        key(wide) {
+                            StudioPageTransition(current?.title, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { title ->
+                                if (title == null) {
+                                    SettingsCategoryList(groups, null, false, categoryListState, Modifier.fillMaxWidth()) {
+                                        selected = it
+                                    }
+                                } else {
+                                    val group = groups.first { it.title == title }
+                                    categoryState.SaveableStateProvider(title) {
+                                        SettingsContent(listOf(group), settings, headings = wide)
+                                    }
                                 }
                             }
                         }
-                        if (wide) VerticalDivider()
-                    }
-                    current?.let { group ->
-                        key(group.title) { SettingsContent(listOf(group), settings, headings = wide) }
                     }
                 }
             }
@@ -172,6 +157,51 @@ internal fun SettingsPage(
             Text(stringResource(R.string.settings_restore))
         } },
         dismissButton = { TextButton({ confirmReset = false }) { Text(stringResource(R.string.cancel)) } })
+}
+
+@Composable
+private fun SettingsSearchResults(groups: List<SettingsGroup>, settings: StudioSettings, query: String) {
+    val resources = LocalResources.current
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val english = remember(context, configuration) {
+        context.createConfigurationContext(Configuration(configuration).apply {
+            setLocale(Locale.ENGLISH)
+        }).resources
+    }
+    val term = query.trim()
+    fun matchesLabel(@StringRes id: Int) =
+        resources.getString(id).contains(term, ignoreCase = true) || english.getString(id).contains(term, ignoreCase = true)
+    val matches = groups.mapNotNull { group ->
+        val entries = if (matchesLabel(group.title)) group.entries
+        else group.entries.filter { matchesLabel(it.title) || it.options.any(::matchesLabel) }
+        group.copy(entries = entries, preview = false).takeIf { entries.isNotEmpty() }
+    }
+    if (matches.isEmpty()) Text(stringResource(R.string.no_matches),
+        Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    else SettingsContent(matches, settings, headings = true)
+}
+
+@Composable
+private fun SettingsCategoryList(
+    groups: List<SettingsGroup>, selected: Int?, wide: Boolean, state: LazyListState,
+    modifier: Modifier, onSelect: (Int) -> Unit
+) {
+    LazyColumn(modifier.fillMaxHeight().selectableGroup(), state = state, contentPadding = PaddingValues(8.dp)) {
+        items(groups, key = { it.title }) { group ->
+            val active = wide && selected == group.title
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                .background(if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                .then(if (wide) Modifier.selectable(active, onClick = { onSelect(group.title) })
+                    else Modifier.clickable(role = Role.Button) { onSelect(group.title) })
+                .heightIn(min = if (wide) 48.dp else 56.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(group.title), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+                    color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface)
+                if (!wide) Symbol(R.drawable.studio_chevron_right, null)
+            }
+        }
+    }
 }
 
 @Composable

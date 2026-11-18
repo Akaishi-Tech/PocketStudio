@@ -37,6 +37,11 @@ private enum class RefSection(val title: Int, val empty: Int) {
     Stashes(R.string.gr_stashes, R.string.gr_no_stashes)
 }
 
+private sealed interface RefDetail {
+    data class Compare(val ref: GitRefItem) : RefDetail
+    data class Commit(val id: String) : RefDetail
+}
+
 private data class RefAction(val label: String, val invoke: () -> Unit)
 private sealed interface RefPrompt {
     data class Confirm(val title: String, val detail: String, val action: String, val run: (Git) -> Unit) : RefPrompt
@@ -93,8 +98,8 @@ private fun RefItem(title: String, leading: Int, actions: List<RefAction>, curre
 internal fun GitBranchesTab(session: GitSession) {
     var section by remember { mutableStateOf(RefSection.Local) }
     var prompt by remember { mutableStateOf<RefPrompt?>(null) }
-    var inspect by remember { mutableStateOf<String?>(null) }
-    var compare by remember { mutableStateOf<GitRefItem?>(null) }
+    var detail by remember { mutableStateOf<RefDetail?>(null) }
+    val scroll = rememberLazyListState()
     val refs = rememberRefData(session, Unit, GitRefs::list)
     if (refs == null) {
         if (session.problem == null) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -109,132 +114,134 @@ internal fun GitBranchesTab(session: GitSession) {
         prompt = RefPrompt.Confirm(label, message, label, run)
     }
 
-    val target = compare
-    if (target != null) {
-        BackHandler { compare = null }
-        val patch = rememberRefData(session, target.fullName) { GitRefs.compare(it, Constants.HEAD, target.fullName) }
-        Column(Modifier.fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StudioIconButton(R.drawable.studio_arrow_back, uiString(R.string.back)) { compare = null }
-                Text("$current → ${target.name}", style = MaterialTheme.typography.titleSmall)
+    StudioPageTransition(detail, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { page ->
+        if (page is RefDetail.Compare) {
+            val target = page.ref
+            BackHandler { detail = null }
+            val patch = rememberRefData(session, target.fullName) { GitRefs.compare(it, Constants.HEAD, target.fullName) }
+            Column(Modifier.fillMaxSize()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StudioIconButton(R.drawable.studio_arrow_back, uiString(R.string.back)) { detail = null }
+                    Text("$current → ${target.name}", style = MaterialTheme.typography.titleSmall)
+                }
+                HorizontalDivider()
+                if (patch == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else if (patch.isEmpty()) Text(uiString(R.string.gr_no_diff), Modifier.padding(16.dp))
+                else GitPatch(patch, Modifier.fillMaxSize())
             }
-            HorizontalDivider()
-            if (patch == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            else if (patch.isEmpty()) Text(uiString(R.string.gr_no_diff), Modifier.padding(16.dp))
-            else GitPatch(patch, Modifier.fillMaxSize())
-        }
-    } else if (inspect != null) {
-        RefCommitDetail(session, inspect!!, showActions = false, close = { inspect = null }, prompt = { prompt = it })
-    } else Column(Modifier.fillMaxSize()) {
-        GitRefs.recoveryTitle(refs.state)?.let { title ->
-            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Text(uiString(title), color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    TextButton(onClick = { session.mutate { GitRefs.recover(it, refs.state, RebaseCommand.Operation.CONTINUE) } },
-                        enabled = !session.busy && (refs.state.isRebasing || refs.state.canCommit())) {
-                        Text(uiString(R.string.gr_continue))
-                    }
-                    if (refs.state.isRebasing) TextButton(onClick = {
-                        confirm(R.string.gr_skip, uiString(R.string.gr_skip_reason)) {
-                            GitRefs.recover(it, refs.state, RebaseCommand.Operation.SKIP)
+        } else if (page is RefDetail.Commit) {
+            RefCommitDetail(session, page.id, showActions = false, close = { detail = null }, prompt = { prompt = it })
+        } else Column(Modifier.fillMaxSize()) {
+            GitRefs.recoveryTitle(refs.state)?.let { title ->
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Text(uiString(title), color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.titleSmall)
+                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                        TextButton(onClick = { session.mutate { GitRefs.recover(it, refs.state, RebaseCommand.Operation.CONTINUE) } },
+                            enabled = !session.busy && (refs.state.isRebasing || refs.state.canCommit())) {
+                            Text(uiString(R.string.gr_continue))
                         }
-                    }, enabled = !session.busy) { Text(uiString(R.string.gr_skip)) }
-                    TextButton(onClick = {
-                        val warning = if (refs.state.isRebasing) R.string.gr_abort_rebase else R.string.gr_abort_reset
-                        confirm(R.string.gr_abort, uiString(warning)) {
-                            GitRefs.recover(it, refs.state, RebaseCommand.Operation.ABORT)
+                        if (refs.state.isRebasing) TextButton(onClick = {
+                            confirm(R.string.gr_skip, uiString(R.string.gr_skip_reason)) {
+                                GitRefs.recover(it, refs.state, RebaseCommand.Operation.SKIP)
+                            }
+                        }, enabled = !session.busy) { Text(uiString(R.string.gr_skip)) }
+                        TextButton(onClick = {
+                            val warning = if (refs.state.isRebasing) R.string.gr_abort_rebase else R.string.gr_abort_reset
+                            confirm(R.string.gr_abort, uiString(warning)) {
+                                GitRefs.recover(it, refs.state, RebaseCommand.Operation.ABORT)
+                            }
+                        }, enabled = !session.busy) { Text(uiString(R.string.gr_abort)) }
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    RefSection.entries.forEach { group ->
+                        FilterChip(selected = section == group, onClick = { section = group }, label = { Text(uiString(group.title)) })
+                    }
+                }
+                if (section != RefSection.Remote) {
+                    val title = when (section) {
+                        RefSection.Tags -> R.string.gr_create_tag
+                        RefSection.Stashes -> R.string.gr_stash_changes
+                        else -> R.string.gr_create_branch
+                    }
+                    StudioIconButton(R.drawable.studio_add, uiString(title), enabled = safe && head != null) {
+                        prompt = when (section) {
+                            RefSection.Tags -> RefPrompt.Tag(Constants.HEAD)
+                            RefSection.Stashes -> RefPrompt.Stash
+                            else -> RefPrompt.Branch(Constants.HEAD)
                         }
-                    }, enabled = !session.busy) { Text(uiString(R.string.gr_abort)) }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                RefSection.entries.forEach { group ->
-                    FilterChip(selected = section == group, onClick = { section = group }, label = { Text(uiString(group.title)) })
-                }
-            }
-            if (section != RefSection.Remote) {
-                val title = when (section) {
-                    RefSection.Tags -> R.string.gr_create_tag
-                    RefSection.Stashes -> R.string.gr_stash_changes
-                    else -> R.string.gr_create_branch
-                }
-                StudioIconButton(R.drawable.studio_add, uiString(title), enabled = safe && head != null) {
-                    prompt = when (section) {
-                        RefSection.Tags -> RefPrompt.Tag(Constants.HEAD)
-                        RefSection.Stashes -> RefPrompt.Stash
-                        else -> RefPrompt.Branch(Constants.HEAD)
                     }
                 }
             }
-        }
-        val entries = when (section) {
-            RefSection.Local -> refs.branches.filterNot { it.remote }
-            RefSection.Remote -> refs.branches.filter { it.remote }
-            RefSection.Tags -> refs.tags
-            RefSection.Stashes -> emptyList()
-        }
-        LazyColumn(Modifier.fillMaxSize()) {
-            if (entries.isEmpty() && (section != RefSection.Stashes || refs.stashes.isEmpty())) {
-                item { Text(uiString(section.empty), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            val entries = when (section) {
+                RefSection.Local -> refs.branches.filterNot { it.remote }
+                RefSection.Remote -> refs.branches.filter { it.remote }
+                RefSection.Tags -> refs.tags
+                RefSection.Stashes -> emptyList()
             }
-            items(entries, key = { it.fullName }) { ref ->
-                val selected = ref.fullName == refs.current
-                val actions = buildList {
-                    add(RefAction(uiString(R.string.gr_view_commit)) { inspect = ref.id })
-                    if (head != null && !selected) add(RefAction(uiString(R.string.gr_compare)) { compare = ref })
-                    if (safe && section == RefSection.Local && !selected) add(RefAction(uiString(R.string.gr_switch)) {
-                        session.mutate { it.checkout().setName(ref.fullName).call() }
-                    })
-                    if (safe && section == RefSection.Remote) add(RefAction(uiString(R.string.gr_track)) {
-                        val name = ref.name.substringAfter('/')
-                        prompt = RefPrompt.Branch(ref.fullName, name)
-                    })
-                    if (safe && section != RefSection.Remote) add(RefAction(uiString(R.string.gr_create_branch)) {
-                        prompt = RefPrompt.Branch(ref.fullName, switch = false)
-                    })
-                    if (safe && !selected && head != null && section != RefSection.Tags) {
-                        add(RefAction(uiString(R.string.gr_merge)) {
-                            confirm(R.string.gr_merge, uiString(R.string.gr_merge_target, ref.name, current)) { GitRefs.merge(it, ref.fullName) }
+            LazyColumn(Modifier.fillMaxSize(), state = scroll) {
+                if (entries.isEmpty() && (section != RefSection.Stashes || refs.stashes.isEmpty())) {
+                    item { Text(uiString(section.empty), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+                items(entries, key = { it.fullName }) { ref ->
+                    val selected = ref.fullName == refs.current
+                    val actions = buildList {
+                        add(RefAction(uiString(R.string.gr_view_commit)) { detail = RefDetail.Commit(ref.id) })
+                        if (head != null && !selected) add(RefAction(uiString(R.string.gr_compare)) { detail = RefDetail.Compare(ref) })
+                        if (safe && section == RefSection.Local && !selected) add(RefAction(uiString(R.string.gr_switch)) {
+                            session.mutate { it.checkout().setName(ref.fullName).call() }
                         })
-                        add(RefAction(uiString(R.string.gr_rebase)) {
-                            confirm(R.string.gr_rebase, uiString(R.string.gr_rebase_target, current, ref.name)) { GitRefs.rebase(it, ref.fullName) }
+                        if (safe && section == RefSection.Remote) add(RefAction(uiString(R.string.gr_track)) {
+                            val name = ref.name.substringAfter('/')
+                            prompt = RefPrompt.Branch(ref.fullName, name)
                         })
-                    }
-                    if (safe && section == RefSection.Local) {
-                        add(RefAction(uiString(R.string.rename)) { prompt = RefPrompt.Rename(ref) })
-                        if (!selected) add(RefAction(uiString(R.string.delete)) {
-                            confirm(R.string.delete, uiString(R.string.gr_delete_branch, ref.name)) {
-                                it.branchDelete().setBranchNames(ref.fullName).call()
+                        if (safe && section != RefSection.Remote) add(RefAction(uiString(R.string.gr_create_branch)) {
+                            prompt = RefPrompt.Branch(ref.fullName, switch = false)
+                        })
+                        if (safe && !selected && head != null && section != RefSection.Tags) {
+                            add(RefAction(uiString(R.string.gr_merge)) {
+                                confirm(R.string.gr_merge, uiString(R.string.gr_merge_target, ref.name, current)) { GitRefs.merge(it, ref.fullName) }
+                            })
+                            add(RefAction(uiString(R.string.gr_rebase)) {
+                                confirm(R.string.gr_rebase, uiString(R.string.gr_rebase_target, current, ref.name)) { GitRefs.rebase(it, ref.fullName) }
+                            })
+                        }
+                        if (safe && section == RefSection.Local) {
+                            add(RefAction(uiString(R.string.rename)) { prompt = RefPrompt.Rename(ref) })
+                            if (!selected) add(RefAction(uiString(R.string.delete)) {
+                                confirm(R.string.delete, uiString(R.string.gr_delete_branch, ref.name)) {
+                                    it.branchDelete().setBranchNames(ref.fullName).call()
+                                }
+                            })
+                        }
+                        if (safe && section == RefSection.Tags) add(RefAction(uiString(R.string.gr_checkout_commit)) {
+                            confirm(R.string.gr_checkout_commit, uiString(R.string.gr_checkout_detached, ref.name)) {
+                                it.checkout().setName(ref.id).call()
                             }
                         })
-                    }
-                    if (safe && section == RefSection.Tags) add(RefAction(uiString(R.string.gr_checkout_commit)) {
-                        confirm(R.string.gr_checkout_commit, uiString(R.string.gr_checkout_detached, ref.name)) {
-                            it.checkout().setName(ref.id).call()
-                        }
-                    })
-                    if (safe && section == RefSection.Tags) add(RefAction(uiString(R.string.delete)) {
-                        confirm(R.string.delete, uiString(R.string.gr_delete_tag, ref.name)) { it.tagDelete().setTags(ref.fullName).call() }
-                    })
-                }
-                val icon = if (selected) R.drawable.studio_check else if (section == RefSection.Tags)
-                    R.drawable.studio_link else R.drawable.studio_git_branch
-                RefItem(ref.name, icon, actions, current = selected)
-            }
-            if (section == RefSection.Stashes) items(refs.stashes, key = { it.index }) { stash ->
-                val actions = buildList {
-                    add(RefAction(uiString(R.string.gr_view_commit)) { inspect = stash.id })
-                    if (safe) {
-                        add(RefAction(uiString(R.string.apply)) { session.mutate { GitRefs.applyStash(it, stash, pop = false) } })
-                        add(RefAction(uiString(R.string.gr_pop)) { session.mutate { GitRefs.applyStash(it, stash, pop = true) } })
-                        add(RefAction(uiString(R.string.delete)) {
-                            confirm(R.string.delete, uiString(R.string.gr_drop_stash, stash.message)) { GitRefs.dropStash(it, stash) }
+                        if (safe && section == RefSection.Tags) add(RefAction(uiString(R.string.delete)) {
+                            confirm(R.string.delete, uiString(R.string.gr_delete_tag, ref.name)) { it.tagDelete().setTags(ref.fullName).call() }
                         })
                     }
+                    val icon = if (selected) R.drawable.studio_check else if (section == RefSection.Tags)
+                        R.drawable.studio_link else R.drawable.studio_git_branch
+                    RefItem(ref.name, icon, actions, current = selected)
                 }
-                RefItem(stash.message, R.drawable.studio_inventory_2, actions)
+                if (section == RefSection.Stashes) items(refs.stashes, key = { it.index }) { stash ->
+                    val actions = buildList {
+                        add(RefAction(uiString(R.string.gr_view_commit)) { detail = RefDetail.Commit(stash.id) })
+                        if (safe) {
+                            add(RefAction(uiString(R.string.apply)) { session.mutate { GitRefs.applyStash(it, stash, pop = false) } })
+                            add(RefAction(uiString(R.string.gr_pop)) { session.mutate { GitRefs.applyStash(it, stash, pop = true) } })
+                            add(RefAction(uiString(R.string.delete)) {
+                                confirm(R.string.delete, uiString(R.string.gr_drop_stash, stash.message)) { GitRefs.dropStash(it, stash) }
+                            })
+                        }
+                    }
+                    RefItem(stash.message, R.drawable.studio_inventory_2, actions)
+                }
             }
         }
     }
@@ -252,43 +259,45 @@ internal fun GitHistoryTab(session: GitSession) {
     val scroll = key(source) { rememberLazyListState() }
     var selected by remember { mutableStateOf<String?>(null) }
     var prompt by remember { mutableStateOf<RefPrompt?>(null) }
-    if (selected != null) {
-        RefCommitDetail(session, selected!!, showActions = true, close = { selected = null }, prompt = { prompt = it })
-    } else {
-        val data = rememberRefData(session, source to count) { git ->
-            val branches = GitRefs.branches(git)
-            val ref = source.takeIf { target -> branches.any { it.fullName == target } } ?: Constants.HEAD
-            val commits = GitRefs.history(git, ref, count + 1)
-            RefHistory(branches, commits, ref, gitGraph(commits))
-        }
-        if (data == null) {
-            if (session.problem == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-            return
-        }
-        var choose by remember { mutableStateOf(false) }
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.padding(horizontal = 4.dp)) {
-                TextButton({ choose = true }) {
-                    Symbol(R.drawable.studio_git_branch, null, Modifier.size(17.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (data.selectedRef == Constants.HEAD) uiString(R.string.gr_checked_out) else Repository.shortenRefName(data.selectedRef))
-                    Symbol(R.drawable.studio_expand_more, null)
-                }
-                val options = listOf(RefAction(uiString(R.string.gr_checked_out)) { source = Constants.HEAD }) +
-                    data.branches.map { RefAction(it.name) { source = it.fullName } }
-                RefDropdown(choose, { choose = false }, options)
+    StudioPageTransition(selected, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { commitId ->
+        if (commitId != null) {
+            RefCommitDetail(session, commitId, showActions = true, close = { selected = null }, prompt = { prompt = it })
+        } else {
+            val data = rememberRefData(session, source to count) { git ->
+                val branches = GitRefs.branches(git)
+                val ref = source.takeIf { target -> branches.any { it.fullName == target } } ?: Constants.HEAD
+                val commits = GitRefs.history(git, ref, count + 1)
+                RefHistory(branches, commits, ref, gitGraph(commits))
             }
-            val date = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
-            val lanes = data.graph.maxOfOrNull { it.lanes } ?: 1
-            LazyColumn(Modifier.fillMaxSize(), state = scroll) {
-                if (data.commits.isEmpty()) item {
-                    Text(uiString(R.string.no_commits_yet), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (data == null) {
+                if (session.problem == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                return@StudioPageTransition
+            }
+            var choose by remember { mutableStateOf(false) }
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.padding(horizontal = 4.dp)) {
+                    TextButton({ choose = true }) {
+                        Symbol(R.drawable.studio_git_branch, null, Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (data.selectedRef == Constants.HEAD) uiString(R.string.gr_checked_out) else Repository.shortenRefName(data.selectedRef))
+                        Symbol(R.drawable.studio_expand_more, null)
+                    }
+                    val options = listOf(RefAction(uiString(R.string.gr_checked_out)) { source = Constants.HEAD }) +
+                        data.branches.map { RefAction(it.name) { source = it.fullName } }
+                    RefDropdown(choose, { choose = false }, options)
                 }
-                itemsIndexed(data.commits.take(count), key = { _, commit -> commit.id }) { index, commit ->
-                    RefHistoryRow(commit, data.graph[index], lanes, date, open = { selected = commit.id })
-                }
-                if (data.commits.size > count) item {
-                    TextButton({ count += 50 }, Modifier.fillMaxWidth()) { Text(uiString(R.string.gr_load_more)) }
+                val date = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
+                val lanes = data.graph.maxOfOrNull { it.lanes } ?: 1
+                LazyColumn(Modifier.fillMaxSize(), state = scroll) {
+                    if (data.commits.isEmpty()) item {
+                        Text(uiString(R.string.no_commits_yet), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    itemsIndexed(data.commits.take(count), key = { _, commit -> commit.id }) { index, commit ->
+                        RefHistoryRow(commit, data.graph[index], lanes, date, open = { selected = commit.id })
+                    }
+                    if (data.commits.size > count) item {
+                        TextButton({ count += 50 }, Modifier.fillMaxWidth()) { Text(uiString(R.string.gr_load_more)) }
+                    }
                 }
             }
         }

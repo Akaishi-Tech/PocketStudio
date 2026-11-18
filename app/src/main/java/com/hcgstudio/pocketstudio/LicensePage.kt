@@ -99,30 +99,33 @@ internal fun LicensePage(dismiss: () -> Unit) {
                         style = MaterialTheme.typography.titleLarge)
                 }
                 HorizontalDivider()
-                if (component == null) {
-                    LazyColumn(state = listState) {
-                        items(components, key = { it.name }) { entry ->
-                            ListItem(headlineContent = { Text(entry.name) }, supportingContent = { Text(entry.license) },
-                                modifier = Modifier.clickable { selection = entry.name })
+                StudioPageTransition(component?.name, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { name ->
+                    if (name == null) {
+                        LazyColumn(state = listState) {
+                            items(components, key = { it.name }) { item ->
+                                ListItem(headlineContent = { Text(item.name) }, supportingContent = { Text(item.license) },
+                                    modifier = Modifier.clickable { selection = item.name })
+                            }
                         }
-                    }
-                } else key(component) {
-                    val error = stringResource(R.string.license_read_error)
-                    val blocks by produceState<List<String>?>(null, component) {
-                        value = withContext(Dispatchers.IO) {
-                            try {
-                                noticeBlocks(component.files.asSequence().map { file ->
-                                    file to (runtimeNotices[file] ?: context.assets.open("licenses/$file")
-                                        .bufferedReader().use { it.readText() })
-                                })
-                            } catch (_: IOException) { listOf(error) }
+                    } else {
+                        val entry = components.first { it.name == name }
+                        val error = stringResource(R.string.license_read_error)
+                        val blocks by produceState<List<String>?>(null, entry) {
+                            value = withContext(Dispatchers.IO) {
+                                try {
+                                    noticeBlocks(entry.files.asSequence().map { file ->
+                                        file to (runtimeNotices[file] ?: context.assets.open("licenses/$file")
+                                            .bufferedReader().use { it.readText() })
+                                    })
+                                } catch (_: IOException) { listOf(error) }
+                            }
                         }
-                    }
-                    val content = blocks
-                    if (content == null) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    else LazyColumn(contentPadding = PaddingValues(16.dp)) {
-                        items(content) { block ->
-                            SelectionContainer { Text(block, style = MaterialTheme.typography.bodyMedium) }
+                        val content = blocks
+                        if (content == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        else LazyColumn(contentPadding = PaddingValues(16.dp)) {
+                            items(content) { block ->
+                                SelectionContainer { Text(block, style = MaterialTheme.typography.bodyMedium) }
+                            }
                         }
                     }
                 }

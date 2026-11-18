@@ -171,17 +171,30 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    if (w.tool == Tool.Codex) CodexPane(w, openAgentAccount)
-                    if ((wide && w.tool != Tool.Codex) || w.tool == Tool.Editor) EditorPane(w, className, Modifier.fillMaxWidth().weight(1f)) {
-                        if (wide) setTree(true)
-                        w.tool = Tool.Project
+                    val tool = w.tool
+                    val mainPane = if (wide && tool != Tool.Codex) Tool.Editor else tool
+                    StudioPageTransition(mainPane, { 0 }, Modifier.fillMaxWidth().weight(1f)) { pane ->
+                        when (pane) {
+                            Tool.Editor -> EditorPane(w, className, Modifier.fillMaxSize()) {
+                                if (wide) setTree(true)
+                                w.tool = Tool.Project
+                            }
+                            Tool.Project -> ProjectPane(w, actions, Modifier.fillMaxSize(), openEntry)
+                            Tool.Codex -> CodexPane(w, openAgentAccount)
+                            Tool.Devices -> DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1)
+                            Tool.Output -> OutputPane(w, actions, Modifier.fillMaxSize())
+                        }
                     }
-                    if (!wide && w.tool == Tool.Project) ProjectPane(w, actions, Modifier.fillMaxSize(), openEntry)
-                    if (w.tool == Tool.Devices || w.tool == Tool.Output) {
-                        if (wide) HorizontalDivider()
-                        val panel = if (wide) Modifier.fillMaxWidth().height((height * .39f).coerceIn(120.dp, 370.dp)) else Modifier.fillMaxSize()
-                        if (w.tool == Tool.Devices) DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1, panel)
-                        else OutputPane(w, actions, panel)
+                    if (wide) {
+                        val bottomPane = tool.takeIf { it == Tool.Devices || it == Tool.Output }
+                        StudioPageTransition(bottomPane, { 0 }, Modifier.fillMaxWidth()) { pane ->
+                            if (pane != null) Column {
+                                HorizontalDivider()
+                                val panel = Modifier.fillMaxWidth().height((height * .39f).coerceIn(120.dp, 370.dp))
+                                if (pane == Tool.Devices) DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1, panel)
+                                else OutputPane(w, actions, panel)
+                            }
+                        }
                     }
                 }
             }
@@ -331,7 +344,9 @@ private fun EditorPane(w: Workspace, className: String, modifier: Modifier, show
     Column(modifier.background(colors.surface)) {
         if (doc != null) {
             if (LocalStudioSettings.current.showEditorTabs) EditorTabs(w)
-            StudioEditor(doc.editor, Modifier.fillMaxSize(), w.devices.markersFor(className)) { line -> w.devices.toggleBreakpoint(className, line) }
+            StudioPageTransition(doc, { 0 }, Modifier.fillMaxSize()) { tab ->
+                StudioEditor(tab.editor, Modifier.fillMaxSize(), w.devices.markersFor(className)) { line -> w.devices.toggleBreakpoint(className, line) }
+            }
         } else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             TextButton(showProject) { Symbol(R.drawable.studio_folder_open, null); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.select_a_project_file)) }
         }

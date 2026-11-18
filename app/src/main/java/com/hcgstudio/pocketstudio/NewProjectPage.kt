@@ -79,38 +79,42 @@ internal fun NewProjectPage(w: Workspace) {
                     Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
             }
             HorizontalDivider()
-            if (configuring) {
-                Column(Modifier.weight(1f).widthIn(max = 540.dp).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(name, { name = it; w.creationError = null }, Modifier.fillMaxWidth(),
-                        singleLine = true, enabled = enabled, label = { Text(stringResource(R.string.project_name)) },
-                        isError = nameError != null, supportingText = nameError?.let { { Text(it) } },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
-                    OutlinedTextField(packageName, { customPackage = it; w.creationError = null }, Modifier.fillMaxWidth(),
-                        singleLine = true, enabled = enabled, label = { Text(stringResource(R.string.package_name)) },
-                        isError = packageError != null, supportingText = packageError?.let { { Text(it) } },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri,
-                            autoCorrectEnabled = false, imeAction = ImeAction.Done))
-                    ProjectLocation(w, parent, name.trim(), enabled) {
-                        focus.clearFocus()
-                        picker.launch(parent)
-                    }
-                    if (template != ProjectTemplate.NO_ACTIVITY) {
-                        ProjectChoice(stringResource(R.string.wizard_language), language, ProjectLanguage.entries,
-                            { if (it == ProjectLanguage.JAVA) "Java" else "Kotlin" }, enabled) {
-                            language = it
-                            w.creationError = null
+            StudioPageTransition(configuring, { if (it) 1 else 0 }, Modifier.weight(1f).fillMaxWidth()) { showForm ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    if (showForm) {
+                        Column(Modifier.widthIn(max = 540.dp).fillMaxSize()
+                            .verticalScroll(rememberScrollState()).padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedTextField(name, { name = it; w.creationError = null }, Modifier.fillMaxWidth(),
+                                singleLine = true, enabled = enabled, label = { Text(stringResource(R.string.project_name)) },
+                                isError = nameError != null, supportingText = nameError?.let { { Text(it) } },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
+                            OutlinedTextField(packageName, { customPackage = it; w.creationError = null }, Modifier.fillMaxWidth(),
+                                singleLine = true, enabled = enabled, label = { Text(stringResource(R.string.package_name)) },
+                                isError = packageError != null, supportingText = packageError?.let { { Text(it) } },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri,
+                                    autoCorrectEnabled = false, imeAction = ImeAction.Done))
+                            ProjectLocation(w, parent, name.trim(), enabled) {
+                                focus.clearFocus()
+                                picker.launch(parent)
+                            }
+                            if (template != ProjectTemplate.NO_ACTIVITY) {
+                                ProjectChoice(stringResource(R.string.wizard_language), language, ProjectLanguage.entries,
+                                    { if (it == ProjectLanguage.JAVA) "Java" else "Kotlin" }, enabled) {
+                                    language = it
+                                    w.creationError = null
+                                }
+                            }
+                            ProjectChoice(stringResource(R.string.wizard_min_sdk), minSdk,
+                                (ProjectTemplate.MIN_SDK..ProjectTemplate.MAX_SDK).toList(), { "API $it" }, enabled) {
+                                minSdk = it
+                                w.creationError = null
+                            }
                         }
-                    }
-                    ProjectChoice(stringResource(R.string.wizard_min_sdk), minSdk,
-                        (ProjectTemplate.MIN_SDK..ProjectTemplate.MAX_SDK).toList(), { "API $it" }, enabled) {
-                        minSdk = it
-                        w.creationError = null
+                    } else {
+                        TemplateGallery(template, Modifier.fillMaxHeight()) { template = it }
                     }
                 }
-            } else {
-                TemplateGallery(template, Modifier.weight(1f)) { template = it }
             }
             if (w.busy) LinearProgressIndicator(Modifier.fillMaxWidth()) else HorizontalDivider()
             Column(Modifier.widthIn(max = 740.dp).fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {

@@ -68,8 +68,8 @@ internal fun GitPage(session: GitSession) {
                 else PrimaryTabRow(session.tab.ordinal, tabs = tabs)
             }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                Box(Modifier.widthIn(max = 1080.dp).fillMaxSize()) {
-                    when (session.tab) {
+                StudioPageTransition(session.tab, { 0 }, Modifier.widthIn(max = 1080.dp).fillMaxSize()) { tab ->
+                    when (tab) {
                         GitTab.Changes -> GitChangesTab(session)
                         GitTab.History -> GitHistoryTab(session)
                         GitTab.Branches -> GitBranchesTab(session)
