@@ -1,0 +1,4 @@
+22f0e87bec7ead6dc819fb5b2db2da8ff1d296c0affd8c51db853b64487f9ac8  app/src/main/jniLibs/arm64-v8a/libstudio_adb.so
+7d250fc83094cef408dd11ddb228d4f955a3e21c3b0773403bba323efa927707  app/src/main/jniLibs/armeabi-v7a/libstudio_adb.so
+838fe89553d0f183e90537b5ad648f765c9bb940b1c478e0b442b75dd123d247  app/src/main/jniLibs/x86/libstudio_adb.so
+ba8c5d826ab0d1d4391cba7dc0373a9a3414617006d4e52ae199248180d34038  app/src/main/jniLibs/x86_64/libstudio_adb.so

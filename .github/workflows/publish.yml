@@ -1,0 +1,69 @@
+name: Build and publish Android packages
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      bump:
+        default: patch
+        type: string
+    secrets:
+      ANDROID_KEYSTORE_BASE64: {required: true}
+      ANDROID_KEYSTORE_PASSWORD: {required: true}
+      ANDROID_KEY_ALIAS: {required: true}
+      ANDROID_KEY_PASSWORD: {required: true}
+
+# The manual and scheduled entry points must serialize their version allocation and asset swaps.
+concurrency:
+  group: pocketstudio-release
+  queue: max
+
+permissions: {}
+jobs:
+  publish:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    permissions:
+      contents: write
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      BUMP: ${{ inputs.bump }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve release versions and signed upstream packages
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py plan
+      - name: Set up the Android build
+        if: steps.plan.outputs.publish == 'true'
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
+          if [[ "$CHANNEL" == app ]]; then
+            git submodule update --init --depth=1 --filter=blob:none -- upstream/release/tools/base
+          fi
+      - name: Build and verify signed APKs
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          umask 077
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/pocketstudio-release.keystore"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          unset ANDROID_KEYSTORE_BASE64
+          python3 .github/scripts/release.py build
+      - name: Publish verified release assets
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py publish

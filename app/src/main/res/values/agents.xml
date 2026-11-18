@@ -1,0 +1,16 @@
+<resources>
+    <string name="agents_tab_label">Agents</string>
+    <string name="choose_model">Choose model</string>
+    <string name="loading_models">Loading models…</string>
+    <string name="refresh_models">Refresh models</string>
+    <string name="reasoning_effort_value">Effort · %1$s</string>
+    <string name="effort_none">None</string>
+    <string name="effort_minimal">Minimal</string>
+    <string name="effort_low">Low</string>
+    <string name="effort_medium">Medium</string>
+    <string name="effort_high">High</string>
+    <string name="effort_xhigh">Extra high</string>
+    <string name="effort_max">Max</string>
+    <string name="effort_ultra">Ultra</string>
+    <string name="fast_mode">Fast</string>
+</resources>

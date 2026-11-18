@@ -1,0 +1,20 @@
+android {
+    sourceSets.main.assets.srcDir '../build-support/assets'
+    sourceSets.androidTest.java.srcDir '../build-support/androidTest'
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols += ['**/libaapt2.so', '**/libstudio_jdk_*.so']
+        }
+        resources.merges += ['META-INF/LICENSE.md']
+        resources.excludes += ['META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA']
+    }
+}
+
+dependencies {
+    implementation 'com.davidehrmann.vcdiff:vcdiff-core:0.2.0'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:5.13.5.202508271544-r'
+    implementation 'org.eclipse.jdt.core.compiler:ecj:4.6.1'
+    implementation 'com.jakewharton.android.repackaged:dalvik-dx:14.0.0_r21'
+    implementation 'com.android.tools.build:apksig:9.2.0'
+}

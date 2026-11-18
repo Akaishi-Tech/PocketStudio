@@ -1,0 +1,4 @@
+<resources>
+    <string name="open_source_licenses">开源许可证</string>
+    <string name="license_read_error">无法打开许可证原文。</string>
+</resources>

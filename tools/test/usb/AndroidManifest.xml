@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.ondevice.studio.adbcheck">
+    <application android:label="USB transport test" />
+    <instrumentation android:name="com.hcgstudio.pocketstudio.adb.UsbCheckRunner"
+        android:targetPackage="dev.ondevice.studio.adbcheck" />
+</manifest>

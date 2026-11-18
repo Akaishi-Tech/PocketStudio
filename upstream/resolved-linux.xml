@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="aosp" fetch=".." review="https://android-review.googlesource.com/"/>
+  
+  <default remote="aosp" revision="refs/tags/studio-2026.2.2" sync-j="4"/>
+  
+  <project name="assets/android-studio-ux-assets" path="tools/assets" revision="12cb5d3f886788b74450295f62da9d7517e7ba94" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/build/bazel" path="build/bazel" revision="c0869c66e6d10dc357079edae0ba6bf45f1d567a" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/doclava" path="external/doclava" revision="643307993b5fe7f59ead04c1ffde16fc6cebecbb" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/dokka" path="external/dokka" revision="00daf26e8eefb2128dfc4619720f3df00b2488e0" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" groups="pdk" clone-depth="1"/>
+  <project name="platform/external/gflags" path="external/gflags" revision="b894dbe85731174ff1b654e858eea3a0978d73b9" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/ggml-org/llama.cpp" path="tools/vendor/ggml-org/llama.cpp" revision="0c5016e023cd308833d194ed52a2f3d08614e3bf" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/googletest" path="external/googletest" revision="5c08f92c881b666998a4f7852c3cf9e393bf33a7" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/gradle-profiler" path="external/gradle-profiler" revision="0c7c62e5af3904f9ebe5fddcc2dc8eb20716695b" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/intellij-plugins" path="external/intellij-plugins" revision="63ef1b752dfb85b69434af32df937a394525a96f" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/jarjar" path="external/jarjar" revision="741153e06175fbe4c2da2ad2ab8b704d9ab30259" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/jetbrains/kotlin" path="external/jetbrains/kotlin" revision="2dfeccde1656af8f2959ac2334700b44ad5da9da" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/modelcontextprotocol/kotlin-sdk" path="tools/vendor/modelcontextprotocol/kotlin-sdk" revision="acbcfab176d66dc0234c7b6b1ab8a5c1ea184c28" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/nanopb-c" path="external/nanopb-c" revision="e90dd6b4b2809aa628e748e134f885683dfa7dba" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/python/absl-py" path="external/python/absl-py" revision="bd7cdd4d3776c9d08bbfea96d711958b24a9fe9c" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/external/redhat-developer/lsp4ij" path="tools/vendor/redhat-developer/lsp4ij" revision="9905585ea81a7a4c6bc0c747a17259b7a467d97b" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/frameworks/data-binding" path="tools/data-binding" revision="095589870a0261b308b757d1d4660db1fa04b29e" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/frameworks/layoutlib" path="frameworks/layoutlib" revision="50fcfc00f5284cb4f0c6259f9c8e2e1e26c9e150" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" groups="layoutlib,notdefault" clone-depth="1"/>
+  <project name="platform/prebuilts/bazel/linux-x86_64" path="prebuilts/bazel/linux-x86_64" revision="cbfea541e55cb61eca7ab676b51389ae66621d3e" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" groups="notdefault,platform-linux" clone-depth="1"/>
+  <project name="platform/prebuilts/clang/host/linux-x86" path="prebuilts/clang/host/linux-x86" revision="ce276b6cb479da08f0b84bbf42afcee78493aa52" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" groups="notdefault,platform-linux" clone-depth="1"/>
+  <project name="platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" path="prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" revision="56ddafaf3094e4316e3086f6a98b426d3d61cf48" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" groups="notdefault,platform-linux" clone-depth="1"/>
+  <project name="platform/prebuilts/python/darwin-x86" path="prebuilts/python/darwin-x86" revision="4bddd7c1de0c84a9c93d093c16bf36ded1b8a55e" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/python/linux-x86" path="prebuilts/python/linux-x86" revision="5915f6e5210e8f138826eeb603b3e2dd02cbc4cd" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/python/windows-x86" path="prebuilts/python/windows-x86" revision="c709cc75fe71937544d0814af44f7fbf31b58c1a" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/r8" path="prebuilts/r8" revision="dcafa77b0d5add2fb81d91abd3dd3cd5555bbd6e" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/studio/jdk" path="prebuilts/studio/jdk" revision="89e290af29b152439294f797e1bc26ec58e89a7c" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/studio/layoutlib" path="prebuilts/studio/layoutlib" revision="6903b3c1e61f18a3b89e1782be3fed20d8305196" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/prebuilts/tools" path="prebuilts/tools" revision="64fc0359521f076b56f63a7441f2f7f94a5f194b" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/system/logging" path="external/android/system/logging" revision="2a8812ee44c811bb0cb7d0f388a355b462c6be81" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/tools/adt/idea" path="tools/adt/idea" revision="20c7e9335f817f368be3e519d29805ffe00e6dcc" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/analytics-library" path="tools/analytics-library" revision="10ae071ce82f1760428c676328b916debada9396" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/apksig" path="tools/apksig" revision="5b00a9cf7c91df6d3642e9792e27530bfcb340f1" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/apkzlib" path="tools/apkzlib" revision="0ed4da152628812f2efeb770519a0fc38cb115dd" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/base" path="tools/base" revision="602d2ddc2b0098f62a657af26b90b0ac1034a6f6" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2">
+    <linkfile src="agent/toplevel.AGENTS.md" dest="AGENTS.md"/>
+    <linkfile src="bazel/tools.BUILD.bazel" dest="tools/BUILD.bazel"/>
+    <linkfile src="bazel/toplevel.BUILD.bazel" dest="BUILD.bazel"/>
+    <linkfile src="bazel/toplevel.WORKSPACE" dest="WORKSPACE"/>
+    <linkfile src="bazel/toplevel.MODULE.bazel" dest="MODULE.bazel"/>
+    <linkfile src="bazel/toplevel.MODULE.bazel.lock" dest="MODULE.bazel.lock"/>
+    <linkfile src="bazel/toplevel.bazelignore" dest=".bazelignore"/>
+    <linkfile src="bazel/toplevel.bazelversion" dest=".bazelversion"/>
+    <linkfile src="bazel/toplevel.bazelrc" dest=".bazelrc"/>
+    <linkfile src="bazel/toplevel.editorconfig" dest=".editorconfig"/>
+    <linkfile src="bazel/sdk/prebuilts.studio.sdk.BUILD" dest="prebuilts/studio/sdk/BUILD"/>
+    <linkfile src="bazel/sdk/prebuilts.studio.sdk.README.md" dest="prebuilts/studio/sdk/README.md"/>
+    <linkfile src="bazel/toolchains/darwin/wrapped_ar" dest="prebuilts/clang/studio-extra/wrapped_ar.darwin"/>
+    <linkfile src="bazel/bzlmod/vendor/vendor.MODULE.bazel" dest="tools/vendor.MODULE.bazel"/>
+  </project>
+  <project name="platform/tools/buildSrc" path="tools/buildSrc" revision="5b6670ff8a06828a96a114519b95c4774f1659c3" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2">
+    <copyfile src="base/settings.gradle" dest="tools/settings.gradle"/>
+    <copyfile src="base/gradlew" dest="tools/gradlew"/>
+    <copyfile src="base/gradlew.bat" dest="tools/gradlew.bat"/>
+    <linkfile src="base/build.gradle" dest="tools/build.gradle"/>
+    <linkfile src="base/gradle.properties" dest="tools/gradle.properties"/>
+  </project>
+  <project name="platform/tools/dexter" path="external/dexter" revision="861a1b26fc155344d9746afec6f8b6cf4ea3e2d8" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/emulator" path="tools/emulator" revision="0f299c23dc29d430f7dcfe27bd673d21b4c241e9" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/external/bazelbuild-rules-kotlin" path="tools/external/bazelbuild-rules-kotlin" revision="cab5eaffc2012dfe46260c03d6419c0d2fa10be0" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/external/fat32lib" path="tools/external/fat32lib" revision="8c68508ebf1aee1c2e025f0646af61f8cd49d2bc" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/external/gradle" path="tools/external/gradle" revision="0e3f8fca5daa00083891b7c5f220b6bd9fdbe9df" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2" clone-depth="1"/>
+  <project name="platform/tools/gradle" path="tools/gradle" revision="6cf0ef72542ec050ec05aa4f8465c8ec79292c5a" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/gradle-recipes" path="tools/gradle-recipes" revision="c4d877e7f7c312ee5c6fc2062b62c8d091ab0760" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/idea" path="tools/idea" revision="51601cde8d8b67db9da5098d7ad4f699df5a6205" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/repohooks" path="tools/repohooks" revision="42a49780aec260ef748e14646bfb9dc8afc3e6f9" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  <project name="platform/tools/studio/google/cloud/testing" path="tools/studio/google/cloud/testing" revision="28cd89a4ad1719a465c42ddd9cd8e2678004694a" upstream="refs/tags/studio-2026.2.2" dest-branch="refs/tags/studio-2026.2.2"/>
+  
+  <repo-hooks in-project="platform/tools/repohooks" enabled-list="pre-upload"/>
+  
+  <superproject name="platform/superproject" revision="studio-2026.2.2"/>
+  
+  <contactinfo bugurl="go/repo-bug"/>
+</manifest>

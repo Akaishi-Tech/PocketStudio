@@ -1,0 +1,7 @@
+/build/
+/release/.repo/
+/release/resolved-manifest.xml
+# Legacy Repo creates these links even though the release tag has no target.
+/release/AGENTS.md
+/release/WORKSPACE
+/release/prebuilts/clang/studio-extra/wrapped_ar.darwin

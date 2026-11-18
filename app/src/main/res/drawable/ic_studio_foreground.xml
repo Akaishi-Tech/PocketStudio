@@ -1,0 +1,16 @@
+<!-- Artwork source: artwork/pocket-studio.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#D2F779"
+        android:pathData="M33 42V33C33 28.6 36.2 26 40.5 27L69 33.7Q71 34.2 72.3 35.4Z" />
+    <path
+        android:fillColor="#9AEAC8"
+        android:fillType="evenOdd"
+        android:pathData="M32.2 46L74.4 38.9C78.3 38.2 81 40.6 81 44.5V56.5C81 62.2 78.4 66.2 73.6 69.1L58.8 78.2C55.7 80.1 52.3 80.1 49.2 78.2L34.4 69.1C29.6 66.2 27 62.2 27 56.5V52.1C27 48.8 28.9 46.6 32.2 46Z
+            M40.5 52.3Q42.1 50.6 43.8 52L51 57.7Q53.1 59.4 51 61.1L43.8 66.8Q42.1 68.2 40.5 66.5Q38.9 64.7 40.8 63.1L45.6 59.4L40.8 55.7Q38.9 54.2 40.5 52.3Z
+            M56.4 62.1H65.3A2.4 2.4 0 0 1 65.3 66.9H56.4A2.4 2.4 0 0 1 56.4 62.1Z" />
+</vector>

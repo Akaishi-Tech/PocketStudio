@@ -1,0 +1,27 @@
+Offline Java debug build components
+
+AAPT2 2.20 from AOSP android-17.0.0_r1, built for four Android ABIs.
+Static NDK r29 builds with a 16 KiB maximum page size, API level 30.
+Source, patches, build recipes and binary distribution by Iconify:
+https://github.com/Mahmud0808/Iconify/tree/f619d546fe14bbee38cc7748139f31168e6255e1/tools/sdk-tools
+https://github.com/Mahmud0808/Iconify/tree/f619d546fe14bbee38cc7748139f31168e6255e1/app/src/main/jniLibs
+
+Eclipse Java Compiler 4.6.1 (Eclipse Public License 1.0)
+https://repo.maven.apache.org/maven2/org/eclipse/jdt/core/compiler/ecj/4.6.1/
+
+Dalvik DX android-14.0.0_r21 (Apache License 2.0)
+https://github.com/JakeWharton/dalvik-dx/tree/14.0.0_r21
+Android APK Signature Scheme library 9.2.0 (Apache License 2.0)
+https://android.googlesource.com/platform/tools/apksig/
+
+JGit 5.13.5 (Eclipse Distribution License, BSD-3-Clause)
+https://www.eclipse.org/jgit/
+
+OpenJDK 17 for Android, GPL-2.0-only with the Classpath Exception.
+The runtime images retain OpenJDK's legal/ notices and third-party licenses.
+Upstream JDK sources:
+https://github.com/openjdk/jdk17u/tree/jdk-17.0.21.0.2-ga
+Android patches, toolchain and license information:
+https://github.com/MojoLauncher/android-openjdk-build-17-25/tree/1e90171cce3eca93c14c6ec59811bd88a9792f34
+Native binaries and images from this build:
+https://github.com/MojoLauncher/android-openjdk-build-17-25/actions/runs/39842631198

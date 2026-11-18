@@ -1,0 +1,24 @@
+Wireless debugging uses on-device AOSP adb client/server builds under the Apache License 2.0.
+The packaged executables are named libstudio_adb.so so the Android Package Manager installs
+them in the native library directory. Only the adb program is included from each distribution.
+
+arm64-v8a: AOSP platform-tools 35.0.2, NDK r29, 16 KiB ELF LOAD alignment.
+Unmodified prebuilt/adb (Git blob 26d529a704be06d2da03a4683b8d45bfd34679ba).
+Build recipe, patches and notice:
+https://github.com/henry5450/adb-for-android/tree/8c0600f76ec06c26d0689f757ed2b60e4c703eb7
+
+armeabi-v7a and x86_64: AndroidIDEOfficial platform-tools v34.0.4.
+Unmodified platform-tools/adb from the arm and x86_64 release archives.
+https://github.com/AndroidIDEOfficial/platform-tools/releases/tag/v34.0.4
+
+x86: AOSP platform-tools 35.0.2. platform-tools/adb from android-sdk-tools-static-x86.zip,
+with ELF debugging symbols removed using llvm-strip --strip-all.
+https://github.com/lzhiyong/android-sdk-tools/releases/tag/35.0.2
+
+Android Open Source Project:
+https://android.googlesource.com/platform/packages/modules/adb/
+SDK platform-tools notices:
+https://dl.google.com/android/repository/platform-tools_r34.0.4-linux.zip
+https://dl.google.com/android/repository/platform-tools_r35.0.2-linux.zip
+
+Verify the binaries from the repository root with sha256sum -c build-support/ADB-SHA256SUMS.

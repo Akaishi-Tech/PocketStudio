@@ -1,0 +1,176 @@
+[submodule "tools/assets"]
+	path = upstream/release/tools/assets
+	url = https://android.googlesource.com/assets/android-studio-ux-assets
+	shallow = true
+[submodule "build/bazel"]
+	path = upstream/release/build/bazel
+	url = https://android.googlesource.com/platform/build/bazel
+	shallow = true
+[submodule "external/doclava"]
+	path = upstream/release/external/doclava
+	url = https://android.googlesource.com/platform/external/doclava
+	shallow = true
+[submodule "external/dokka"]
+	path = upstream/release/external/dokka
+	url = https://android.googlesource.com/platform/external/dokka
+	shallow = true
+[submodule "external/gflags"]
+	path = upstream/release/external/gflags
+	url = https://android.googlesource.com/platform/external/gflags
+	shallow = true
+[submodule "tools/vendor/ggml-org/llama.cpp"]
+	path = upstream/release/tools/vendor/ggml-org/llama.cpp
+	url = https://android.googlesource.com/platform/external/ggml-org/llama.cpp
+	shallow = true
+[submodule "external/googletest"]
+	path = upstream/release/external/googletest
+	url = https://android.googlesource.com/platform/external/googletest
+	shallow = true
+[submodule "external/gradle-profiler"]
+	path = upstream/release/external/gradle-profiler
+	url = https://android.googlesource.com/platform/external/gradle-profiler
+	shallow = true
+[submodule "external/intellij-plugins"]
+	path = upstream/release/external/intellij-plugins
+	url = https://android.googlesource.com/platform/external/intellij-plugins
+	shallow = true
+[submodule "external/jarjar"]
+	path = upstream/release/external/jarjar
+	url = https://android.googlesource.com/platform/external/jarjar
+	shallow = true
+[submodule "external/jetbrains/kotlin"]
+	path = upstream/release/external/jetbrains/kotlin
+	url = https://android.googlesource.com/platform/external/jetbrains/kotlin
+	shallow = true
+[submodule "tools/vendor/modelcontextprotocol/kotlin-sdk"]
+	path = upstream/release/tools/vendor/modelcontextprotocol/kotlin-sdk
+	url = https://android.googlesource.com/platform/external/modelcontextprotocol/kotlin-sdk
+	shallow = true
+[submodule "external/nanopb-c"]
+	path = upstream/release/external/nanopb-c
+	url = https://android.googlesource.com/platform/external/nanopb-c
+	shallow = true
+[submodule "external/python/absl-py"]
+	path = upstream/release/external/python/absl-py
+	url = https://android.googlesource.com/platform/external/python/absl-py
+	shallow = true
+[submodule "tools/vendor/redhat-developer/lsp4ij"]
+	path = upstream/release/tools/vendor/redhat-developer/lsp4ij
+	url = https://android.googlesource.com/platform/external/redhat-developer/lsp4ij
+	shallow = true
+[submodule "tools/data-binding"]
+	path = upstream/release/tools/data-binding
+	url = https://android.googlesource.com/platform/frameworks/data-binding
+	shallow = true
+[submodule "frameworks/layoutlib"]
+	path = upstream/release/frameworks/layoutlib
+	url = https://android.googlesource.com/platform/frameworks/layoutlib
+	shallow = true
+[submodule "prebuilts/bazel/linux-x86_64"]
+	path = upstream/release/prebuilts/bazel/linux-x86_64
+	url = https://android.googlesource.com/platform/prebuilts/bazel/linux-x86_64
+	shallow = true
+[submodule "prebuilts/clang/host/linux-x86"]
+	path = upstream/release/prebuilts/clang/host/linux-x86
+	url = https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
+	shallow = true
+[submodule "prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8"]
+	path = upstream/release/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8
+	url = https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8
+	shallow = true
+[submodule "prebuilts/python/darwin-x86"]
+	path = upstream/release/prebuilts/python/darwin-x86
+	url = https://android.googlesource.com/platform/prebuilts/python/darwin-x86
+	shallow = true
+[submodule "prebuilts/python/linux-x86"]
+	path = upstream/release/prebuilts/python/linux-x86
+	url = https://android.googlesource.com/platform/prebuilts/python/linux-x86
+	shallow = true
+[submodule "prebuilts/python/windows-x86"]
+	path = upstream/release/prebuilts/python/windows-x86
+	url = https://android.googlesource.com/platform/prebuilts/python/windows-x86
+	shallow = true
+[submodule "prebuilts/r8"]
+	path = upstream/release/prebuilts/r8
+	url = https://android.googlesource.com/platform/prebuilts/r8
+	shallow = true
+[submodule "prebuilts/studio/jdk"]
+	path = upstream/release/prebuilts/studio/jdk
+	url = https://android.googlesource.com/platform/prebuilts/studio/jdk
+	shallow = true
+[submodule "prebuilts/studio/layoutlib"]
+	path = upstream/release/prebuilts/studio/layoutlib
+	url = https://android.googlesource.com/platform/prebuilts/studio/layoutlib
+	shallow = true
+[submodule "prebuilts/tools"]
+	path = upstream/release/prebuilts/tools
+	url = https://android.googlesource.com/platform/prebuilts/tools
+	shallow = true
+[submodule "external/android/system/logging"]
+	path = upstream/release/external/android/system/logging
+	url = https://android.googlesource.com/platform/system/logging
+	shallow = true
+[submodule "tools/adt/idea"]
+	path = upstream/release/tools/adt/idea
+	url = https://android.googlesource.com/platform/tools/adt/idea
+	shallow = true
+[submodule "tools/analytics-library"]
+	path = upstream/release/tools/analytics-library
+	url = https://android.googlesource.com/platform/tools/analytics-library
+	shallow = true
+[submodule "tools/apksig"]
+	path = upstream/release/tools/apksig
+	url = https://android.googlesource.com/platform/tools/apksig
+	shallow = true
+[submodule "tools/apkzlib"]
+	path = upstream/release/tools/apkzlib
+	url = https://android.googlesource.com/platform/tools/apkzlib
+	shallow = true
+[submodule "tools/base"]
+	path = upstream/release/tools/base
+	url = https://android.googlesource.com/platform/tools/base
+	shallow = true
+[submodule "tools/buildSrc"]
+	path = upstream/release/tools/buildSrc
+	url = https://android.googlesource.com/platform/tools/buildSrc
+	shallow = true
+[submodule "external/dexter"]
+	path = upstream/release/external/dexter
+	url = https://android.googlesource.com/platform/tools/dexter
+	shallow = true
+[submodule "tools/emulator"]
+	path = upstream/release/tools/emulator
+	url = https://android.googlesource.com/platform/tools/emulator
+	shallow = true
+[submodule "tools/external/bazelbuild-rules-kotlin"]
+	path = upstream/release/tools/external/bazelbuild-rules-kotlin
+	url = https://android.googlesource.com/platform/tools/external/bazelbuild-rules-kotlin
+	shallow = true
+[submodule "tools/external/fat32lib"]
+	path = upstream/release/tools/external/fat32lib
+	url = https://android.googlesource.com/platform/tools/external/fat32lib
+	shallow = true
+[submodule "tools/external/gradle"]
+	path = upstream/release/tools/external/gradle
+	url = https://android.googlesource.com/platform/tools/external/gradle
+	shallow = true
+[submodule "tools/gradle"]
+	path = upstream/release/tools/gradle
+	url = https://android.googlesource.com/platform/tools/gradle
+	shallow = true
+[submodule "tools/gradle-recipes"]
+	path = upstream/release/tools/gradle-recipes
+	url = https://android.googlesource.com/platform/tools/gradle-recipes
+	shallow = true
+[submodule "tools/idea"]
+	path = upstream/release/tools/idea
+	url = https://android.googlesource.com/platform/tools/idea
+	shallow = true
+[submodule "tools/repohooks"]
+	path = upstream/release/tools/repohooks
+	url = https://android.googlesource.com/platform/tools/repohooks
+	shallow = true
+[submodule "tools/studio/google/cloud/testing"]
+	path = upstream/release/tools/studio/google/cloud/testing
+	url = https://android.googlesource.com/platform/tools/studio/google/cloud/testing
+	shallow = true

@@ -1,0 +1,30 @@
+import org.gradle.api.attributes.java.TargetJvmEnvironment
+
+plugins {
+    id 'java-library'
+}
+
+def toolsBase = file('release/tools/base')
+if (!new File(toolsBase, 'ddmlib/src/main/java/com/android/ddmlib/Log.java').isFile()) {
+    throw new GradleException('Initialize AOSP sources with git submodule update --init --depth 1 -- upstream/release/tools/base')
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets.main.java {
+    srcDirs = [new File(toolsBase, 'ddmlib/src/main/java'), new File(toolsBase, 'annotations/src/main/java')]
+    include 'com/android/ddmlib/Log.java', 'com/android/ddmlib/DdmPreferences.java'
+    include 'com/android/annotations/NonNull.java', 'com/android/annotations/Nullable.java'
+}
+
+dependencies {
+    implementation('com.google.guava:guava:33.5.0-jre') {
+        attributes {
+            attribute(TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE,
+                    objects.named(TargetJvmEnvironment, TargetJvmEnvironment.ANDROID))
+        }
+    }
+}

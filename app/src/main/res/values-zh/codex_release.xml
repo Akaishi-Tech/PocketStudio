@@ -1,0 +1,8 @@
+<resources>
+    <string name="codex_release_not_published">GitHub 上暂时没有可用的 Codex 插件版本，请在发布后重试。</string>
+    <string name="codex_invalid_release">Codex 插件正在更新或发布信息无效，请稍后重试。</string>
+    <string name="codex_github_release_error">无法从 GitHub 获取 Codex 插件（HTTP %1$d）。</string>
+    <string name="codex_migrate_runtime_title">替换本机签名的 Codex 运行时？</string>
+    <string name="codex_migrate_runtime_message">新版插件已下载并通过验证。Android 要求先卸载旧的本机签名运行时。请打开运行时的应用信息，点击「卸载」，然后返回此处安装新版。项目、对话和账号均保存在掌上 Studio 中。</string>
+    <string name="codex_open_runtime_settings">打开运行时应用信息</string>
+</resources>

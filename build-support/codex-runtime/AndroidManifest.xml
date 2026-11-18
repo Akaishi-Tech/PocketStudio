@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.hcgstudio.pocketstudio.codexruntime">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
+    <!-- Android extracts executable helpers with upstream names from debuggable, extractNativeLibs packages.
+         This resource-only package declares no permissions, components or application code. -->
+    <application android:label="掌上Studio - Codex插件" android:hasCode="false" android:debuggable="true"
+        android:extractNativeLibs="true" android:allowBackup="false"/>
+</manifest>

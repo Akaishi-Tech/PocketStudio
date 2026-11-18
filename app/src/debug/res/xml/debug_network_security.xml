@@ -1,0 +1,6 @@
+<network-security-config>
+    <!-- The Android chat test uses adb reverse to reach the model catalog fixture. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
