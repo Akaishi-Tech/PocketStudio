@@ -24,6 +24,7 @@ SUPPORT = ROOT / "build-support/codex-runtime"
 PIN = ROOT / "app/src/main/res/raw/codex_plugin_signer.der"
 KEYRING = SUPPORT / "termux-autobuilds.gpg"
 MANIFEST = SUPPORT / "AndroidManifest.xml"
+RESOURCES = SUPPORT / "res"
 APACHE = SUPPORT / "termux-Apache-2.0.txt"
 FINGERPRINT = "CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 REPO = "https://packages.termux.dev/apt/termux-main"
@@ -145,8 +146,9 @@ def lock_for(release_hash, packages):
     require(re.fullmatch(r"\d+\.\d+\.\d+(?:-\d+)?", version) and
             all(row["version"] == version for row in packages if row["name"] == "codex"),
             "Codex ABIs do not have one common Android version")
-    inputs = [Path(__file__), MANIFEST, KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN]
-    recipe = {p.name: digest_file(p) for p in inputs}
+    inputs = [Path(__file__).resolve(), MANIFEST, KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN]
+    inputs.extend(p for p in RESOURCES.rglob("*") if p.is_file())
+    recipe = {p.relative_to(ROOT).as_posix(): digest_file(p) for p in inputs}
     return {"version": version, "releaseSha256": release_hash, "packages": packages,
             "buildId": sha(canonical({"recipe": recipe, "packages": packages}))}
 
@@ -303,10 +305,12 @@ def assemble(stage, lock, code, output):
     tools, android = sdk_tools()
     work = stage.parent
     template = work / "manifest.apk"
+    compiled_resources = work / "resources.zip"
+    subprocess.run([tools / "aapt2", "compile", "--dir", RESOURCES, "-o", compiled_resources], check=True)
     subprocess.run([tools / "aapt2", "link", "-I", android, "--manifest", MANIFEST, "--version-code", str(code),
-                    "--version-name", lock["version"], "-o", template], check=True)
+                    "--version-name", lock["version"], "-o", template, compiled_resources], check=True)
     with zipfile.ZipFile(template) as compiled:
-        (stage / "AndroidManifest.xml").write_bytes(compiled.read("AndroidManifest.xml"))
+        compiled.extractall(stage)
     # Fixed ZIP metadata also makes offline rebuilds deterministic with the same SDK and signing key.
     with zipfile.ZipFile(work / "unsigned.apk", "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as apk:
         for filename in sorted(p for p in stage.rglob("*") if p.is_file()):
@@ -314,7 +318,7 @@ def assemble(stage, lock, code, output):
             entry = zipfile.ZipInfo(key, date_time=(1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
             entry.external_attr = (0o100755 if key.startswith("lib/") else 0o100644) << 16
-            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.compress_type = zipfile.ZIP_STORED if key == "resources.arsc" else zipfile.ZIP_DEFLATED
             with filename.open("rb") as src, apk.open(entry, "w") as dst:
                 shutil.copyfileobj(src, dst, BLOCK)
     aligned = work / "aligned.apk"
