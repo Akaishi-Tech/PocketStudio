@@ -86,8 +86,14 @@ private class InstalledFontStyle(
             val face = font as InstalledFontStyle
             val italic = face.style == FontStyle.Italic
             if (Build.VERSION.SDK_INT >= 28) return Typeface.create(face.base, face.weight.weight, italic)
-            val weightStyle = if (face.weight >= FontWeight.SemiBold) Typeface.BOLD else Typeface.NORMAL
-            return Typeface.create(face.base, weightStyle or (if (italic) Typeface.ITALIC else Typeface.NORMAL))
+            val bold = face.weight >= FontWeight.SemiBold
+            val legacyStyle = when {
+                bold && italic -> Typeface.BOLD_ITALIC
+                bold -> Typeface.BOLD
+                italic -> Typeface.ITALIC
+                else -> Typeface.NORMAL
+            }
+            return Typeface.create(face.base, legacyStyle)
         }
 
         override suspend fun awaitLoad(context: Context, font: AndroidFont) = loadBlocking(context, font)
