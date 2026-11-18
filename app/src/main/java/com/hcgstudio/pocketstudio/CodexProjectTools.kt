@@ -14,6 +14,13 @@ internal object CodexProjectTools {
         "description" to "Work directly on the Android project the user has opened.",
         "tools" to JSONArray(listOf(
             spec("list_files", "List one project directory. Use an empty path for its root.", "path"),
+            spec("search_project", "Search saved project text for a case-sensitive single-line literal. Returns matching paths, 1-based line numbers, excerpts and match counts.", "query"),
+            spec("get_editor_context", "Read the active editor's live selection, cursor, nearby code and unsaved state. Lines and UTF-16 columns are 1-based and selection ends are exclusive."),
+            spec("read_logcat", "Read recent Logcat lines for an installed application on the connected device, including crash logs. Defaults to the current project's built APK; supply its application ID if needed.",
+                properties = json(
+                    "packageName" to json("type" to "string", "description" to "Installed application ID on the connected device."),
+                    "maxLines" to json("type" to "integer", "minimum" to 1, "maximum" to 400, "default" to 150))),
+            spec("inspect_device_ui", "Read the current foreground UI hierarchy on the connected Android device. Returns visible control text, identifiers and screen bounds."),
             spec("read_file", "Read a UTF-8 project file and its revision for editing.", "path"),
             spec("write_file", "Write a UTF-8 file. Supply revision from read_file or 'new' to create. Parent directory must exist.", "path", "revision", "text"),
             spec("move_file", "Move or rename a file to a new relative path. Supply its current revision.", "path", "destination", "revision"),
@@ -22,11 +29,13 @@ internal object CodexProjectTools {
             spec("run_gradle", "Run this project's Gradle wrapper tasks and return the build output.", "tasks")
         ))))
 
-    private fun spec(name: String, description: String, vararg names: String) = json(
+    private fun spec(name: String, description: String, vararg names: String,
+                     properties: JSONObject = JSONObject().apply {
+                         for (field in names) put(field, json("type" to "string"))
+                     }) = json(
         "type" to "function", "name" to name, "description" to description, "deferLoading" to false,
-        "inputSchema" to json("type" to "object", "properties" to JSONObject().apply {
-            for (field in names) put(field, json("type" to "string"))
-        }, "required" to JSONArray(names.toList()), "additionalProperties" to false))
+        "inputSchema" to json("type" to "object", "properties" to properties,
+            "required" to JSONArray(names.toList()), "additionalProperties" to false))
 
     private fun digest(text: String) = MessageDigest.getInstance("SHA-256")
         .digest(text.toByteArray()).joinToString("") { "%02x".format(it) }

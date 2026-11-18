@@ -1,0 +1,16 @@
+<resources>
+    <string name="git_tab_changes">Changes</string>
+    <string name="git_tab_history">History</string>
+    <string name="git_tab_branches">Branches</string>
+    <string name="git_tab_remotes">Remotes</string>
+    <string name="git_init">Initialize repository</string>
+    <string name="git_refresh">Refresh repository</string>
+    <string name="git_repository_exists">A repository already exists here. Refresh to open it.</string>
+    <string name="git_root_required">Open the working folder that contains the repository’s .git directory.</string>
+    <string name="git_detached_head">Detached · %1$s</string>
+    <string name="git_worktree">Working tree</string>
+    <string name="git_index">Staged</string>
+    <string name="git_external_command">This operation requires an external Git command that cannot run in Studio.</string>
+    <string name="git_tls_verification">Enable TLS certificate verification for this repository to connect over HTTPS.</string>
+    <string name="git_remote_cookie_file">This repository specifies an HTTP cookie file. Remove http.cookieFile from its Git configuration to connect.</string>
+</resources>

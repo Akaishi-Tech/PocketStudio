@@ -8,7 +8,9 @@
 
 ## 开始使用
 
-在欢迎页点「新建项目」，输入项目名称，确认包名后点「选择位置」。在系统文件选择器中选定父文件夹，Studio 会在其中创建同名的 Android 项目并打开 `MainActivity.java`。已有工作区也可从「文件 → 新建项目」开始。新项目使用 Java 和 XML，在 Android 11 及以上设备安装 SDK Platform 34 后，即可在「构建」中生成调试 APK。
+在欢迎页或「文件」菜单点「新建项目」，选择「空白视图 Activity」「按钮计数器」或「无 Activity」，然后点「下一步」。填写项目名称和包名，选择父文件夹与最低 SDK。含 Activity 的模板还可选择 Java 或 Kotlin。点「完成」后，Studio 会创建同名文件夹并打开 Activity 源文件。选择「无 Activity」时会打开清单文件。
+
+在 Android 11 及以上设备上，可在 SDK Manager 安装 SDK Platform 34，然后构建调试 APK。快速构建 Kotlin 项目还需安装 Kotlin / D8。
 
 可从 [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) 下载并安装主应用 `PocketStudio.apk`，也可以[从源码构建](#从源码构建及验证)。
 
@@ -19,9 +21,14 @@
 | 智能体 | 在当前工程中使用 Codex，查看聊天记录、Markdown 回复、文件操作和构建详情 |
 | 布局 | 打开资源布局 XML，从「视图 → 预览布局」查看原生视图。支持常用控件及项目内的字符串、颜色和尺寸 |
 | 构建 | 手机内离线编译单模块 Java 工程、打包资源、签名、定位编译错误、导出及安装 APK。安装可选的 Kotlin / D8 工具后也可编译 Kotlin 工程 |
-| Gradle 和 Git | 在手机上运行工程自身的 Gradle Wrapper，执行构建、测试、Lint 或自定义任务。Git 支持查看本地状态、差异与历史 |
+| Gradle | 在手机上运行工程自身的 Gradle Wrapper，执行构建、测试、Lint 或自定义任务 |
+| Git | 克隆或初始化仓库，查看差异、按文件或区块暂存并提交，查看文件历史与逐行作者，管理分支、标签和储藏，抓取、拉取和推送 |
 | 设备 | 选择目标、安装 APK、启动应用、执行 Shell、流式 Logcat 及文本和级别过滤、目标设备屏幕与控件检查 |
 | 调试器 | 列出可调试进程、附加 ART、设置和移除多个源码行断点、检查栈和当前帧变量、单步执行、继续和分离 |
+
+从欢迎页选择「克隆仓库」，或在项目树顶端点分支图标打开 Git（`Alt+9`）。在「更改」中点文件即可查看差异。遇到冲突时，可选择保留的版本，也可打开编辑器手动合并。分支比较、合并和变基位于「分支」页，拣选、还原和重置位于对应提交的操作菜单。
+
+克隆的仓库存放在应用专用目录中，可从「最近项目」重新打开。私有 HTTPS 仓库可在传输对话框中填写用户名和访问令牌。使用 SSH 时，选择私钥和包含服务器公钥的 OpenSSH `known_hosts` 文件。
 
 在欢迎页点齿轮，或从工作区打开「文件 → 设置」（`Ctrl+Alt+S`）。界面和编辑器可分别选择字体。编辑器支持 JetBrains Mono、字体连字和配色预览，每种方案单独保存自定义颜色。设置页还可搜索缩进、保存时清理、Gradle 离线模式和控制台换行等选项。
 
@@ -33,13 +40,17 @@
 
 打开项目后点「智能体 → 下载 Codex」。Studio 从本仓库 GitHub Release 的固定标签 `codex-runtime` 下载已签名的 `PocketStudio-Codex.apk`，核对文件大小、SHA-256、包名和签名证书后打开系统安装器。插件显示为「掌上Studio - Codex插件」，内含 ARM64 和 x86_64 的原生 Codex。也可以从同一版本的发布页下载两个 APK 并分别安装。再次进入「智能体」时会检查插件更新，由你选择何时安装。
 
-在「智能体」右上角打开「账户与用量」，选择通过 Codex CLI 登录。Codex CLI 会提供验证链接和一次性验证码。在浏览器中打开验证链接，登录 ChatGPT 并输入验证码，然后返回 Studio 即可使用该账户。如果设备码登录已停用，请在 ChatGPT 的安全设置中开启，或请工作区管理员开启。[Codex 设备码登录说明](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
+在「智能体」右上角打开「账户与用量」，点「通过 Codex CLI 登录」。Studio 会打开本机浏览器。在浏览器中登录 ChatGPT，完成后返回 Studio 即可使用该账户。
+
+如果浏览器登录未能完成，回到 Studio 登录页，点「使用设备码」。打开验证页面，输入 Studio 显示的一次性验证码。如果设备码登录已停用，请在 ChatGPT 的安全设置中开启，或请工作区管理员开启。[Codex 设备码登录说明](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
 
 如果之前在 Studio 用过「使用 ChatGPT 继续」，请通过 CLI 重新登录一次。Codex 返回用量数据后，账户页面会显示当前时段的剩余额度。也可以直接查看 [Codex 用量面板](https://chatgpt.com/codex/settings/usage)。
 
 选择「使用 API 密钥」可连接 API 服务。OpenAI 使用默认 Endpoint。若要连接兼容 Responses API 的其他服务，填写其 HTTPS 基础地址，例如 `https://example.com/v1`。输入该服务的 API 密钥，点「保存连接」。费用计入对应的 API 账户。
 
 点「新聊天」向智能体提问。它可以在当前工程中列出、读取和编辑文件，运行 Gradle 任务前会显示确认。对话中的工具摘要可以展开查看操作和结果。编辑器保留未保存的草稿，文件内容发生冲突时会提示处理。
+
+你可以让 Codex 搜索工程里已保存的文件，也可以在编辑器中选中代码，直接问「这段代码做什么」。它能读取当前标签页的选区和附近尚未保存的改动。连接调试设备后，它还能查看前台界面的控件文字和边界，或读取应用最近的日志。Logcat 默认使用当前工程已构建 APK 的应用 ID。如果还没在 Studio 里构建过，可以在问题中写明已安装的应用 ID。更新 Studio 后，新建聊天即可使用新增工具。
 
 [手机上的聊天与工具详情](docs/screenshots/agents.png)
 

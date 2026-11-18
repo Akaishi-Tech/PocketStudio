@@ -53,12 +53,26 @@ public final class DeviceDebugTest extends Instrumentation {
             } else if ("editor".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.EditorChecks.run();
                 result.putString("result", "PASS editor and refactoring");
+            } else if ("codexTools".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.ProjectSearchChecks.run(getTargetContext());
+                com.hcgstudio.pocketstudio.DeviceAgentChecks.run();
+                result.putString("result", "PASS project search and device tool checks");
+            } else if ("codexDeviceTools".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.DeviceAgentChecks.runConnected(getTargetContext(),
+                        Integer.parseInt(arguments.getString("port")));
+                result.putString("result", "PASS connected Logcat and device UI inspection");
             } else if ("codexAuth".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.CodexAuthChecks.run(getTargetContext());
                 result.putString("result", "PASS isolated Codex account credentials");
             } else if ("codexChat".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.CodexChatChecks.run(getTargetContext(),
                         Integer.parseInt(arguments.getString("port")), "true".equals(arguments.getString("keep"))));
+            } else if ("gitSsh".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.GitRemoteSshChecks.run(getTargetContext(), arguments.getString("url"));
+                result.putString("result", "PASS SSH clone, key authentication and host verification");
+            } else if ("gitWorkspace".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.GitWorkspaceChecks.run(getTargetContext(), arguments.getString("tree"));
+                result.putString("result", "PASS Git staging, commits, checkout, merge abort and workspace persistence");
             } else if ("workspace".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.ProjectWorkspaceChecks.run(getTargetContext(), arguments.getString("tree"));
                 result.putString("result", "PASS selected project reads, writes, deletes, build artifacts and conflict recovery");

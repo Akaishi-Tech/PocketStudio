@@ -146,12 +146,13 @@ internal class StudioEditorState(
 
     fun insert(insertion: String) = replace(start, end, insertion)
     val lineCount get() = lineStarts.size
+    fun lineStartOffset(line: Int) = lineStarts[line - 1]
 
     fun lineAt(at: Int): Int {
         val index = lineStarts.binarySearch(at)
         return if (index >= 0) index + 1 else -index - 1
     }
-    private fun lineStart(at: Int) = lineStarts[lineAt(at) - 1]
+    private fun lineStart(at: Int) = lineStartOffset(lineAt(at))
     private fun lineEnd(at: Int): Int {
         val next = lineStarts.getOrNull(lineAt(at)) ?: return text.length
         return if (next >= 2 && text[next - 2] == '\r') next - 2 else next - 1

@@ -32,6 +32,7 @@
     <string name="settings_font_ligatures">Enable font ligatures</string>
     <string name="settings_serif">Serif</string>
     <string name="settings_monospace">Monospace</string>
+    <string name="settings_monospace_only">Monospaced only</string>
     <string name="settings_compact">Compact mode</string>
     <string name="settings_toolbar_actions">Show toolbar actions</string>
     <string name="settings_tabs">Show editor tabs</string>

@@ -28,6 +28,9 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal sealed interface DeviceDialog {
     data object LocalSetup : DeviceDialog
@@ -396,6 +399,23 @@ internal class DeviceController(context: Context) : Closeable {
             result
         }) { stopLog(); output = it; statusMessage = deviceStatus(R.string.launched, pkg) }
     }
+
+    private suspend fun queryDevice(read: suspend (Target) -> String): String = withContext(Dispatchers.Main.immediate) {
+        val selected = target ?: throw IOException(app.getString(R.string.connect_to_a_target_device_first))
+        val result = withTimeoutOrNull(30_000L) {
+            withContext(Dispatchers.IO) { read(selected) }
+        } ?: throw IOException(app.getString(R.string.agent_device_query_timeout))
+        if (target !== selected || !selected.isConnected) throw IOException(app.getString(R.string.target_device_disconnected))
+        result
+    }
+
+    suspend fun readLogcat(projectApk: File?, packageName: String?, maxLines: Int = 150): String = queryDevice { adb ->
+        val pkg = packageName ?: projectApk?.let { app.packageManager.getPackageArchiveInfo(it.absolutePath, 0)?.packageName }
+            ?: throw IOException(app.getString(R.string.agent_log_package_required))
+        DeviceAgentTools.logs(adb, pkg, maxLines)
+    }
+
+    suspend fun inspectDeviceUi(): String = queryDevice { DeviceAgentTools.inspect(it) }
 
     fun inspect() {
         val adb = currentTarget() ?: return

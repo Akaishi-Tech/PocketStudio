@@ -45,6 +45,8 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     val codex = CodexController(this, scope)
     var project by mutableStateOf<Project?>(null)
         private set
+    var git by mutableStateOf<GitSession?>(null)
+        private set
     var tool by mutableStateOf(Tool.Editor)
     val tabs = mutableStateListOf<OpenFile>()
     var active by mutableStateOf<OpenFile?>(null)
@@ -57,6 +59,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         private set
     var running by mutableStateOf(false)
         private set
+    val canSwitchProject get() = !busy && !running && !codex.working && git == null
     var output by mutableStateOf("")
         private set
     var apk by mutableStateOf<File?>(null)
@@ -89,10 +92,10 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         if (!location.isNullOrEmpty()) openProject(location.toUri())
     }
 
-    private suspend fun <T> io(block: () -> T): T =
+    private suspend fun <T> io(block: suspend () -> T): T =
         storage.withLock { withContext(Dispatchers.IO) { block() } }
 
-    suspend fun <T> projectOperation(selected: Project, block: () -> T): T = io {
+    suspend fun <T> projectOperation(selected: Project, block: suspend () -> T): T = io {
         check(project === selected) { app.getString(R.string.project_closed) }
         block()
     }
@@ -160,17 +163,21 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         }
     }
 
-    fun createProject(parent: Uri, name: String, packageName: String) {
-        val entry = "app/src/main/java/${packageName.replace('.', '/')}/MainActivity.java"
-        switchProject(entry, creating = true) {
-            app.contentResolver.takePersistableUriPermission(parent,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            Project.createProject(app, parent, name, packageName)
+    fun createProject(
+        parent: Uri, name: String, packageName: String,
+        template: ProjectTemplate, language: ProjectLanguage, minSdk: Int
+    ) {
+        switchProject(template.entryPath(packageName, language), creating = true) {
+            if (parent.scheme == "content") {
+                app.contentResolver.takePersistableUriPermission(parent,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            Project.createProject(app, parent, name, packageName, template, language, minSdk)
         }
     }
 
     private fun switchProject(restoreFile: String?, creating: Boolean = false, load: () -> Project) {
-        if (busy || running || codex.working) return
+        if (!canSwitchProject) return
         busy = true
         flushDrafts()
         action {
@@ -196,7 +203,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     }
 
     fun closeProject() {
-        if (busy || running || codex.working) return
+        if (busy || running || codex.working || git != null) return
         flushDrafts()
         reset(); project = null
         prefs.edit { putString("openProject", "") }
@@ -257,7 +264,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
 
     fun changeNode(node: Project.Node, op: String, input: String) {
         val p = project ?: return
-        if (busy || running || codex.working) return
+        if (busy || running || codex.working || git != null) return
         busy = true
         action {
             try {
@@ -375,6 +382,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                     if (node.folder) null else node to p.read(node)
                 } catch (_: java.io.FileNotFoundException) { null }
                 catch (_: Project.UnsupportedText) { null }
+                catch (_: java.nio.charset.CharacterCodingException) { null }
             }
             if (project !== p) return
             val index = tabs.indexOf(old)
@@ -424,37 +432,51 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     fun log(line: String) {
         output = (output + line + "\n").takeLast(100000)
     }
-    fun command(task: String, runOnDevice: Boolean = false) {
+    fun openGit(tab: GitTab = GitTab.Changes, file: String? = null, diff: Boolean = false) {
+        val selected = project ?: return
+        if (busy || running || codex.working || git != null) return
+        busy = true
+        action {
+            try {
+                if (!saveDocuments()) return@action
+                val session = GitSession(this@Workspace, selected, tab, file, diff)
+                git = session
+                busy = false
+                val editPath = session.untilClosed()
+                if (editPath != null && project === selected) diagnostic(editPath, 0)
+            } finally {
+                git = null
+                busy = false
+            }
+        }
+    }
+
+    fun build(runOnDevice: Boolean = false) {
         val p = project ?: return
-        if (running || busy || codex.working) return
+        if (running || busy || codex.working || git != null) return
         val targetId = if (runOnDevice && devices.connected && !devices.busy) devices.connectionId else null
         running = true; output = ""; tool = Tool.Output
         action {
             try {
                 if (!saveDocuments()) return@action
-                if (task == "build") {
-                    val result = withContext(Dispatchers.IO) {
-                        ProjectWorkspace.open(p).use { workspace ->
-                            val built = EmbeddedBuilder.build(app, workspace.directory.toFile()) { msg -> scope.launch { log(msg) } }
-                            copyResult(p, built)
-                        }
+                val result = withContext(Dispatchers.IO) {
+                    ProjectWorkspace.open(p).use { workspace ->
+                        val built = EmbeddedBuilder.build(app, workspace.directory.toFile()) { msg -> scope.launch { log(msg) } }
+                        copyResult(p, built)
                     }
-                    apk = result; log(app.getString(R.string.build_succeeded_kib, result.length() / 1024))
-                    if (runOnDevice) {
-                        if (targetId == devices.connectionId && devices.connected && !devices.busy) {
-                            tool = Tool.Devices
-                            devices.install(result, true)
-                        } else log(app.getString(R.string.the_target_device_changed_disconnected_or_became_busy))
-                    }
-                } else {
-                    log("git $task")
-                    log(withContext(Dispatchers.IO) { GitCommands.run(p, task) })
+                }
+                apk = result; log(app.getString(R.string.build_succeeded_kib, result.length() / 1024))
+                if (runOnDevice) {
+                    if (targetId == devices.connectionId && devices.connected && !devices.busy) {
+                        tool = Tool.Devices
+                        devices.install(result, true)
+                    } else log(app.getString(R.string.the_target_device_changed_disconnected_or_became_busy))
                 }
             } catch (e: Exception) { if (e is CancellationException) throw e; log(e.localizedMessage ?: e.toString()) }
             catch (e: LinkageError) { log(e.toString()) }
             finally {
                 running = false
-                if (task == "build") refreshAfterExternalRun(p)
+                refreshAfterExternalRun(p)
             }
         }
     }

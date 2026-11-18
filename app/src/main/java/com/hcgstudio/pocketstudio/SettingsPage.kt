@@ -236,15 +236,58 @@ private fun <T> choice(@StringRes title: Int, value: T, choices: List<T>, label:
             text = {
                 Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
                     choices.forEach { option ->
-                        Row(Modifier.fillMaxWidth().selectable(option == value, role = Role.RadioButton,
-                            onClick = { if (value != option) set(option); open = false }).heightIn(min = 48.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            RadioButton(option == value, onClick = null)
-                            Text(stringResource(label(option)))
+                        ChoiceRow(stringResource(label(option)), option == value) {
+                            if (value != option) set(option)
+                            open = false
                         }
                     }
                 }
             }, confirmButton = { TextButton({ open = false }) { Text(stringResource(R.string.cancel)) } })
+    }
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().selectable(selected, role = Role.RadioButton, onClick = onClick).heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        RadioButton(selected, onClick = null)
+        Text(label)
+    }
+}
+
+@Composable
+private fun fontLabel(font: StudioFont): String = when (font) {
+    is StudioFont.Preset -> stringResource(font.label)
+    is StudioFont.Installed -> font.name
+}
+
+private fun fontChoice(@StringRes title: Int, selected: StudioFont, set: (StudioFont) -> Unit) =
+    Preference(title, StudioFont.builtIns.map { it.label } + R.string.settings_monospace_only) { name ->
+        var open by rememberSaveable { mutableStateOf(false) }
+        PreferenceRow(name, { open = true }) { ValueText(fontLabel(selected)) }
+        if (open) {
+            val fonts by produceState<List<StudioFontOption>?>(null) { value = availableStudioFonts() }
+            var monoOnly by rememberSaveable { mutableStateOf(false) }
+            val visible = remember(fonts, monoOnly) {
+                val all = fonts ?: builtInFontOptions
+                if (monoOnly) all.filter { it.isMonospace } else all
+            }
+            AlertDialog(onDismissRequest = { open = false }, title = { Text(name) },
+                text = {
+                    Column {
+                        FilterChip(selected = monoOnly, onClick = { monoOnly = !monoOnly },
+                            label = { Text(stringResource(R.string.settings_monospace_only)) })
+                        if (fonts == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp).selectableGroup()) {
+                            items(visible, key = { it.font.id }) { (font) ->
+                                ChoiceRow(fontLabel(font), selected == font) {
+                                    set(font)
+                                    open = false
+                                }
+                            }
+                        }
+                    }
+                }, confirmButton = { TextButton({ open = false }) { Text(stringResource(R.string.cancel)) } })
+        }
     }
 
 private fun numeric(@StringRes title: Int, current: Int, range: IntRange,
@@ -338,15 +381,6 @@ private fun ColorPicker(name: String, color: Color, custom: Boolean, dismiss: ()
 }
 
 @StringRes
-private fun fontLabel(font: StudioFont) = when (font) {
-    StudioFont.System -> R.string.settings_system_font
-    StudioFont.Inter -> R.string.settings_inter
-    StudioFont.JetBrainsMono -> R.string.settings_jetbrains_mono
-    StudioFont.Serif -> R.string.settings_serif
-    StudioFont.Monospace -> R.string.settings_monospace
-}
-
-@StringRes
 private fun themeLabel(theme: StudioThemeMode) = when (theme) {
     StudioThemeMode.System -> R.string.settings_system_theme
     StudioThemeMode.Light -> R.string.settings_light
@@ -362,7 +396,7 @@ private fun settingsGroups(
     return listOf(
         SettingsGroup(R.string.settings_appearance, listOf(
             choice(R.string.settings_theme, s.theme, StudioThemeMode.entries, ::themeLabel) { change(s.copy(theme = it)) },
-            choice(R.string.settings_ui_font, s.uiFont, StudioFont.entries, ::fontLabel) { change(s.copy(uiFont = it)) },
+            fontChoice(R.string.settings_ui_font, s.uiFont) { change(s.copy(uiFont = it)) },
             numeric(R.string.settings_ui_size, s.uiFontSize, 11..20, sp) { change(s.copy(uiFontSize = it)) },
             toggle(R.string.settings_compact, s.compactMode) { change(s.copy(compactMode = it)) },
             toggle(R.string.settings_toolbar_actions, s.showMainToolbarActions) { change(s.copy(showMainToolbarActions = it)) },
@@ -371,7 +405,7 @@ private fun settingsGroups(
             toggle(R.string.settings_status, s.showStatusBar) { change(s.copy(showStatusBar = it)) }
         )),
         SettingsGroup(R.string.settings_editor_font, listOf(
-            choice(R.string.settings_font_family, s.editorFont, StudioFont.entries, ::fontLabel) { change(s.copy(editorFont = it)) },
+            fontChoice(R.string.settings_font_family, s.editorFont) { change(s.copy(editorFont = it)) },
             numeric(R.string.settings_editor_size, s.editorFontSize, 10..32, sp) { change(s.copy(editorFontSize = it)) },
             toggle(R.string.settings_font_ligatures, s.fontLigatures) { change(s.copy(fontLigatures = it)) },
             numeric(R.string.settings_line_spacing, (s.lineSpacing * 100).roundToInt(), 100..200, { "$it%" }) {

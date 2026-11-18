@@ -39,6 +39,13 @@ class Responses(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
+    def tool_call(self, index, request):
+        if index == 1:
+            return "read_file", {"path": "sample.txt"}
+        if index == 2:
+            return "write_file", {"path": "sample.txt", "revision": digest("one"), "text": "two"}
+        return None, None
+
     def do_POST(self):
         if self.path != "/v1/responses":
             self.send_error(404)
@@ -46,12 +53,7 @@ class Responses(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         self.server.requests.append(request)
         index = len(self.server.requests)
-        if index == 1:
-            name, args = "read_file", {"path": "sample.txt"}
-        elif index == 2:
-            name, args = "write_file", {"path": "sample.txt", "revision": digest("one"), "text": "two"}
-        else:
-            name = None
+        name, args = self.tool_call(index, request)
         if name and self.server.code_mode:
             item = {"id": f"ct_{index}", "type": "custom_tool_call", "namespace": "functions", "name": "exec",
                     "call_id": f"call_{index}", "input": f"text(await tools.studio__{name}({json.dumps(args)}))"}

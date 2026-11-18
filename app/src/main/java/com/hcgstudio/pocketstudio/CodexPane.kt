@@ -148,11 +148,11 @@ internal fun CodexPane(w: Workspace, openAccount: () -> Unit) {
                     }
                 } else CodexConversation(c, !w.running && !w.busy, openAccount)
             }
-            c.chats.isEmpty() && !c.loading -> CenterAction(R.drawable.studio_chat, uiString(R.string.no_chats_yet)) {
+            c.chats.isEmpty() && !c.loading && !c.working -> CenterAction(R.drawable.studio_chat, uiString(R.string.no_chats_yet)) {
                 Button({ if (c.usable) c.newChat() else openAccount() }) { Text(stringResource(R.string.new_chat)) }
             }
             else -> {
-                if (c.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (c.loading || (c.working && c.chats.isEmpty())) LinearProgressIndicator(Modifier.fillMaxWidth())
                 ChatList(c, Modifier.fillMaxSize())
             }
         }

@@ -1,0 +1,9 @@
+<resources>
+    <string name="agent_device_query_timeout">The target device did not respond within 30 seconds.</string>
+    <string name="agent_log_package_required">Provide packageName with the installed application ID, or build the project APK first.</string>
+    <string name="agent_log_line_range">maxLines must be between 1 and 400.</string>
+    <string name="agent_device_packages_unavailable">Could not read installed package UIDs for the current device user.</string>
+    <string name="agent_package_not_installed">The current device user has no installed package named %1$s.</string>
+    <string name="agent_package_shared_uid">%1$s shares its Android UID with other packages. Logcat cannot isolate its historical logs.</string>
+    <string name="agent_logcat_failed">Could not read app logs from the device. %1$s</string>
+</resources>

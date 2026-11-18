@@ -7,7 +7,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
-import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -94,61 +93,30 @@ final class Project {
   }
 
   static Project createProject(Context context, Uri parentTree, String name, String packageName) throws IOException {
+    return createProject(context, parentTree, name, packageName, ProjectTemplate.BUTTON,
+        ProjectLanguage.JAVA, ProjectTemplate.DEFAULT_MIN_SDK);
+  }
+
+  static Project createProject(Context context, Uri parentTree, String name, String packageName,
+      ProjectTemplate template, ProjectLanguage language, int minSdk) throws IOException {
     name = name.trim();
     packageName = packageName.trim();
     String problem = projectNameError(name);
-    if (problem == null) problem = packageNameError(packageName);
+    if (problem == null) problem = template.packageNameError(packageName, language);
     if (problem != null) throw new IOException(problem);
+    if (minSdk < ProjectTemplate.MIN_SDK || minSdk > ProjectTemplate.MAX_SDK)
+      throw new IOException(uiString(R.string.invalid_sdk_platform_number));
 
     Project parent = new Project(context, parentTree);
     Node child = parent.create(parent.root, name, true);
     try {
       Project project = new Project(context, child.uri);
       if (!name.equals(project.root.name)) throw new IOException(uiString(R.string.a_project_with_that_name_already_exists_or));
-      project.copyTemplate("template", project.root, name, packageName);
+      template.writeFiles(project, name, packageName, language, minSdk);
       return project;
     } catch (IOException | RuntimeException e) {
       try { parent.delete(child); } catch (Exception cleanup) { e.addSuppressed(cleanup); }
       throw e;
-    }
-  }
-
-  private Node createTemplateNode(Node parent, String name, boolean folder) throws IOException {
-    Node node = create(parent, name, folder);
-    if (tree != null && !name.equals(documentName(node.uri)))
-      throw new IOException(uiString(R.string.the_selected_location_cannot_preserve_the_template_file_name, name));
-    return node;
-  }
-
-  private void copyTemplate(String assetDir, Node dir, String name, String packageName) throws IOException {
-    String[] children = context.getAssets().list(assetDir);
-    if (children == null || children.length == 0) throw new IOException(uiString(R.string.the_project_template_is_missing_format, assetDir));
-    if (dir.path.equals("app/src/main/java")) {
-      for (String part : packageName.split("\\.")) dir = createTemplateNode(dir, part, true);
-    }
-    for (String fileName : children) {
-      String path = assetDir + "/" + fileName;
-      String[] contents = context.getAssets().list(path);
-      boolean folder = contents != null && contents.length > 0;
-      Node node = createTemplateNode(dir, fileName, folder);
-      if (folder) {
-        copyTemplate(path, node, name, packageName);
-        continue;
-      }
-      byte[] data;
-      try (InputStream input = context.getAssets().open(path);
-           ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-        byte[] buffer = new byte[8192];
-        for (int count; (count = input.read(buffer)) != -1; ) output.write(buffer, 0, count);
-        data = output.toByteArray();
-      }
-      if (fileName.equals("strings.xml")) {
-        String label = TextUtils.htmlEncode(name);
-        data = new String(data, StandardCharsets.UTF_8).replace("__APP_NAME__", label).getBytes(StandardCharsets.UTF_8);
-      } else if (fileName.equals("MainActivity.java") || node.path.equals("app/build.gradle")) {
-        data = new String(data, StandardCharsets.UTF_8).replace("__PACKAGE__", packageName).getBytes(StandardCharsets.UTF_8);
-      }
-      write(node, data);
     }
   }
 
@@ -413,33 +381,6 @@ final class Project {
     try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
       for (Path item : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator)
         Files.deleteIfExists(item);
-    }
-  }
-
-  void copyTo(File destination, boolean includeGit) throws IOException {
-    Files.createDirectories(destination.toPath());
-    copyDir(root, destination.toPath(), includeGit, false);
-  }
-
-  void copyForGit(File destination) throws IOException {
-    Files.createDirectories(destination.toPath());
-    copyDir(root, destination.toPath(), true, true);
-  }
-
-  private void copyDir(Node from, Path destination, boolean includeGit, boolean exact) throws IOException {
-    for (Node child : list(from)) {
-      if (Thread.currentThread().isInterrupted()) throw new InterruptedIOException();
-      if (!exact && child.folder && (Arrays.asList("build", ".gradle", ".idea").contains(child.name)
-          || (!includeGit && child.name.equals(".git")))) continue;
-      if (!exact && from == root && child.name.equals("local.properties")) continue;
-      Path target = destination.resolve(child.name).normalize();
-      if (!destination.equals(target.getParent())) throw new IOException(uiString(R.string.invalid_file_name));
-      if (child.folder) {
-        Files.createDirectory(target);
-        copyDir(child, target, includeGit, exact);
-      } else {
-        try (InputStream in = input(child)) { Files.copy(in, target); }
-      }
     }
   }
 

@@ -21,17 +21,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import android.net.Uri
 import kotlinx.coroutines.*
 
@@ -53,7 +49,7 @@ private fun Brand(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, sdk: () -> Unit,
+internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, clone: () -> Unit, sdk: () -> Unit,
                      licenses: () -> Unit, settings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().background(colors.surface)) {
@@ -82,10 +78,10 @@ internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, imp
                 Spacer(Modifier.height(24.dp))
                 if (wide) FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WelcomeButtons(!w.busy, newProject, open, importZip)
+                    WelcomeButtons(w.canSwitchProject, newProject, open, importZip, clone)
                 } else Column(Modifier.widthIn(max = 260.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WelcomeButtons(!w.busy, newProject, open, importZip, Modifier.fillMaxWidth())
+                    WelcomeButtons(w.canSwitchProject, newProject, open, importZip, clone, Modifier.fillMaxWidth())
                 }
                 TextButton(licenses) { Text(androidx.compose.ui.res.stringResource(R.string.open_source_licenses)) }
                 if (w.recent.isNotEmpty()) {
@@ -109,7 +105,7 @@ internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, imp
 }
 
 @Composable
-private fun WelcomeButtons(enabled: Boolean, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, modifier: Modifier = Modifier) {
+private fun WelcomeButtons(enabled: Boolean, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, clone: () -> Unit, modifier: Modifier = Modifier) {
     Button(newProject, modifier.heightIn(min = 48.dp), enabled = enabled) {
         Symbol(R.drawable.studio_add, null, Modifier.size(20.dp)); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.new_project))
     }
@@ -119,40 +115,11 @@ private fun WelcomeButtons(enabled: Boolean, newProject: () -> Unit, open: () ->
     FilledTonalButton(importZip, modifier.heightIn(min = 48.dp), enabled = enabled) {
         Symbol(R.drawable.studio_upload_file, null, Modifier.size(20.dp)); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.import_zip))
     }
-}
-
-@Composable
-internal fun NewProjectDialog(
-    name: String, packageName: String, setName: (String) -> Unit, setPackageName: (String) -> Unit,
-    error: String?, busy: Boolean, dismiss: () -> Unit, chooseLocation: () -> Unit
-) {
-    val nameError = Project.projectNameError(name.trim())
-    val packageError = Project.packageNameError(packageName.trim())
-    val showNameError = name.isNotEmpty() && nameError != null
-    val showPackageError = packageName.isNotEmpty() && packageError != null
-    val ready = !busy && nameError == null && packageError == null
-    AlertDialog(
-        onDismissRequest = { if (!busy) dismiss() },
-        title = { Text(stringResource(R.string.new_project)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, setName, Modifier.fillMaxWidth(), enabled = !busy, singleLine = true,
-                    label = { Text(stringResource(R.string.project_name)) }, isError = showNameError,
-                    supportingText = if (showNameError) { { Text(nameError.orEmpty()) } } else null,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
-                OutlinedTextField(packageName, setPackageName, Modifier.fillMaxWidth(), enabled = !busy, singleLine = true,
-                    label = { Text(stringResource(R.string.package_name)) }, isError = showPackageError,
-                    supportingText = if (showPackageError) { { Text(packageError.orEmpty()) } } else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { if (ready) chooseLocation() }))
-                if (error != null) Text(error, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = { TextButton(chooseLocation, enabled = ready) { Text(stringResource(R.string.choose_location)) } },
-        dismissButton = { TextButton(dismiss, enabled = !busy) { Text(stringResource(R.string.cancel)) } }
-    )
+    FilledTonalButton(clone, modifier.heightIn(min = 48.dp), enabled = enabled) {
+        Symbol(R.drawable.studio_git_branch, null, Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(stringResource(R.string.git_clone_action))
+    }
 }
 
 private data class ToolItem(val tool: Tool, @get:StringRes val label: Int, val icon: Int)
@@ -313,11 +280,15 @@ private fun ProjectPane(w: Workspace, actions: List<StudioAction>, modifier: Mod
             StudioIconButton(R.drawable.studio_refresh, uiString(R.string.refresh_project), onClick = w::refreshTree)
         }
         HorizontalDivider(color = colors.outlineVariant.copy(alpha = .55f))
-        Row(Modifier.fillMaxWidth().clickable { w.selectedDir = p.root; w.selectedNode = p.root }.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Symbol(R.drawable.studio_folder_open, null, Modifier.size(19.dp), colors.primary)
-            Text(p.root.name, Modifier.padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth().padding(end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).clickable { w.selectedDir = p.root; w.selectedNode = p.root }
+                .heightIn(min = 48.dp).padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Symbol(R.drawable.studio_folder_open, null, Modifier.size(19.dp), colors.primary)
+                Text(p.root.name, Modifier.padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
+            val git = actions.first { it.id == "git-status" }
+            StudioIconButton(R.drawable.studio_git_branch, stringResource(R.string.git), git.enabled, git.run)
         }
         val rows = buildList<Pair<Int, Project.Node>> {
             fun append(path: String, level: Int) {

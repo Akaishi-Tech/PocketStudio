@@ -123,14 +123,15 @@ private fun EditorContent(
     val numbers = colors.getValue(EditorColorRole.LINE_NUMBER)
     val pad = 12.dp
     val fontSize = settings.editorFontSize
-    val style = TextStyle(fontFamily = settings.editorFont.family, fontSize = fontSize.sp,
+    val editorFamily = LocalEditorFontFamily.current
+    val style = TextStyle(fontFamily = editorFamily, fontSize = fontSize.sp,
         lineHeight = (fontSize * settings.lineSpacing).sp, color = colors.getValue(EditorColorRole.TEXT),
         fontFeatureSettings = if (settings.fontLigatures) "'liga' 1, 'calt' 1" else "'liga' 0, 'calt' 0",
         textDirection = TextDirection.Ltr)
     val measure = rememberTextMeasurer()
     val columnWidth = remember(measure, style) { measure.measure("0000000000", style).size.width / 10f }
     val gutterFont = (fontSize - 2).sp
-    val editorTypeface by LocalFontFamilyResolver.current.resolve(settings.editorFont.family)
+    val editorTypeface by LocalFontFamilyResolver.current.resolve(editorFamily)
     val numberPaint = remember(editorTypeface, gutterFont, pixels) {
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             typeface = editorTypeface as? Typeface ?: Typeface.MONOSPACE

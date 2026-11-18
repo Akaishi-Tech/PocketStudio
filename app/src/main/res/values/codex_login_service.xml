@@ -1,0 +1,4 @@
+<resources>
+    <string name="codex_login_channel">Codex sign-in</string>
+    <string name="codex_login_notification">Waiting for browser verification. Tap to return to Pocket Studio.</string>
+</resources>

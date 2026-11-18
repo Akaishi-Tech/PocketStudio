@@ -8,7 +8,31 @@ from threading import Thread
 from protocol import Responses, check_turn_settings, digest
 
 
+RESUMED_TOOLS = [
+    ("search_project", {"query": "two"}),
+    ("get_editor_context", {}),
+    ("read_logcat", {"packageName": "com.hcgstudio.pocketstudio", "maxLines": 20}),
+    ("inspect_device_ui", {}),
+]
+
+
 class AccountModelsAndResponses(Responses):
+    def tool_call(self, index, request):
+        if index <= 3 or self.server.keep:
+            return super().tool_call(index, request)
+        # A change of model can trigger an internal request before the resumed user turn.
+        if not self.server.resumed_calls and not any(
+            item.get("role") == "user" and any(part.get("text") == "请确认修改已完成。" for part in item["content"])
+            for item in request["input"]
+        ):
+            return None, None
+        called = len(self.server.resumed_calls)
+        if called == len(RESUMED_TOOLS):
+            return None, None
+        name, args = RESUMED_TOOLS[called]
+        self.server.resumed_calls[name] = f"call_{index}"
+        return name, args
+
     def do_POST(self):
         if self.headers.get("Authorization") != "Bearer local-fixture-only":
             self.send_error(401)
@@ -50,6 +74,8 @@ def main():
         fixture.catalog_requests = 0
         fixture.code_mode = False
         fixture.markdown = markdown
+        fixture.keep = args.keep
+        fixture.resumed_calls = {}
         Thread(target=fixture.serve_forever, daemon=True).start()
         port = subprocess.check_output(adb + ["reverse", "tcp:0", f"tcp:{fixture.server_port}"], text=True).strip()
         try:
@@ -66,9 +92,33 @@ def main():
             assert digest("one") in str(outputs[1]), "The runtime did not receive the app's read_file result"
             assert digest("two") in str(outputs[2]), "The runtime did not receive the app's write_file result"
             print("PASS account catalog retry, selected model, effort and Fast on both turns, and both project-tool outputs")
+            if not args.keep:
+                check_resumed_tools(fixture, outputs)
         finally:
             subprocess.run(adb + ["reverse", "--remove", f"tcp:{port}"], check=True)
             fixture.shutdown()
+
+
+def check_resumed_tools(fixture, outputs):
+    expected = {name for name, _ in RESUMED_TOOLS}
+    assert set(fixture.resumed_calls) == expected, fixture.resumed_calls
+    for request in (fixture.requests[0], fixture.requests[-1]):
+        catalog = request.get("tools", []) + [tool for item in request["input"] if item["type"] == "additional_tools"
+                                             for tool in item["tools"]]
+        studio = next(tool for tool in catalog if tool.get("name") == "studio")
+        assert expected.issubset({tool["name"] for tool in studio["tools"]}), studio
+    returned = {item["call_id"]: item["output"] for batch in outputs for item in batch}
+
+    def result(name):
+        content = returned[fixture.resumed_calls[name]]
+        return content if isinstance(content, str) else "\n".join(part["text"] for part in content)
+
+    search = json.loads(result("search_project"))
+    assert search["matches"] == [{"path": "sample.txt", "line": 1, "excerpt": "two"}], search
+    editor = json.loads(result("get_editor_context"))
+    assert editor["path"] == "sample.txt" and editor["dirty"] and editor["selection"]["text"] == "selected", editor
+    assert result("read_logcat").strip() and result("inspect_device_ui").strip()
+    print("PASS four IDE tools registered and called on resume, saved-file search and live unsaved selection")
 
 
 if __name__ == "__main__":

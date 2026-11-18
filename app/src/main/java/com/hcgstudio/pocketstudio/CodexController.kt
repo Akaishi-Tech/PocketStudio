@@ -5,6 +5,9 @@ import androidx.compose.runtime.*
 import com.hcgstudio.pocketstudio.codex.CodexRelease
 import com.hcgstudio.pocketstudio.codex.CodexRuntime
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.selects.select
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -30,7 +33,12 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     var downloadProgress by mutableFloatStateOf(0f); private set
     var installIntent by mutableStateOf<Intent?>(null)
     var signingIn by mutableStateOf(false); private set
+    private var deviceCodeRequest by mutableStateOf<CompletableDeferred<Unit>?>(null)
+    private var browserLoginFailed by mutableStateOf(false)
+    val offerDeviceCode get() = deviceCodeRequest != null || (browserLoginFailed && !signingIn && error != null)
     var deviceCode by mutableStateOf<CodexDeviceCode?>(null); private set
+    var replacingDeviceCode by mutableStateOf(false); private set
+    private val resumed = MutableStateFlow(false)
     private var updatingAccount by mutableStateOf(false)
     val accountBusy get() = signingIn || updatingAccount
     var error by mutableStateOf<String?>(null)
@@ -63,7 +71,6 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
     private var currentTurn = ""
     private var connection: CodexRpc? = null
     private var accountKey: String? = null
-    private var loadedList = false
     val usable get() = account?.let { if (it.useChatGpt) it.selected?.signedIn == true else it.hasApiKey } == true
     val update get() = release?.takeIf { version != null && (legacyInstalled || it.versionCode > installedVersionCode) }
 
@@ -91,7 +98,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                 checked = true
                 applyAccount(state, refreshCatalog = changed)
                 if (installed != null && (checkUpdate || changed)) checkRelease()
-                if (installed != null && !loadedList && !detail && !loading) list()
+                if (installed != null && !detail && !loading) list()
                 if (installed != null) checkCliAccount(state)
             } catch (e: CancellationException) { failure(e) }
             catch (e: Exception) { checked = true; failure(e) }
@@ -137,7 +144,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         val wasUsable = usable
         if (accountChanged) {
             clearChat()
-            chats.clear(); loadedList = false; quota = emptyList()
+            chats.clear(); quota = emptyList()
         }
         accountKey = key
         account = state
@@ -236,7 +243,52 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
             finally { updatingAccount = false }
         }
     }
-    fun login() {
+    fun login(openBrowser: (String) -> Unit) = startLogin { home ->
+        val identity = supervisorScope {
+            val useCode = CompletableDeferred<Unit>()
+            val browser = async {
+                cli.loginWithBrowser(home) { url ->
+                    resumed.first { it }
+                    try {
+                        openBrowser(url)
+                    } catch (e: IllegalArgumentException) {
+                        throw IOException(uiString(R.string.no_browser_available_to_open_this_link), e)
+                    }
+                }
+            }
+            deviceCodeRequest = useCode
+            try {
+                select<CodexCliAccount?> {
+                    useCode.onAwait {
+                        browser.cancel()
+                        null
+                    }
+                    browser.onAwait { it }
+                }
+            } catch (e: Exception) {
+                ensureActive()
+                browserLoginFailed = true
+                throw e
+            } finally {
+                deviceCodeRequest = null
+            }
+        }
+        identity ?: loginWithDeviceCode(home)
+    }
+
+    fun useDeviceCode() {
+        val request = deviceCodeRequest
+        if (request != null) request.complete(Unit)
+        else if (offerDeviceCode) startLogin(::loginWithDeviceCode)
+    }
+
+    private suspend fun loginWithDeviceCode(home: File) = cli.loginWithDeviceCode(home, awaitRetry = {
+        deviceCode = null
+        replacingDeviceCode = true
+        resumed.first { it }
+    }) { deviceCode = it }
+
+    private fun startLogin(authorize: suspend (File) -> CodexCliAccount) {
         if (accountBusy || working) return
         if (version == null) {
             error = uiString(R.string.install_the_codex_runtime_first)
@@ -244,31 +296,44 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         }
         installationJob?.cancel()
         signingIn = true
+        browserLoginFailed = false
         error = null
         loginJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             var home: File? = null
             try {
-                val candidate = io { auth.newLoginHome().also { home = it } }
-                val identity = cli.login(candidate) { deviceCode = it }
-                deviceCode = null
-                ensureActive()
-                // Once confirmed, finish recording the account even if the page closes.
-                withContext(NonCancellable) {
-                    applyAccount(io { auth.acceptCliLogin(candidate, identity) }, refreshCatalog = true)
-                    if (selectedProject != null) list()
+                CodexLoginService.start(w.app).use {
+                    val candidate = io { auth.newLoginHome().also { home = it } }
+                    val identity = authorize(candidate)
+                    deviceCode = null
+                    ensureActive()
+                    // Once confirmed, finish recording the account even if the page closes.
+                    withContext(NonCancellable) {
+                        applyAccount(io { auth.acceptCliLogin(candidate, identity) }, refreshCatalog = true)
+                        if (selectedProject != null) list()
+                    }
                 }
             } catch (_: TimeoutCancellationException) {
                 error = uiString(R.string.sign_in_timed_out_try_again)
             } catch (e: Exception) { failure(e) }
             finally {
-                withContext(NonCancellable + Dispatchers.IO) { home?.deleteRecursively() }
-                deviceCode = null
-                signingIn = false
+                try {
+                    withContext(NonCancellable + Dispatchers.IO) { home?.deleteRecursively() }
+                } finally {
+                    deviceCode = null
+                    replacingDeviceCode = false
+                    signingIn = false
+                }
             }
         }
     }
 
-    fun cancelLogin() { loginJob?.cancel() }
+    fun setActivityResumed(value: Boolean) { resumed.value = value }
+
+    fun cancelLogin() {
+        browserLoginFailed = false
+        deviceCodeRequest = null
+        loginJob?.cancel()
+    }
 
     fun logout() {
         val profile = account?.selected ?: return
@@ -295,7 +360,7 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         cancelLogin()
         turnJob?.cancel(); turnJob = null
         clearModels()
-        clearChat(); chats.clear(); loadedList = false; quota = emptyList(); error = null
+        clearChat(); chats.clear(); quota = emptyList(); error = null
         selectedProject = null
     }
     fun dispose() { reset() }
@@ -373,17 +438,15 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
             try {
                 val found = mutableListOf<CodexChat>()
                 withServer(p, false) { rpc, directory ->
-                    pages(rpc, "thread/list", json("sortKey" to "updated_at", "modelProviders" to JSONArray(),
+                    pages(rpc, "thread/list", json("cwd" to directory.absolutePath,
+                        "sortKey" to "updated_at", "modelProviders" to JSONArray(),
                         "sourceKinds" to JSONArray(listOf("appServer","cli","unknown","vscode")), "limit" to 50)) {
-                        // A CLI account shares its rollout directory across projects.
-                        // Original project-specific rollouts can also be indexed here.
-                        if (it.string("cwd") != directory.absolutePath) return@pages
                         found.add(CodexChat(it.getString("id"), it.string("name").ifBlank {
                             it.string("preview").lineSequence().firstOrNull().orEmpty().take(90)
                         }, it.optLong("updatedAt")))
                     }
                 }
-                ensureActive(); chats.clear(); chats.addAll(found); loadedList = true
+                ensureActive(); chats.clear(); chats.addAll(found)
             } catch (e: Exception) { failure(e) } finally { if (isActive) loading = false }
         }
     }
@@ -443,12 +506,11 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
         var sent = false
         turnJob = scope.launch {
             try {
-                if (!w.saveDocuments()) throw IOException(uiString(R.string.resolve_conflicts_in_unsaved_files_first))
                 withServer(p, true) { rpc, dir ->
                     connection = rpc
                     val options = json("cwd" to dir.absolutePath, "sandbox" to "read-only",
                         "approvalPolicy" to "on-request", "developerInstructions" to
-                        "Call the studio namespace tools directly to inspect and edit the current Android project. Paths are relative to the selected project. Use run_gradle for builds. The app-server directory is private session storage.")
+                        "Call the studio namespace tools directly to inspect and edit the current Android project. Paths are relative to the selected project. File tools use saved content. Use get_editor_context for the user's live selection and drafts, and run_gradle for builds. The app-server directory is private session storage.")
                     options.put("model", chosen.model.id)
                     if (savedId == null) {
                         options.put("dynamicTools", CodexProjectTools.tools).put("environments", JSONArray())
@@ -577,21 +639,35 @@ internal class CodexController(private val w: Workspace, private val scope: Coro
                 var ok = true
                 val text = try {
                     check(params.string("namespace") == "studio") { uiString(R.string.unknown_project_tool) }
-                    if (name == "run_gradle") {
-                        val tasks = args.getString("tasks")
-                        check(ask(uiString(R.string.run_gradle_tasks), tasks)) { uiString(R.string.build_declined_by_the_user) }
-                        check(w.saveDocuments()) { uiString(R.string.resolve_editing_conflicts_first) }
-                        CodexProjectTools.gradle(p, tasks)
-                    } else {
-                        if (name in setOf("delete_file", "move_file")) {
-                            val path = args.string("path")
-                            check(ask(if (name == "delete_file") uiString(R.string.delete_file) else uiString(R.string.move_file),
-                                listOf(path, args.string("destination")).filter(String::isNotEmpty).joinToString(" → "))) { uiString(R.string.declined_by_the_user) }
+                    check(w.project === p) { uiString(R.string.project_closed) }
+                    when (name) {
+                        "search_project" -> w.projectOperation(p) {
+                            runInterruptible { searchProjectForAgent(p, args.getString("query")) }
                         }
-                        if (name in setOf("write_file", "delete_file", "move_file")) check(w.tabs.none { it.node.path == args.string("path") && it.dirty }) {
-                            uiString(R.string.save_your_editor_changes_then_try_again)
+                        "get_editor_context" -> editorContext(w.active).toString()
+                        "read_logcat" -> {
+                            val limit = args.opt("maxLines") ?: 150
+                            require(limit is Int) { uiString(R.string.agent_log_line_range) }
+                            w.devices.readLogcat(w.apk, if (args.has("packageName")) args.getString("packageName") else null, limit)
                         }
-                        w.projectOperation(p) { CodexProjectTools.perform(p, name, args) }
+                        "inspect_device_ui" -> w.devices.inspectDeviceUi()
+                        "run_gradle" -> {
+                            val tasks = args.getString("tasks")
+                            check(ask(uiString(R.string.run_gradle_tasks), tasks)) { uiString(R.string.build_declined_by_the_user) }
+                            check(w.saveDocuments()) { uiString(R.string.resolve_editing_conflicts_first) }
+                            CodexProjectTools.gradle(p, tasks)
+                        }
+                        else -> {
+                            if (name in setOf("delete_file", "move_file")) {
+                                val path = args.string("path")
+                                check(ask(if (name == "delete_file") uiString(R.string.delete_file) else uiString(R.string.move_file),
+                                    listOf(path, args.string("destination")).filter(String::isNotEmpty).joinToString(" → "))) { uiString(R.string.declined_by_the_user) }
+                            }
+                            if (name in setOf("write_file", "delete_file", "move_file")) check(w.tabs.none { it.node.path == args.string("path") && it.dirty }) {
+                                uiString(R.string.save_your_editor_changes_then_try_again)
+                            }
+                            w.projectOperation(p) { CodexProjectTools.perform(p, name, args) }
+                        }
                     }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { ok = false; e.localizedMessage ?: uiString(R.string.project_operation_failed) }

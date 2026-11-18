@@ -1,0 +1,9 @@
+<resources>
+    <string name="git_file_history">File history</string>
+    <string name="git_file_blame">Blame</string>
+    <string name="git_file_no_history">No commits for this path</string>
+    <string name="git_file_no_committed_version">This file has no version in HEAD.</string>
+    <string name="git_file_no_text">This file has no text to annotate.</string>
+    <string name="git_file_large">This file is too large to annotate.</string>
+    <string name="git_file_empty">Empty file</string>
+</resources>

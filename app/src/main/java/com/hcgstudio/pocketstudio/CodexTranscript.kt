@@ -59,6 +59,10 @@ internal fun transcriptItem(item: JSONObject): ChatLine? {
             val args = item.optJSONObject("arguments") ?: JSONObject()
             val path = args.string("path")
             val (title, category) = when (val tool = item.string("tool")) {
+                "search_project" -> chatLabel(R.string.activity_search_query, args.string("query")) to R.string.search_files
+                "get_editor_context" -> chatLabel(R.string.read_editor_context) to R.string.read_editor_context
+                "read_logcat" -> chatLabel(R.string.read_app_logcat) to R.string.logcat
+                "inspect_device_ui" -> chatLabel(R.string.inspect_screen) to R.string.inspect_screen
                 "read_file" -> chatLabel(R.string.activity_read_path, path) to R.string.read_file
                 "list_files" -> listDirectory(path, R.string.project_root) to R.string.list_directory
                 "move_file" -> chatLabel(R.string.activity_move_path, path) to R.string.move_file_label

@@ -1,0 +1,16 @@
+<resources>
+    <string name="git_tab_changes">更改</string>
+    <string name="git_tab_history">历史</string>
+    <string name="git_tab_branches">分支</string>
+    <string name="git_tab_remotes">远程</string>
+    <string name="git_init">初始化仓库</string>
+    <string name="git_refresh">刷新仓库</string>
+    <string name="git_repository_exists">此目录已有仓库，请刷新后打开。</string>
+    <string name="git_root_required">请打开包含仓库 .git 目录的工作区根目录。</string>
+    <string name="git_detached_head">游离指针 · %1$s</string>
+    <string name="git_worktree">工作区</string>
+    <string name="git_index">暂存区</string>
+    <string name="git_external_command">此操作需要外部 Git 命令，无法在 Studio 中运行。</string>
+    <string name="git_tls_verification">请启用此仓库的 TLS 证书验证后再通过 HTTPS 连接。</string>
+    <string name="git_remote_cookie_file">此仓库指定了 HTTP Cookie 文件。请移除 Git 配置中的 http.cookieFile 后再连接。</string>
+</resources>

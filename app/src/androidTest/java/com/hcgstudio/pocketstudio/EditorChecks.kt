@@ -1,10 +1,49 @@
 package com.hcgstudio.pocketstudio
 
+import android.net.Uri
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
 /** Regression checks for editing boundaries and source binding; runs on ART with the shipped parser. */
 object EditorChecks {
+    private fun agentContextChecks() {
+        check(!editorContext(null).getBoolean("active"))
+        val node = Project.Node(Uri.EMPTY, "Sample.kt", "src/Sample.kt", false)
+        val doc = OpenFile(node, "saved", "one\r\ntwo\r\nthree") {}
+        doc.editor.select(8, 5)
+        val context = editorContext(doc)
+        check(context.getString("path") == node.path && context.getBoolean("dirty"))
+        check(context.getJSONObject("cursor").getInt("line") == 2)
+        check(context.getJSONObject("cursor").getInt("column") == 1)
+        val selection = context.getJSONObject("selection")
+        check(selection.getString("text") == "two" && !selection.getBoolean("truncated"))
+        check(selection.getJSONObject("start").getInt("column") == 1)
+        check(selection.getJSONObject("endExclusive").getInt("column") == 4)
+        check(context.getJSONObject("context").getString("text") == doc.editor.text)
+
+        val longLine = "a".repeat(4095) + "😀" + "b".repeat(8192)
+        val longDoc = OpenFile(node, longLine, longLine) {}
+        longDoc.editor.select(0, longLine.length)
+        val bounds = editorContext(longDoc)
+        check(!bounds.getBoolean("dirty"))
+        check(bounds.getJSONObject("selection").getBoolean("truncated"))
+        check(bounds.getJSONObject("selection").getString("text") == "a".repeat(4095))
+        check(bounds.getJSONObject("context").getString("text") == "b".repeat(2048))
+        longDoc.editor.select(4096 + 2048)
+        check(editorContext(longDoc).getJSONObject("context").getString("text").startsWith("😀"))
+
+        val lines = (1..20).joinToString("\n")
+        val manyLines = OpenFile(node, lines, lines) {}
+        manyLines.editor.go(12, 2)
+        val snippet = editorContext(manyLines).getJSONObject("context")
+        check(snippet.getJSONObject("start").getInt("line") == 7)
+        check(snippet.getString("text") == (7..17).joinToString("\n", postfix = "\n"))
+        val empty = editorContext(OpenFile(node, "", "") {})
+        check(empty.getBoolean("active") && empty.getInt("lineCount") == 1)
+        check(empty.getJSONObject("cursor").getInt("column") == 1)
+        check(empty.getJSONObject("selection").getString("text").isEmpty())
+    }
+
     private fun settingsChecks() {
         val tabs = EditorTabStops("\ta\tb\nxy\t\t", 4)
         check(tabs.display == "    a   b\nxy      ")
@@ -56,6 +95,7 @@ object EditorChecks {
     }
 
     @JvmStatic fun run() {
+        agentContextChecks()
         settingsChecks()
         val edits = mutableListOf<String>()
         val state = StudioEditorState("one\r\ntwo\r\nthree", "Sample.kt", onTextChanged = edits::add)

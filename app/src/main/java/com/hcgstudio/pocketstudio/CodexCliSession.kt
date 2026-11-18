@@ -6,6 +6,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -14,7 +15,12 @@ import java.nio.file.Files
 internal data class CodexDeviceCode(val verificationUrl: String, val userCode: String)
 internal data class CodexCliAccount(val email: String?, val userId: String?, val workspaceId: String? = null)
 
-/** The CLI owns the device authorization, credential store, refresh, and logout. */
+// The app-server reports reqwest transport failures as text, without a separate error code.
+private fun deviceRequestFailure(endpoint: String) =
+    "error sending request for url (https://auth.openai.com/api/accounts/deviceauth/$endpoint)"
+private class DeviceTokenRequestFailed : IOException(uiString(R.string.codex_login_network_error))
+
+/** The CLI owns the browser callback, device authorization, credential store, refresh, and logout. */
 internal class CodexCliSession(private val launch: (File) -> Process) {
     constructor(runtime: CodexRuntime) : this({ home ->
         Files.createDirectories(home.toPath())
@@ -22,35 +28,72 @@ internal class CodexCliSession(private val launch: (File) -> Process) {
             listOf("-c", "cli_auth_credentials_store=\"file\""))
     })
 
-    suspend fun login(home: File, onCode: (CodexDeviceCode) -> Unit): CodexCliAccount = withServer(home) { rpc ->
-        val start = rpc.request("account/login/start", json("type" to "chatgptDeviceCode"))
+    suspend fun loginWithBrowser(home: File, openBrowser: suspend (String) -> Unit): CodexCliAccount = login(home) { rpc ->
+        authorize(rpc, "chatgpt") { start -> openBrowser(httpsUrl(start, "authUrl")) }
+    }
+
+    suspend fun loginWithDeviceCode(home: File, awaitRetry: suspend () -> Unit = {},
+                                    onCode: (CodexDeviceCode) -> Unit): CodexCliAccount = login(home) { rpc ->
+        try {
+            authorizeDevice(rpc, onCode)
+        } catch (_: DeviceTokenRequestFailed) {
+            // The CLI has ended this grant. A fresh loginId and code are required.
+            awaitRetry()
+            authorizeDevice(rpc, onCode)
+        }
+    }
+
+    private suspend fun authorizeDevice(rpc: CodexRpc, onCode: (CodexDeviceCode) -> Unit) {
+        authorize(rpc, "chatgptDeviceCode") { start ->
+            val code = start.string("userCode")
+            if (code.isBlank()) throw incomplete()
+            onCode(CodexDeviceCode(httpsUrl(start, "verificationUrl"), code))
+        }
+    }
+
+    private fun httpsUrl(start: JSONObject, field: String): String {
+        val url = start.string(field)
+        val uri = runCatching { URI(url) }.getOrNull()
+        if (uri?.scheme != "https" || uri.host.isNullOrEmpty() || uri.rawUserInfo != null) throw incomplete()
+        return url
+    }
+
+    private suspend fun login(home: File, authorize: suspend (CodexRpc) -> Unit): CodexCliAccount = withServer(home) { rpc ->
+        // Bound the entire sign-in, including time spent waiting to return to Studio.
+        withTimeout(16 * 60_000L) {
+            authorize(rpc)
+            readAccount(rpc) ?: throw incomplete()
+        }
+    }
+
+    private suspend fun authorize(rpc: CodexRpc, type: String, onStart: suspend (JSONObject) -> Unit) {
+        val start = try {
+            rpc.request("account/login/start", json("type" to type))
+        } catch (e: IOException) {
+            if (type == "chatgptDeviceCode" && e.message.orEmpty().endsWith(deviceRequestFailure("usercode"))) {
+                throw IOException(uiString(R.string.codex_login_network_error), e)
+            }
+            throw e
+        }
         val id = start.string("loginId")
-        if (start.string("type") != "chatgptDeviceCode" || id.isBlank()) throw incomplete()
+        if (id.isBlank()) throw incomplete()
         var completed = false
         try {
-            val url = start.string("verificationUrl")
-            val uri = runCatching { URI(url) }.getOrNull()
-            val code = start.string("userCode")
-            if (uri?.scheme != "https" || uri.host.isNullOrEmpty() || uri.rawUserInfo != null || code.isBlank()) {
-                throw incomplete()
-            }
-            onCode(CodexDeviceCode(url, code))
-            // Device codes normally expire after 15 minutes. Also bound the wait if a
-            // stalled runtime never sends the terminal notification.
-            withTimeout(16 * 60_000L) {
-                while (true) {
-                    val event = rpc.events.receive()
-                    if (event.string("method") != "account/login/completed") continue
-                    val result = event.optJSONObject("params") ?: continue
-                    if (result.string("loginId") != id) continue
-                    completed = true
-                    if (!result.optBoolean("success")) {
-                        throw IOException(result.string("error").ifBlank { uiString(R.string.chatgpt_authorization_is_incomplete) })
-                    }
-                    break
+            if (start.string("type") != type) throw incomplete()
+            onStart(start)
+            while (true) {
+                val event = rpc.events.receive()
+                if (event.string("method") != "account/login/completed") continue
+                val result = event.optJSONObject("params") ?: continue
+                if (result.string("loginId") != id) continue
+                completed = true
+                if (result.optBoolean("success")) return
+                val error = result.string("error")
+                if (type == "chatgptDeviceCode" && error == deviceRequestFailure("token")) {
+                    throw DeviceTokenRequestFailed()
                 }
+                throw IOException(error.ifBlank { uiString(R.string.chatgpt_authorization_is_incomplete) })
             }
-            readAccount(rpc) ?: throw incomplete()
         } finally {
             if (!completed) withContext(NonCancellable) {
                 withTimeoutOrNull(2_000L) {

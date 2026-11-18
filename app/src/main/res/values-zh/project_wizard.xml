@@ -1,0 +1,13 @@
+<resources>
+    <string name="wizard_select_template">选择项目模板</string>
+    <string name="wizard_empty_views">空白视图 Activity</string>
+    <string name="wizard_button_counter">按钮计数器</string>
+    <string name="wizard_no_activity">无 Activity</string>
+    <string name="wizard_next">下一步</string>
+    <string name="wizard_finish">完成</string>
+    <string name="wizard_save_location">保存位置</string>
+    <string name="wizard_choose_parent">选择父文件夹</string>
+    <string name="wizard_language">编程语言</string>
+    <string name="wizard_min_sdk">最低 SDK</string>
+    <string name="wizard_reserved_kotlin_package">请选择 kotlin 命名空间以外的包名</string>
+</resources>

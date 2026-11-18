@@ -298,7 +298,7 @@ private fun CompletionDialog(state: StudioEditorState, close: () -> Unit) {
             LazyColumn(Modifier.heightIn(max = 340.dp)) {
                 if (options.isEmpty()) item { Text(stringResource(R.string.no_matching_identifiers)) }
                 items(options) { token -> Text(token, Modifier.fillMaxWidth().clickable { state.complete(range, token); close() }
-                    .padding(vertical = 12.dp), fontFamily = LocalStudioSettings.current.editorFont.family) }
+                    .padding(vertical = 12.dp), fontFamily = LocalEditorFontFamily.current) }
             }
         })
 }
@@ -386,7 +386,7 @@ private fun RefactorDialog(state: StudioEditorState, kind: String, label: String
                 }
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
                     items(changes) { row ->
-                        Text(row, fontFamily = LocalStudioSettings.current.editorFont.family, style = MaterialTheme.typography.bodySmall,
+                        Text(row, fontFamily = LocalEditorFontFamily.current, style = MaterialTheme.typography.bodySmall,
                             color = if (row.startsWith("−")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -427,7 +427,7 @@ private fun LocationsDialog(state: StudioEditorState, kind: String, label: Strin
                                 Text(location.label, Modifier.fillMaxWidth().clickable {
                                     if (state.text == original) state.select(location.start, location.end)
                                     close()
-                                }.padding(vertical = 12.dp), fontFamily = LocalStudioSettings.current.editorFont.family)
+                                }.padding(vertical = 12.dp), fontFamily = LocalEditorFontFamily.current)
                             }
                         }
                     }

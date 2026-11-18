@@ -14,10 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.core.view.WindowCompat
 
 internal val LocalStudioSettings = compositionLocalOf { StudioSettings() }
 internal val LocalStudioDarkTheme = compositionLocalOf { false }
+internal val LocalEditorFontFamily = compositionLocalOf<FontFamily> { FontFamily.Monospace }
 
 private val lightColors = lightColorScheme(
     primary = Color(0xff25694e), onPrimary = Color.White,
@@ -89,10 +91,15 @@ internal fun StudioTheme(settings: StudioSettings, content: @Composable () -> Un
             }
         }
     }
-    val typography = remember(settings.uiFont, settings.uiFontSize) {
+    val uiFont = settings.uiFont.resolve(StudioFont.System)
+    val editorFont = settings.editorFont.resolve(StudioFont.Monospace)
+    val effectiveSettings = remember(settings, uiFont.font, editorFont.font) {
+        settings.copy(uiFont = uiFont.font, editorFont = editorFont.font)
+    }
+    val typography = remember(uiFont.family, settings.uiFontSize) {
         val scale = settings.uiFontSize / 14f
         fun TextStyle.configured() = copy(
-            fontFamily = settings.uiFont.family,
+            fontFamily = uiFont.family,
             fontSize = fontSize * scale,
             lineHeight = lineHeight * scale
         )
@@ -106,7 +113,8 @@ internal fun StudioTheme(settings: StudioSettings, content: @Composable () -> Un
             )
         }
     }
-    CompositionLocalProvider(LocalStudioSettings provides settings, LocalStudioDarkTheme provides dark) {
+    CompositionLocalProvider(LocalStudioSettings provides effectiveSettings, LocalStudioDarkTheme provides dark,
+        LocalEditorFontFamily provides editorFont.family) {
         MaterialTheme(colorScheme = colors, typography = typography, content = content)
     }
 }

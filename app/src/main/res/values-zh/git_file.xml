@@ -1,0 +1,9 @@
+<resources>
+    <string name="git_file_history">文件历史</string>
+    <string name="git_file_blame">逐行溯源</string>
+    <string name="git_file_no_history">此路径没有提交记录</string>
+    <string name="git_file_no_committed_version">HEAD 中没有这个文件。</string>
+    <string name="git_file_no_text">此文件没有可溯源的文本。</string>
+    <string name="git_file_large">此文件过大，无法逐行溯源。</string>
+    <string name="git_file_empty">文件为空</string>
+</resources>

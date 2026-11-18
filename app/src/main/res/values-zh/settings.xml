@@ -32,6 +32,7 @@
     <string name="settings_font_ligatures">启用字体连字</string>
     <string name="settings_serif">衬线字体</string>
     <string name="settings_monospace">等宽字体</string>
+    <string name="settings_monospace_only">仅等宽</string>
     <string name="settings_compact">紧凑模式</string>
     <string name="settings_toolbar_actions">显示工具栏操作</string>
     <string name="settings_tabs">显示编辑器标签页</string>

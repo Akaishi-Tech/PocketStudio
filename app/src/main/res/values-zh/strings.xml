@@ -127,7 +127,11 @@
     <string name="contains_an_assignment_or_named_argument_with_the">"包含赋值或同名命名实参"</string>
     <string name="contains_invalid_java_syntax_format">"%1$s 含有无法解析的 Java 语法"</string>
     <string name="codex_cli_sign_in">通过 Codex CLI 登录</string>
+    <string name="codex_use_device_code">使用设备码</string>
     <string name="codex_enter_device_code">请在验证页面输入下方验证码。</string>
+    <string name="codex_enter_replacement_code">登录连接已中断。请重新打开验证页面，输入下方的新验证码。</string>
+    <string name="codex_requesting_replacement_code">正在获取新的验证码…</string>
+    <string name="codex_login_network_error">无法连接登录服务。请检查网络后重新登录。</string>
     <string name="codex_open_verification_page">打开验证页面</string>
     <string name="conversation_context_compacted">"已整理对话上下文"</string>
     <string name="copy">"复制"</string>
@@ -499,7 +503,6 @@
     <string name="replacement_canceled">"替换已取消"</string>
     <string name="replacements">"已替换 %1$s 处"</string>
     <string name="request_failed">"请求失败"</string>
-    <string name="resolve_conflicts_in_unsaved_files_first">"请先处理未保存文件的冲突"</string>
     <string name="unsaved_changes">有未保存的更改</string>
     <string name="resolve_editing_conflicts_first">"请先解决编辑冲突"</string>
     <string name="restore_default">"恢复默认"</string>
@@ -700,7 +703,7 @@
     <string name="the_working_copy_is_missing_sync_paused_to">"工作副本目录丢失，已暂停同步以保留所选目录中的文件"</string>
     <string name="the_zip_contains_no_project_files">"ZIP 中没有项目文件"</string>
     <string name="there_is_a_nested_scope_or_a_parameter">"存在嵌套作用域或同名参数"</string>
-    <string name="this_account_has_not_been_saved">"未保存此账户"</string>
+    <string name="sign_in_to_use_this_account">请先登录此账户</string>
     <string name="this_action_is_unavailable_here">"此处无法执行该操作"</string>
     <string name="this_client_does_not_support_the_request">"此客户端不支持该请求"</string>
     <string name="this_device">"本机"</string>

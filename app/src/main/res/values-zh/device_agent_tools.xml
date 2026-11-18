@@ -1,0 +1,9 @@
+<resources>
+    <string name="agent_device_query_timeout">目标设备在 30 秒内未响应。</string>
+    <string name="agent_log_package_required">请通过 packageName 指定已安装应用的 ID，或先构建当前工程的 APK。</string>
+    <string name="agent_log_line_range">maxLines 必须在 1 到 400 之间。</string>
+    <string name="agent_device_packages_unavailable">无法读取设备当前用户已安装应用的 UID。</string>
+    <string name="agent_package_not_installed">设备当前用户尚未安装名为 %1$s 的应用。</string>
+    <string name="agent_package_shared_uid">%1$s 与其他应用共享 Android UID，Logcat 无法单独筛出该应用的历史日志。</string>
+    <string name="agent_logcat_failed">无法读取设备上的应用日志。%1$s</string>
+</resources>

@@ -10,9 +10,9 @@ Pocket Studio runs on Android 8.0 or later. The interface follows the device lan
 
 ## Getting started
 
-Install `PocketStudio.apk` from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). On the welcome screen, create a project, enter its name, confirm the package name and choose a parent folder in the system file picker. Studio creates a project folder and opens `MainActivity.java`. You can also create a project from the File menu in an existing workspace.
+Install `PocketStudio.apk` from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Choose **New project** on the welcome screen or in the **File** menu. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder and minimum SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest.
 
-The template uses Java and XML. On Android 11 or later, install SDK Platform 34 in SDK Manager, then use the Build menu to build your first debug APK.
+On Android 11 or later, install SDK Platform 34 in SDK Manager to build a debug APK. For quick builds of Kotlin projects, also install Kotlin / D8.
 
 | Workspace | What you can do |
 | --- | --- |
@@ -21,9 +21,14 @@ The template uses Java and XML. On Android 11 or later, install SDK Platform 34 
 | Agents | Use Codex in the current project and review chat history, Markdown replies, file operations and build details. |
 | Layout preview | Open a layout XML file and preview it from the View menu. The preview supports common Android views and project string, color and dimension resources. |
 | Build | Build a single-module Java app offline, package resources, locate compiler errors, sign, export and install the APK. Kotlin projects can use the optional Kotlin / D8 tools. |
-| Gradle and Git | Run the project's Gradle Wrapper on the device for builds, tests, lint or custom tasks. Inspect local Git status, diffs and history. |
+| Gradle | Run the project's Gradle Wrapper on the device for builds, tests, lint or custom tasks. |
+| Git | Clone or initialize repositories, review diffs and stage files or individual hunks, commit changes, inspect file history and blame, manage branches, tags and stashes, and fetch, pull or push. |
 | Devices | Select a target, install an APK, launch an app, run shell commands, filter live Logcat output by text or level, and inspect the target's screen and view hierarchy. |
 | Debugger | List debuggable processes, attach to ART, add and remove source breakpoints, inspect the stack and current frame variables, step, resume and detach. |
+
+Choose **Clone repository** on the welcome screen or open Git with the branch icon above the project tree (`Alt+9`). In **Changes**, tap a file to see its diff. For conflicts, pick a version or open the editor to merge changes by hand. Open a branch’s menu to compare, merge or rebase. Open a commit’s menu to cherry-pick, revert or reset.
+
+Clones are stored in the app’s private project storage and appear under **Recent projects**. For a private HTTPS remote, enter a username and access token in the transfer dialog. For SSH, select a private key and a matching OpenSSH `known_hosts` file.
 
 Open Settings with the gear on the welcome screen or **File → Settings** (`Ctrl+Alt+S`) in a project. Choose interface and editor fonts independently, preview JetBrains Mono and ligatures, and customize colors for each editor scheme. Search settings to adjust indentation, save actions, Gradle offline mode or console wrapping.
 
@@ -37,13 +42,17 @@ The debug APK action runs the built-in quick builder. To run a task defined by t
 
 Open **Agents** in a project and choose **Download Codex**. Studio downloads the signed `PocketStudio-Codex.apk` from this repository’s `codex-runtime` GitHub Release, verifies its size, SHA-256 digest, package name and signing certificate, and opens the Android installer. The plugin is named **Pocket Studio - Codex Plugin** in English. It includes the native Codex runtime for ARM64 and x86_64. You can also install it alongside the main APK from the same app release. Studio checks for plugin updates when you open Agents and lets you decide when to install them.
 
-Open **Account and usage** in the top-right corner of Agents and choose the Codex CLI sign-in option. The CLI supplies a verification link and a one-time code. Open the verification link in your browser, sign in to ChatGPT and enter the code. Return to Studio to use the account. If device-code login is disabled, enable it in your ChatGPT security settings or ask your workspace admin to enable it. [Codex device-code sign-in](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
+Open **Account and usage** in the top-right corner of Agents and choose **Sign in with Codex CLI**. Studio opens the browser on this device. Sign in to ChatGPT there, then return to Studio.
+
+If browser sign-in stalls, return to the Studio sign-in page and choose **Use device code**. Open the verification page and enter the one-time code shown in Studio. If device-code login is disabled, enable it in your ChatGPT security settings or ask your workspace admin to enable it. [Codex device-code sign-in](https://learn.chatgpt.com/docs/auth#login-on-headless-devices)
 
 If you previously used **Continue with ChatGPT** in Studio, sign in once through the CLI. The account page shows the remaining allowance when Codex reports a usage window. You can also check it on the [Codex usage dashboard](https://chatgpt.com/codex/settings/usage).
 
 To connect with an API key, choose **Use an API key**. Keep the default endpoint for OpenAI or enter the HTTPS base URL of a Responses API–compatible service, such as `https://example.com/v1`. Enter the API key for that service and choose **Save connection**. API usage is billed to the associated API account.
 
 Start a new chat to work with the current project. Codex can list, read and edit files. It asks for confirmation before running Gradle tasks. Expand a tool summary to inspect its actions and results. The editor keeps unsaved drafts and reports conflicts when a file changes on disk.
+
+Ask Codex to find text across saved project files, or select code in the editor and ask about “this selection.” It can read the active tab and nearby unsaved edits. With a debug device connected, it can also inspect the foreground screen’s controls and bounds or read recent logs for your app. Logcat uses the application ID from the current project’s built APK by default. If you haven’t built it in Studio, include the installed application ID in your question. After updating Studio, start a new chat to access newly added tools.
 
 [Chat and tool details on a phone](docs/screenshots/agents.png)
 

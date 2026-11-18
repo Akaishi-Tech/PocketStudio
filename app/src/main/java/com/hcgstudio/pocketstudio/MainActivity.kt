@@ -57,7 +57,12 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
+        workspace.codex.setActivityResumed(true)
         if (workspace.settings.autoUpdate) workspace.updates.check(automatic = true)
+    }
+    override fun onPause() {
+        workspace.codex.setActivityResumed(false)
+        super.onPause()
     }
     override fun onStop() {
         workspace.flushDrafts()
@@ -139,14 +144,14 @@ private fun StudioApp(w: Workspace) {
     val editor = active?.editor
     val className = remember(editor?.text, active?.node?.name) {
         val name = active?.node?.name.orEmpty().substringBeforeLast('.')
-        val pkg = Regex("""(?m)^\s*package\s+([\w.]+)""").find(editor?.text.orEmpty())?.groupValues?.get(1)
+        val pkg = Regex("""(?m)^\s*package\s+([\w.`]+)""").find(editor?.text.orEmpty())?.groupValues?.get(1)?.replace("`", "")
         if (pkg == null) name else "$pkg.$name"
     }
     fun act(id: String, label: String, group: Int, shortcut: String = "", enabled: Boolean = true, run: () -> Unit) =
         StudioAction(id, label, group, shortcut, enabled, run)
     val keymap = remember { Keymap(context.getSharedPreferences("studio-keymap", 0)) }
     val defaults = buildList {
-        add(act("newProject", context.getString(R.string.new_project), R.string.file, enabled = !w.running && !w.busy, run = newProject))
+        add(act("newProject", context.getString(R.string.new_project), R.string.file, enabled = w.canSwitchProject, run = newProject))
         add(act("open", context.getString(R.string.open_folder), R.string.file, "Ctrl+O", !w.running && !w.busy, openTree))
         add(act("import", context.getString(R.string.import_zip), R.string.file, enabled = !w.running && !w.busy, run = importZip))
         add(act("settings", context.getString(R.string.settings), R.string.file, "Ctrl+Alt+S") { showSettings = true })
@@ -176,8 +181,8 @@ private fun StudioApp(w: Workspace) {
         add(act("devices", context.getString(R.string.devices_and_debugging), R.string.view, "Alt+5", canEdit) { w.tool = Tool.Devices })
         add(act("output", context.getString(R.string.build_output), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
         add(act("preview", context.getString(R.string.preview_layout), R.string.view, enabled = active?.node?.path?.contains(Regex("(^|/)res/layout[^/]*/[^/]+\\.xml$")) == true) { dialog = "preview" })
-        add(act("build", context.getString(R.string.build_debug_apk), R.string.build, "Ctrl+F9", idle) { w.command("build") })
-        add(act("run", context.getString(R.string.build_and_run_on_device), R.string.build, "Shift+F10", idle && w.devices.connected && !w.devices.busy) { w.command("build", true) })
+        add(act("build", context.getString(R.string.build_debug_apk), R.string.build, "Ctrl+F9", idle) { w.build() })
+        add(act("run", context.getString(R.string.build_and_run_on_device), R.string.build, "Shift+F10", idle && w.devices.connected && !w.devices.busy) { w.build(true) })
         add(act("openApk", context.getString(R.string.install_apk_on_this_device), R.string.build, enabled = idle && w.apk != null) {
             w.apk?.let { openApk(Uri.fromFile(it)) }
         })
@@ -213,8 +218,16 @@ private fun StudioApp(w: Workspace) {
         deviceAction("stack", context.getString(R.string.call_stack), devices.paused, devices::stack)
         deviceAction("locals", context.getString(R.string.local_variables), devices.paused, devices::locals)
         deviceAction("detach", context.getString(R.string.detach_debugger), devices.attached, devices::detach)
-        for ((cmd, label) in mapOf("status" to context.getString(R.string.working_tree_status), "diff" to context.getString(R.string.view_diff), "log" to context.getString(R.string.commit_history)))
-            add(act("git-$cmd", label, R.string.git, enabled = idle) { w.command(cmd) })
+        add(act("git-status", context.getString(R.string.git_tab_changes), R.string.git, "Alt+9", idle) { w.openGit() })
+        add(act("git-diff", context.getString(R.string.view_diff), R.string.git, enabled = idle) { w.openGit(diff = true) })
+        val gitFile = (if (w.tool == Tool.Project) w.selectedNode else active?.node)?.takeUnless { it.folder }
+        add(act("git-file", context.getString(R.string.git_file_history), R.string.git, enabled = idle && gitFile != null) {
+            gitFile?.let { w.openGit(GitTab.History, file = it.path) }
+        })
+        add(act("git-log", context.getString(R.string.commit_history), R.string.git, enabled = idle) { w.openGit(GitTab.History) })
+        add(act("git-branches", context.getString(R.string.git_tab_branches), R.string.git, enabled = idle) { w.openGit(GitTab.Branches) })
+        add(act("git-remotes", context.getString(R.string.git_tab_remotes), R.string.git, enabled = idle) { w.openGit(GitTab.Remotes) })
+        add(act("git-clone", context.getString(R.string.git_clone_action), R.string.git, enabled = idle) { dialog = "gitClone" })
         add(act("licenses", context.getString(R.string.open_source_licenses), R.string.tools) { dialog = "licenses" })
         add(act("keymap", context.getString(R.string.keyboard_shortcuts), R.string.tools) { dialog = "keymap" })
         add(act("sdk", context.getString(R.string.sdk_manager), R.string.tools) { dialog = "sdk" })
@@ -222,10 +235,12 @@ private fun StudioApp(w: Workspace) {
     }
     val actions = defaults.map(keymap::apply)
     val rootFocus = remember { FocusRequester() }
-    LaunchedEffect(p, showSettings) { if (!showSettings) rootFocus.requestFocus() }
+    LaunchedEffect(p, showSettings, newProjectVisible) {
+        if (!showSettings && !newProjectVisible) rootFocus.requestFocus()
+    }
     val notice = w.message
     LaunchedEffect(notice) { if (notice != null) { snack.showSnackbar(notice); if (w.message == notice) w.message = null } }
-    BackHandler(p != null && dialog.isEmpty() && !newProjectVisible && !showAgentAccount && !showSettings) {
+    BackHandler(p != null && dialog.isEmpty() && w.git == null && !newProjectVisible && !showAgentAccount && !showSettings) {
         if (active == null) showTree = true
         w.tool = if (active != null) Tool.Editor else Tool.Project
     }
@@ -233,7 +248,7 @@ private fun StudioApp(w: Workspace) {
     Scaffold(
         modifier = Modifier.onPreviewKeyEvent { key ->
             val event = key.nativeKeyEvent
-            val action = if (dialog.isEmpty() && !newProjectVisible && !showAgentAccount && !showSettings) actions.firstOrNull { it.enabled && it.matches(event) } else null
+            val action = if (dialog.isEmpty() && w.git == null && !newProjectVisible && !showAgentAccount && !showSettings) actions.firstOrNull { it.enabled && it.matches(event) } else null
             if (action == null) false else { action.run(); true }
         }.focusRequester(rootFocus).focusable(),
         contentWindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
@@ -244,7 +259,10 @@ private fun StudioApp(w: Workspace) {
                 LaunchedEffect(p) { w.codex.enter(p) }
             }
             val workbenchState = key(p?.root?.uri) { rememberSaveableStateHolder() }
-            if (showSettings) SettingsPage(w.settings, w::updateSettings, { showSettings = false },
+            val git = w.git
+            if (newProjectVisible) NewProjectPage(w)
+            else if (git != null) GitPage(git)
+            else if (showSettings) SettingsPage(LocalStudioSettings.current, w::updateSettings, { showSettings = false },
                 { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) })
             else if (p != null && showAgentAccount) CodexAccountPage(w.codex) {
                 showAgentAccount = false
@@ -257,12 +275,13 @@ private fun StudioApp(w: Workspace) {
                     showAgentAccount = true
                 }
             }
-            else Welcome(w, newProject, openTree, importZip, { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
+            else Welcome(w, newProject, openTree, importZip, { dialog = "gitClone" }, { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
             if (w.busy && !newProjectVisible) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
     }
     val dismiss = { dialog = "" }
     when (dialog) {
+        "gitClone" -> GitCloneDialog(dismiss) { directory -> dismiss(); w.openProject(Uri.fromFile(directory)) }
         "licenses" -> LicensePage(dismiss)
         "keymap" -> KeymapDialog(actions, defaults, keymap, dismiss)
         "sdk" -> SdkManager(dismiss)
@@ -282,38 +301,6 @@ private fun StudioApp(w: Workspace) {
     if (p != null) {
         if (w.tool == Tool.Codex || showAgentAccount) CodexToolApproval(w.codex)
     }
-    if (newProjectVisible) CreateProject(w)
     DeviceDialogs(w.devices)
     AppUpdateDialog(w.updates)
-}
-
-@Composable
-private fun CreateProject(w: Workspace) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var customPackage by rememberSaveable { mutableStateOf<String?>(null) }
-    val packageName = customPackage ?: remember(name) { suggestedPackage(name) }
-    var parent by rememberSaveable { mutableStateOf<Uri?>(null) }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { parent = it }
-    LaunchedEffect(parent, w.busy) {
-        val location = parent ?: return@LaunchedEffect
-        if (!w.busy) {
-            parent = null
-            w.createProject(location, name.trim(), packageName.trim())
-        }
-    }
-    NewProjectDialog(name, packageName,
-        setName = { name = it; w.creationError = null },
-        setPackageName = { customPackage = it; w.creationError = null },
-        error = w.creationError, busy = w.busy || parent != null,
-        dismiss = { w.newProjectVisible.value = false },
-        chooseLocation = { w.creationError = null; picker.launch(null) })
-}
-
-private fun suggestedPackage(name: String): String {
-    val trimmed = name.trim()
-    if (trimmed.isEmpty()) return "com.example.myapp"
-    val slug = trimmed.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.take(240)
-    val suffix = slug.ifEmpty { "app" + trimmed.hashCode().toUInt().toString(16) }
-    val candidate = "com.example.$suffix"
-    return if (Project.packageNameError(candidate) == null) candidate else "com.example.app$suffix"
 }

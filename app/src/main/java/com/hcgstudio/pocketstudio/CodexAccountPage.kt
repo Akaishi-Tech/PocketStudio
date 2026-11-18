@@ -39,14 +39,14 @@ internal fun CodexAccountPage(c: CodexController, close: () -> Unit) {
             c.error = null
             apiForm = false
         } else {
-            if (c.signingIn) c.cancelLogin()
+            c.cancelLogin()
             close()
         }
     }
     BackHandler(onBack = back)
     val title = when {
         apiForm -> R.string.api_connection
-        c.usable || state?.accounts?.isNotEmpty() == true -> R.string.account_and_usage
+        c.usable || state?.signedInAccounts?.isNotEmpty() == true -> R.string.account_and_usage
         else -> R.string.sign_in_to_codex
     }
     Surface(Modifier.fillMaxSize()) {
@@ -76,14 +76,17 @@ internal fun CodexAccountPage(c: CodexController, close: () -> Unit) {
 
 @Composable
 private fun AccountMethods(c: CodexController, state: CodexAuthState, editApi: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     if (c.signingIn) {
-        val uriHandler = LocalUriHandler.current
         val code = c.deviceCode
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (code == null) LinearProgressIndicator(Modifier.width(242.dp))
-            else {
-                Text(stringResource(R.string.codex_enter_device_code), style = MaterialTheme.typography.bodyLarge)
+            if (code == null) {
+                if (c.replacingDeviceCode) Text(stringResource(R.string.codex_requesting_replacement_code))
+                LinearProgressIndicator(Modifier.width(242.dp))
+            } else {
+                val instructions = if (c.replacingDeviceCode) R.string.codex_enter_replacement_code else R.string.codex_enter_device_code
+                Text(stringResource(instructions), style = MaterialTheme.typography.bodyLarge)
                 SelectionContainer {
                     Text(code.userCode, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.headlineMedium, fontFamily = FontFamily.Monospace)
@@ -97,16 +100,17 @@ private fun AccountMethods(c: CodexController, state: CodexAuthState, editApi: (
                     }
                 }) { Text(stringResource(R.string.codex_open_verification_page)) }
             }
+            if (c.offerDeviceCode) DeviceCodeButton(c)
             TextButton(c::cancelLogin) { Text(stringResource(R.string.cancel_sign_in)) }
         }
         return
     }
     val enabled = !c.accountBusy && !c.working
     val active = state.selected?.takeIf { state.useChatGpt }
-    if (state.accounts.isNotEmpty()) {
-        val labelCounts = remember(state.accounts) { state.accounts.groupingBy { it.label }.eachCount() }
+    if (state.signedInAccounts.isNotEmpty()) {
+        val labelCounts = remember(state.signedInAccounts) { state.signedInAccounts.groupingBy { it.label }.eachCount() }
         Column(Modifier.fillMaxWidth().selectableGroup()) {
-            state.accounts.forEach { profile ->
+            state.signedInAccounts.forEach { profile ->
                 val selected = active?.id == profile.id
                 Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected, enabled = enabled,
                     role = Role.RadioButton, onClick = { if (!selected) c.configure { it.selectAccount(profile.id) } }),
@@ -136,15 +140,21 @@ private fun AccountMethods(c: CodexController, state: CodexAuthState, editApi: (
     }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button({ c.login() }, enabled = enabled, modifier = Modifier.width(242.dp).heightIn(min = 48.dp),
+        Button({ c.login(uriHandler::openUri) }, enabled = enabled, modifier = Modifier.width(242.dp).heightIn(min = 48.dp),
             shape = RoundedCornerShape(12.dp)) {
             Text(stringResource(R.string.codex_cli_sign_in))
         }
+        if (c.offerDeviceCode) DeviceCodeButton(c, enabled)
         OutlinedButton(editApi, enabled = enabled, modifier = Modifier.width(242.dp).heightIn(min = 48.dp),
             shape = RoundedCornerShape(12.dp)) {
             Text(stringResource(if (state.hasApiKey) R.string.api_connection else R.string.use_an_api_key))
         }
     }
+}
+
+@Composable
+private fun DeviceCodeButton(c: CodexController, enabled: Boolean = true) {
+    TextButton(c::useDeviceCode, enabled = enabled) { Text(stringResource(R.string.codex_use_device_code)) }
 }
 
 @Composable

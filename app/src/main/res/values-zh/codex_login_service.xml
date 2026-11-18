@@ -1,0 +1,4 @@
+<resources>
+    <string name="codex_login_channel">Codex 登录</string>
+    <string name="codex_login_notification">正在等待浏览器验证。点按返回掌上 Studio。</string>
+</resources>

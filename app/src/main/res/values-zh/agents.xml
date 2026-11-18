@@ -1,5 +1,8 @@
 <resources>
     <string name="agents_tab_label">智能体</string>
+    <string name="read_editor_context">读取编辑器选区及上下文</string>
+    <string name="read_app_logcat">读取应用日志</string>
+    <string name="search_query_single_line">请输入一行非空的搜索文本。</string>
     <string name="choose_model">选择模型</string>
     <string name="loading_models">正在加载模型…</string>
     <string name="refresh_models">刷新模型列表</string>

@@ -127,7 +127,11 @@
     <string name="contains_an_assignment_or_named_argument_with_the">"Contains an assignment or named argument with the same name"</string>
     <string name="contains_invalid_java_syntax_format">"%1$s contains invalid Java syntax"</string>
     <string name="codex_cli_sign_in">Sign in with Codex CLI</string>
+    <string name="codex_use_device_code">Use device code</string>
     <string name="codex_enter_device_code">Enter this code on the verification page.</string>
+    <string name="codex_enter_replacement_code">The sign-in connection was interrupted. Open the verification page again and enter this new code.</string>
+    <string name="codex_requesting_replacement_code">Getting a new verification code…</string>
+    <string name="codex_login_network_error">Couldn\'t reach the sign-in service. Check your connection and try signing in again.</string>
     <string name="codex_open_verification_page">Open verification page</string>
     <string name="conversation_context_compacted">"Conversation context compacted"</string>
     <string name="copy">"Copy"</string>
@@ -499,7 +503,6 @@
     <string name="replacement_canceled">"Replacement canceled"</string>
     <string name="replacements">"Replacements: %1$s"</string>
     <string name="request_failed">"Request failed"</string>
-    <string name="resolve_conflicts_in_unsaved_files_first">"Resolve conflicts in unsaved files first"</string>
     <string name="unsaved_changes">Unsaved changes</string>
     <string name="resolve_editing_conflicts_first">"Resolve editing conflicts first"</string>
     <string name="restore_default">"Restore default"</string>
@@ -700,7 +703,7 @@
     <string name="the_working_copy_is_missing_sync_paused_to">"The working copy is missing. Sync paused to preserve files in the selected directory."</string>
     <string name="the_zip_contains_no_project_files">"The ZIP contains no project files"</string>
     <string name="there_is_a_nested_scope_or_a_parameter">"There is a nested scope or a parameter with the same name"</string>
-    <string name="this_account_has_not_been_saved">"This account has not been saved"</string>
+    <string name="sign_in_to_use_this_account">Sign in to use this account</string>
     <string name="this_action_is_unavailable_here">"This action is unavailable here"</string>
     <string name="this_client_does_not_support_the_request">"This client does not support the request"</string>
     <string name="this_device">"This device"</string>

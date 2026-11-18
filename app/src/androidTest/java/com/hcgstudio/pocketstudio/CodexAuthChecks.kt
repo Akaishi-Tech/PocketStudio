@@ -11,8 +11,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.nio.file.Files
 import java.util.Base64
 
@@ -49,6 +51,7 @@ object CodexAuthChecks {
         check(reopened.credential(legacy) == key && !legacy.useChatGpt && legacy.apiEndpoint == CodexAuth.DEFAULT_API_ENDPOINT)
         val saved = checkNotNull(legacy.selected)
         check(saved.id == id && !saved.signedIn)
+        check(legacy.signedInAccounts.isEmpty())
         val migrated = storage.read().getJSONObject("accounts").getJSONObject(id)
         check(listOf("identity", "access", "refresh").none(migrated::has))
         check(context.noBackupFilesDir.listFiles().orEmpty().filter { it.isFile }.none { key in it.readText(Charsets.ISO_8859_1) })
@@ -75,74 +78,200 @@ object CodexAuthChecks {
         val signedIn = login(cli, "fixture CLI credentials")
         val profile = checkNotNull(signedIn.selected)
         check(signedIn.useChatGpt && profile.signedIn && profile.id == id && signedIn.accountKey == "plan-$id")
+        check(signedIn.signedInAccounts == listOf(profile))
         val savedHome = checkNotNull(auth.cliHome(profile))
         check(File(savedHome, "auth.json").readText() == "fixture CLI credentials")
         check(reopened.snapshot() == signedIn)
         check(runCatching { auth.credential(signedIn) }.isFailure)
-        val other = checkNotNull(login(cli.copy(workspaceId = "workspace-two"), "other workspace").selected)
-        check(other.id != profile.id && auth.cliHome(other) != savedHome)
+        val both = login(cli.copy(workspaceId = "workspace-two"), "other workspace")
+        val other = checkNotNull(both.selected)
+        val otherHome = checkNotNull(auth.cliHome(other))
+        check(other.id != profile.id && otherHome != savedHome)
+        check(both.signedInAccounts.toSet() == setOf(profile, other))
         check(File(savedHome, "auth.json").readText() == "fixture CLI credentials")
         auth.selectAccount(profile.id)
         check(File(savedHome, "auth.json").delete()) // The CLI clears its credentials on logout.
         auth.markSignedOut(id)
         val signedOut = reopened.snapshot()
-        check(signedOut.selected?.signedIn == false && signedOut.accounts.single { it.id == other.id }.signedIn)
-        check(login(cli, "new credentials").selected == profile && auth.cliHome(profile) == savedHome)
+        check(signedOut.selected?.signedIn == false && signedOut.accountKey == signedIn.accountKey)
+        check(signedOut.signedInAccounts == listOf(other))
+        reopened.selectAccount(other.id)
+        check(runCatching { auth.selectAccount(id) }.isFailure)
+        check(auth.snapshot().selected == other)
+        check(File(otherHome, "auth.json").delete())
+        reopened.markSignedOut(other.id)
+        check(auth.snapshot().signedInAccounts.isEmpty())
+        val restored = login(cli, "new credentials")
+        check(restored.selected == profile && auth.cliHome(profile) == savedHome)
+        check(restored.signedInAccounts == listOf(profile) && reopened.snapshot() == restored)
         auth.saveApiConfiguration("", key)
         check(auth.credential(reopened.snapshot()) == key)
         reopened.removeApiKey()
         check(!auth.snapshot().hasApiKey && runCatching { auth.credential(legacy) }.isFailure)
     }
 
-    private suspend fun checkCliLogin(home: File) = coroutineScope {
-        val verification = CodexDeviceCode("https://auth.openai.com/codex/device", "TEST-CODE")
-        val account = CodexCliAccount("account@example.test", "fixture-user", "workspace-one")
-        for (cancel in listOf(false, true)) {
-            ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
-                listener.soTimeout = 6_000
-                val fixture = async(Dispatchers.IO) {
-                    listener.accept().use { socket ->
-                        socket.soTimeout = 6_000
-                        val input = socket.getInputStream().bufferedReader()
-                        val output = socket.getOutputStream().bufferedWriter()
-                        fun send(message: JSONObject) {
-                            output.write(message.toString())
-                            output.newLine()
-                            output.flush()
-                        }
-                        fun receive(method: String): JSONObject = JSONObject(input.readLine()).also {
-                            check(it.getString("method") == method) { "Expected $method, received $it" }
-                        }
-                        fun reply(request: JSONObject, result: JSONObject) = send(json("id" to request.get("id"), "result" to result))
-                        reply(receive("initialize"), JSONObject())
-                        receive("initialized")
-                        val start = receive("account/login/start")
-                        check(start.getJSONObject("params").getString("type") == "chatgptDeviceCode")
-                        reply(start, json("type" to "chatgptDeviceCode", "loginId" to "fixture", "userCode" to verification.userCode,
-                            "verificationUrl" to verification.verificationUrl))
-                        if (cancel) {
-                            val stop = receive("account/login/cancel")
-                            check(stop.getJSONObject("params").getString("loginId") == "fixture")
-                            reply(stop, json("status" to "canceled"))
-                        } else {
-                            send(json("method" to "account/login/completed", "params" to json("loginId" to "other", "success" to false)))
-                            send(json("method" to "account/login/completed", "params" to json("loginId" to "fixture", "success" to true)))
-                            reply(receive("account/read"), json("account" to json("type" to "chatgpt", "email" to account.email,
-                                "planType" to "plus"), "userId" to account.userId,
-                                "workspaceRouting" to json("chatgptAccountId" to account.workspaceId)))
-                        }
+    private val cliAccount = CodexCliAccount("account@example.test", "fixture-user", "workspace-one")
+    private const val verificationUrl = "https://auth.openai.com/codex/device"
+    private const val networkError = "error sending request for url (https://auth.openai.com/api/accounts/deviceauth/token)"
+
+    private suspend fun checkCliLogin(home: File) {
+        val authorizationUrl = "https://auth.openai.com/oauth/authorize?state=fixture"
+        withCli(home, {
+            val request = receive("account/login/start")
+            check(request.getJSONObject("params").getString("type") == "chatgpt")
+            reply(request, json("type" to "chatgpt", "loginId" to "browser", "authUrl" to authorizationUrl))
+            complete("other", "Unrelated sign-in failed")
+            complete("browser")
+            readAccount()
+        }) { cli ->
+            val opened = mutableListOf<String>()
+            check(cli.loginWithBrowser(home) { opened.add(it) } == cliAccount)
+            check(opened == listOf(authorizationUrl))
+        }
+
+        withCli(home, {
+            start("first")
+            complete("other", networkError)
+            complete("first")
+            readAccount()
+        }) { cli ->
+            val codes = mutableListOf<CodexDeviceCode>()
+            check(cli.loginWithDeviceCode(home) { codes.add(it) } == cliAccount)
+            check(codes == listOf(CodexDeviceCode(verificationUrl, "first")))
+        }
+
+        withCli(home, {
+            start("first")
+            val stop = receive("account/login/cancel")
+            check(stop.getJSONObject("params").getString("loginId") == "first")
+            reply(stop, json("status" to "canceled"))
+        }) { cli ->
+            coroutineScope {
+                val displayed = CompletableDeferred<CodexDeviceCode>()
+                val login = async { cli.loginWithDeviceCode(home) { displayed.complete(it) } }
+                check(displayed.await() == CodexDeviceCode(verificationUrl, "first"))
+                login.cancelAndJoin()
+            }
+        }
+
+        for (error in listOf("Device authorization denied", "error sending request for url (https://auth.openai.com/oauth/token)")) {
+            withCli(home, {
+                start("first")
+                complete("first", error)
+            }) { cli ->
+                val result = runCatching { cli.loginWithDeviceCode(home, awaitRetry = { error("Unexpected retry") }) { } }
+                check(result.exceptionOrNull() is IOException && result.exceptionOrNull()?.message == error)
+            }
+        }
+
+        checkInterruptedLogin(home)
+        checkInterruptedLogin(home, cancelWhileWaiting = true)
+        checkInterruptedLogin(home, failAgain = true)
+    }
+
+    private suspend fun checkInterruptedLogin(home: File, cancelWhileWaiting: Boolean = false, failAgain: Boolean = false) {
+        val waiting = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        withCli(home, {
+            start("first")
+            complete("first", networkError)
+            if (!cancelWhileWaiting) {
+                start("second")
+                check(resume.isCompleted)
+                complete("first", "Late completion for the previous code")
+                complete("second", if (failAgain) networkError else null)
+                if (!failAgain) readAccount()
+            }
+        }) { cli ->
+            coroutineScope {
+                val codes = mutableListOf<CodexDeviceCode>()
+                val login = async {
+                    runCatching {
+                        cli.loginWithDeviceCode(home, awaitRetry = {
+                            check(waiting.complete(Unit)) { "Login retried more than once" }
+                            resume.await()
+                        }) { codes.add(it) }
                     }
                 }
-                val cli = CodexCliSession { directory ->
-                    check(directory == home)
-                    ProcessBuilder("/system/bin/toybox", "nc", "127.0.0.1", listener.localPort.toString()).start()
+                waiting.await()
+                check(codes == listOf(CodexDeviceCode(verificationUrl, "first")))
+                if (cancelWhileWaiting) {
+                    login.cancelAndJoin()
+                } else {
+                    resume.complete(Unit)
+                    val result = login.await()
+                    if (failAgain) {
+                        val failure = result.exceptionOrNull()
+                        check(failure is IOException && failure.message == uiString(R.string.codex_login_network_error))
+                    } else {
+                        check(result.getOrThrow() == cliAccount)
+                    }
+                    check(codes == listOf(CodexDeviceCode(verificationUrl, "first"), CodexDeviceCode(verificationUrl, "second")))
                 }
-                val displayed = CompletableDeferred<CodexDeviceCode>()
-                val login = async { cli.login(home) { displayed.complete(it) } }
-                check(displayed.await() == verification)
-                if (cancel) login.cancelAndJoin() else check(login.await() == account)
-                fixture.await()
             }
+        }
+    }
+
+    private suspend fun withCli(home: File, serve: LoginFixture.() -> Unit, exercise: suspend (CodexCliSession) -> Unit) = coroutineScope {
+        ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+            listener.soTimeout = 6_000
+            val server = async(Dispatchers.IO) {
+                listener.accept().use { socket ->
+                    socket.soTimeout = 6_000
+                    LoginFixture(socket).run {
+                        reply(receive("initialize"), JSONObject())
+                        receive("initialized")
+                        serve()
+                        expectClosed()
+                    }
+                }
+            }
+            val cli = CodexCliSession { directory ->
+                check(directory == home)
+                ProcessBuilder("/system/bin/toybox", "nc", "127.0.0.1", listener.localPort.toString()).start()
+            }
+            exercise(cli)
+            server.await()
+        }
+    }
+
+    private class LoginFixture(socket: Socket) {
+        private val input = socket.getInputStream().bufferedReader()
+        private val output = socket.getOutputStream().bufferedWriter()
+
+        fun start(id: String) {
+            val request = receive("account/login/start")
+            check(request.getJSONObject("params").getString("type") == "chatgptDeviceCode")
+            reply(request, json("type" to "chatgptDeviceCode", "loginId" to id,
+                "userCode" to id, "verificationUrl" to verificationUrl))
+        }
+
+        fun complete(id: String, error: String? = null) {
+            send(json("method" to "account/login/completed", "params" to json("loginId" to id,
+                "success" to (error == null), "error" to error)))
+        }
+
+        fun readAccount() {
+            reply(receive("account/read"), json("account" to json("type" to "chatgpt", "email" to cliAccount.email,
+                "planType" to "plus"), "userId" to cliAccount.userId,
+                "workspaceRouting" to json("chatgptAccountId" to cliAccount.workspaceId)))
+        }
+
+        fun expectClosed() {
+            val extra = input.readLine()
+            check(extra == null) { "Unexpected request after login ended: $extra" }
+        }
+
+        fun receive(method: String): JSONObject = JSONObject(input.readLine()).also {
+            check(it.getString("method") == method) { "Expected $method, received $it" }
+        }
+
+        fun reply(request: JSONObject, result: JSONObject) = send(json("id" to request.get("id"), "result" to result))
+
+        private fun send(message: JSONObject) {
+            output.write(message.toString())
+            output.newLine()
+            output.flush()
         }
     }
 }

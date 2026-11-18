@@ -2,19 +2,9 @@ package com.hcgstudio.pocketstudio
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.core.content.edit
 
 internal enum class StudioThemeMode { System, Light, Dark, HighContrast }
-
-internal enum class StudioFont(val family: FontFamily) {
-    System(FontFamily.Default),
-    JetBrainsMono(FontFamily(Font(R.font.jetbrains_mono_regular))),
-    Inter(FontFamily(Font(R.font.siwc_inter_medium))),
-    Serif(FontFamily.Serif),
-    Monospace(FontFamily.Monospace)
-}
 
 internal data class StudioSettings(
     val theme: StudioThemeMode = StudioThemeMode.System,
@@ -61,14 +51,14 @@ internal data class StudioSettings(
     fun save(prefs: SharedPreferences) {
         prefs.edit {
             putString("theme", theme.name)
-            putString("uiFont", uiFont.name)
+            putString("uiFont", uiFont.id)
             putInt("uiFontSize", uiFontSize)
             putBoolean("compactMode", compactMode)
             putBoolean("showMainToolbarActions", showMainToolbarActions)
             putBoolean("showEditorTabs", showEditorTabs)
             putBoolean("showTabCloseButtons", showTabCloseButtons)
             putBoolean("showStatusBar", showStatusBar)
-            putString("editorFont", editorFont.name)
+            putString("editorFont", editorFont.id)
             putInt("editorFontSize", editorFontSize)
             putBoolean("fontLigatures", fontLigatures)
             putFloat("lineSpacing", lineSpacing)
@@ -117,14 +107,14 @@ internal data class StudioSettings(
             fun number(key: String, fallback: Int, range: IntRange) = (values[key] as? Int)?.coerceIn(range) ?: fallback
             return StudioSettings(
                 theme = enumSetting(values["theme"], defaults.theme),
-                uiFont = enumSetting(values["uiFont"], defaults.uiFont),
+                uiFont = StudioFont.read(values["uiFont"], defaults.uiFont),
                 uiFontSize = number("uiFontSize", defaults.uiFontSize, 11..20),
                 compactMode = flag("compactMode", defaults.compactMode),
                 showMainToolbarActions = flag("showMainToolbarActions", defaults.showMainToolbarActions),
                 showEditorTabs = flag("showEditorTabs", defaults.showEditorTabs),
                 showTabCloseButtons = flag("showTabCloseButtons", defaults.showTabCloseButtons),
                 showStatusBar = flag("showStatusBar", defaults.showStatusBar),
-                editorFont = enumSetting(values["editorFont"], defaults.editorFont),
+                editorFont = StudioFont.read(values["editorFont"], defaults.editorFont),
                 editorFontSize = number("editorFontSize", defaults.editorFontSize, 10..32),
                 fontLigatures = flag("fontLigatures", defaults.fontLigatures),
                 lineSpacing = (values["lineSpacing"] as? Float)?.takeIf { it.isFinite() }?.coerceIn(1f, 2f) ?: defaults.lineSpacing,

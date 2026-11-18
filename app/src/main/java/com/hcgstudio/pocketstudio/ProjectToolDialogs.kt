@@ -26,7 +26,6 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.io.IOException
-import java.nio.charset.CharacterCodingException
 
 @Composable
 internal fun LayoutPreviewDialog(project: Project, xml: String, path: String, onDismiss: () -> Unit) {
@@ -79,55 +78,6 @@ internal fun LayoutPreviewDialog(project: Project, xml: String, path: String, on
             }
         }
     )
-}
-
-private data class SearchHit(val file: Project.Node, val line: Int, val excerpt: String)
-private data class MatchedFile(val node: Project.Node, val digest: ByteArray)
-private data class SearchResults(
-    val query: String, val files: List<MatchedFile>, val hits: List<SearchHit>, val count: Long
-)
-private val ignoredFolders = setOf(".git", ".gradle", ".idea", "build", "node_modules", ".cxx", ".kotlin")
-private val binaryExtensions = setOf("png", "jpg", "jpeg", "webp", "gif", "zip", "jar", "aar", "apk", "aab",
-    "keystore", "jks", "class", "dex", "so", "ttf", "otf", "mp3", "mp4", "pdf", "ico", "webm")
-
-private fun searchProject(project: Project, query: String): SearchResults {
-    val hits = mutableListOf<SearchHit>()
-    val files = mutableListOf<MatchedFile>()
-    val hash = MessageDigest.getInstance("SHA-256")
-    var count = 0L
-    val directories = ArrayDeque<Project.Node>()
-    directories.add(project.root)
-    while (directories.isNotEmpty()) {
-        for (node in project.list(directories.removeFirst())) {
-            if (Thread.currentThread().isInterrupted) throw InterruptedException()
-            if (node.folder) {
-                if (node.name !in ignoredFolders) directories.addLast(node)
-                continue
-            }
-            if (node.name.substringAfterLast('.', "").lowercase() in binaryExtensions) continue
-            val source = try {
-                project.read(node)
-            } catch (_: CharacterCodingException) {
-                continue
-            } catch (_: Project.UnsupportedText) {
-                continue
-            }
-            val before = count
-            source.lineSequence().forEachIndexed { index, line ->
-                var pos = line.indexOf(query)
-                if (pos >= 0 && hits.size < 100) {
-                    hits += SearchHit(node, index + 1,
-                        line.substring((pos - 28).coerceAtLeast(0), (pos + maxOf(90, query.length)).coerceAtMost(line.length)).trimEnd())
-                }
-                while (pos >= 0) {
-                    count++
-                    pos = line.indexOf(query, pos + query.length)
-                }
-            }
-            if (count > before) files += MatchedFile(node, hash.digest(source.toByteArray()))
-        }
-    }
-    return SearchResults(query, files, hits, count)
 }
 
 private data class ReplaceResult(val changed: List<Project.Node>, val error: String?)
@@ -192,14 +142,14 @@ internal fun ProjectSearchDialog(
 ) {
     var query by remember(project) { mutableStateOf(initialQuery.substringBefore('\n').substringBefore('\r')) }
     var replacement by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<SearchResults?>(null) }
+    var results by remember(project, replace) { mutableStateOf<SearchResults?>(null) }
     var scanning by remember { mutableStateOf(false) }
     var applying by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf("") }
     var outcome by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(query, project, reload) {
+    LaunchedEffect(query, project, reload, replace) {
         val needle = query
         results = null
         error = ""
@@ -207,7 +157,7 @@ internal fun ProjectSearchDialog(
         if (!scanning) return@LaunchedEffect
         delay(250)
         try {
-            results = runInterruptible(Dispatchers.IO) { searchProject(project, needle) }
+            results = runInterruptible(Dispatchers.IO) { searchProject(project, needle, forReplacement = replace) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -235,7 +185,7 @@ internal fun ProjectSearchDialog(
                 if (outcome.isNotEmpty()) Text(outcome, style = MaterialTheme.typography.bodySmall)
                 if (preview != null) {
                     val label = if (preview.count == 0L) uiString(R.string.no_matches)
-                        else uiString(R.string.file_match_counts, preview.files.size, preview.count) + if (preview.hits.size == 100) uiString(R.string.previewing_first_100_lines) else ""
+                        else uiString(R.string.file_match_counts, preview.fileCount, preview.count) + if (preview.truncated) uiString(R.string.previewing_first_100_lines) else ""
                     Text(label, style = MaterialTheme.typography.labelMedium)
                     LazyColumn(Modifier.fillMaxWidth().heightIn(max = 340.dp)) {
                         items(preview.hits) { hit ->

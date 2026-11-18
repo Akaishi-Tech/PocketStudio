@@ -13,10 +13,12 @@ import java.util.UUID
 
 /** The controller uses real app-server processes. The only model endpoint is a loopback fixture. */
 object CodexChatChecks {
-    private class FixtureApp(real: Context, val state: File, val prefix: String) : Application() {
+    private class FixtureApp(real: Context, val state: File, val prefix: String, keep: Boolean) : Application() {
         private val preferenceFiles = mutableSetOf<String>()
+        private val files = if (keep) real.filesDir else File(state, "files").apply { mkdirs() }
         init { attachBaseContext(real) }
         override fun getApplicationContext(): Context = this
+        override fun getFilesDir(): File = files
         override fun getNoBackupFilesDir(): File = state
         @Synchronized override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
             preferenceFiles.add(prefix + name)
@@ -29,8 +31,8 @@ object CodexChatChecks {
         require(port in 1..65535) { "A loopback fixture port is required" }
         val token = UUID.randomUUID().toString()
         val app = FixtureApp(ctx.applicationContext, Files.createTempDirectory(ctx.noBackupFilesDir.toPath(), "chat-check-").toFile(),
-            "codex-chat-check-$token-")
-        val imports = File(ctx.filesDir, "imports").apply { mkdirs() }
+            "codex-chat-check-$token-", keep)
+        val imports = File(app.filesDir, "imports").apply { mkdirs() }
         val directory = Files.createTempDirectory(imports.toPath(), "Codex-Android-").toFile()
         val sample = File(directory, "sample.txt").apply { writeText("one") }
         val uri = Uri.fromFile(directory.canonicalFile)
@@ -45,9 +47,14 @@ object CodexChatChecks {
             .joinToString("") { "%02x".format(it) }
         val history = File(historyRoot, "codex-projects/$partition")
         check(!history.exists())
-        val controller = CodexController(workspace, scope, fixtureHistory = history.takeIf { keep })
+        val historyAlias = if (keep) null else File(app.state, "history-alias")
+        var controller = CodexController(workspace, scope, fixtureHistory = historyAlias ?: history)
         var retained = false
         try {
+            if (historyAlias != null) {
+                Files.createDirectories(history.toPath())
+                Files.createSymbolicLink(historyAlias.toPath(), history.toPath())
+            }
             // This storage resolves exclusively inside the per-run test directory.
             CodexAuth(app).saveApiConfiguration(endpoint, "local-fixture-only")
             withContext(Dispatchers.Main) {
@@ -81,15 +88,24 @@ object CodexChatChecks {
                 controller.input = "请将 sample.txt 从 one 修改为 two。"
                 controller.send()
                 check(controller.working) { "Controller did not start the turn" }
+                controller.back()
+                check(!controller.detail && controller.working)
                 await("tool calls and streamed response") { !controller.working }
                 check(controller.error == null) { controller.error.orEmpty() }
                 checkTranscript(controller)
                 val id = checkNotNull(controller.chatId)
-                controller.back()
-                await("fresh app-server history list") {
-                    check(controller.error == null) { controller.error.orEmpty() }
-                    !controller.loading && controller.chats.any { it.id == id }
+                suspend fun awaitHistory(stage: String) {
+                    await(stage) {
+                        check(controller.error == null) { controller.error.orEmpty() }
+                        !controller.loading && controller.chats.any { it.id == id }
+                    }
                 }
+                awaitHistory("fresh app-server history list")
+                // The stored cwd and the reopened project directory can be aliases on Android.
+                controller.dispose()
+                controller = CodexController(workspace, scope, fixtureHistory = history.takeIf { keep })
+                controller.enter(project)
+                awaitHistory("persisted chat after reopening the project")
                 controller.open(controller.chats.single { it.id == id })
                 await("history items and model choices") { !controller.loading && !controller.modelsLoading }
                 check(controller.error == null) { controller.error.orEmpty() }
@@ -105,11 +121,31 @@ object CodexChatChecks {
                 check(controller.effort == "high" && controller.fast)
                 controller.chooseModel("gpt-5.5")
                 check(controller.effort == "low" && !controller.fast)
+                if (!keep) {
+                    workspace.openFile(project.resolve("sample.txt"))
+                    await("opening the edited file") { workspace.active?.node?.path == "sample.txt" }
+                    val editor = checkNotNull(workspace.active).editor
+                    check(editor.text == "two")
+                    editor.replace(0, editor.text.length, "draft\nselected")
+                    editor.select(6, 14)
+                }
                 controller.input = "请确认修改已完成。"
                 controller.send()
                 check(controller.working)
                 await("new settings on the resumed chat") { !controller.working }
                 check(controller.error == null && controller.chatId == id) { controller.error.orEmpty() }
+                if (!keep) {
+                    val draft = checkNotNull(workspace.active)
+                    check(draft.dirty && draft.editor.selected == "selected")
+                    val activities = controller.lines.filter { it.kind == ChatKind.Activity }
+                    val deviceErrors = activities.filter { it.failed }
+                    check(deviceErrors.map { it.category }.sorted() == listOf(R.string.logcat, R.string.inspect_screen).sorted()) {
+                        "Expected two disconnected-device errors: " + activities.map { it.category to it.detail }
+                    }
+                    check(deviceErrors.all { it.detail == uiString(R.string.connect_to_a_target_device_first) })
+                }
+                controller.back()
+                awaitHistory("resumed chat after the completed turn")
             }
             check(sample.readText() == "two") { "The selected project's file did not change" }
             check(File(history, "sessions").isDirectory)
@@ -135,6 +171,7 @@ object CodexChatChecks {
         } finally {
             withContext(Dispatchers.Main) { controller.dispose(); workspace.closeProject(); workspace.devices.close(); scope.cancel() }
             app.cleanPreferences()
+            historyAlias?.let { Files.deleteIfExists(it.toPath()) }
             app.state.deleteRecursively()
             if (!retained) { directory.deleteRecursively(); history.deleteRecursively() }
         }

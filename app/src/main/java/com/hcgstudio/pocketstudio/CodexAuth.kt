@@ -18,7 +18,7 @@ internal class ApiConfigurationError(@get:StringRes val reason: Int) : IllegalAr
 internal data class CodexAccount(val id: String, val label: String, val signedIn: Boolean, val subject: String)
 
 internal data class CodexAuthState(
-    val accounts: List<CodexAccount>, val selected: CodexAccount?, val hasApiKey: Boolean,
+    val signedInAccounts: List<CodexAccount>, val selected: CodexAccount?, val hasApiKey: Boolean,
     val useChatGpt: Boolean, val apiEndpoint: String
 ) {
     val accountKey: String get() = when {
@@ -51,7 +51,8 @@ internal class CodexAuth(context: Context) {
             val profile = profiles.getJSONObject(id)
             CodexAccount(id, profile.getString("label"), profile.optBoolean("cliSignedIn"), profile.optString("sub", id))
         }.toList().sortedBy { it.label }
-        CodexAuthState(accounts, accounts.find { it.id == state.optString("selected") },
+        // The last selected profile still identifies its local chat history after logout.
+        CodexAuthState(accounts.filter { it.signedIn }, accounts.find { it.id == state.optString("selected") },
             state.optString("apiKey").isNotBlank(), state.optBoolean("useChatGpt", true),
             state.optString("apiEndpoint", DEFAULT_API_ENDPOINT))
     }
@@ -79,7 +80,9 @@ internal class CodexAuth(context: Context) {
 
     fun selectAccount(id: String) = synchronized(lock) {
         val state = storage.read()
-        require(state.optJSONObject("accounts")?.has(id) == true) { uiString(R.string.this_account_has_not_been_saved) }
+        require(state.optJSONObject("accounts")?.optJSONObject(id)?.optBoolean("cliSignedIn") == true) {
+            uiString(R.string.sign_in_to_use_this_account)
+        }
         storage.write(state.put("selected", id).put("useChatGpt", true))
     }
 
