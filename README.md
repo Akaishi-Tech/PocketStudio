@@ -40,7 +40,7 @@ Choose **Output → Output options → Build debug APK** to run the quick builde
 
 ## Using Codex in a project
 
-Open **Agents → Plugin store** to browse agent plugins, or **Settings → Plugins** to see all categories. Open a plugin to see its icon, developer and description. Choose **Install** on Codex Plugin to use Codex in the current project. Studio selects the APK matching the device, verifies its size, SHA-256, package, version and signing certificate, and uses local debugging to install it when available. Otherwise Android's package installer opens. The plugin repository publishes separate Codex APKs for ARM64 and x86_64. [Plugin releases](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
+Open **Agents → Plugin store** to browse agent plugins, or **Settings → Plugin store** to see all categories. Open a plugin to see its icon, developer and description. Choose **Install** on Codex Plugin to use Codex in the current project. Studio selects the APK matching the device, verifies its size, SHA-256, package, version and signing certificate, and uses local debugging to install it when available. Otherwise Android's package installer opens. The plugin repository publishes separate Codex APKs for ARM64 and x86_64. [Plugin releases](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
 
 Open **Account and usage** in the top-right corner of Agents and choose **Sign in with Codex CLI**. Studio opens the browser on this device. Sign in to ChatGPT there, then return to Studio.
 

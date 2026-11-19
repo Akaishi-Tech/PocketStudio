@@ -38,7 +38,7 @@
 
 ## 在项目中使用智能体
 
-首次打开「智能体」时，点「插件商店」即可浏览智能体插件。「设置 → 插件」显示全部类别。点开插件可查看图标、开发者和介绍。安装 Codex 插件后即可在当前项目中使用它。商店自动选择与设备架构匹配的 APK，并核对大小、SHA-256、包名、版本和签名。本机调试可用时优先使用它安装，否则打开系统安装器。独立插件仓库提供 ARM64 和 x86_64 两种 Codex APK。[插件发行页](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
+首次打开「智能体」时，点「插件商店」即可浏览智能体插件。「设置 → 插件商店」显示全部类别。点开插件可查看图标、开发者和介绍。安装 Codex 插件后即可在当前项目中使用它。商店自动选择与设备架构匹配的 APK，并核对大小、SHA-256、包名、版本和签名。本机调试可用时优先使用它安装，否则打开系统安装器。独立插件仓库提供 ARM64 和 x86_64 两种 Codex APK。[插件发行页](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
 
 在「智能体」右上角打开「账户与用量」，点「通过 Codex CLI 登录」。Studio 会打开本机浏览器。在浏览器中登录 ChatGPT，完成后返回 Studio 即可使用该账户。
 
