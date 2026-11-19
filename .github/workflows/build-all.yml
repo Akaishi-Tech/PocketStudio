@@ -1,13 +1,53 @@
 name: Build all Pocket Studio plugins
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+      - 'plugin-api/**'
+      - 'agent-api/**'
+      - 'build-support/**'
+      - 'scripts/build-codex-plugin.py'
+      - 'scripts/plugin_signer.py'
+      - 'scripts/package-local-jdk.py'
+      - '.github/workflows/build-all.yml'
+      - '.github/actions/build-plugin/**'
+      - '.github/scripts/build-plugin.py'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradle.properties'
+      - 'settings.gradle'
+      - 'build.gradle'
+      - '.gitmodules'
+      - 'upstream/build.gradle'
+      - 'upstream/release/tools/base'
+      - '!**/*.md'
+  schedule:
+    - cron: '29 3 * * *'
 concurrency:
   group: signed-plugin-builds
   cancel-in-progress: false
 permissions:
   contents: read
 jobs:
+  upstream:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start a build if the upstream Codex package changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: python3 .github/scripts/build-plugin.py --check-upstream
   plugins:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name != 'schedule' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     strategy:
@@ -28,7 +68,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
   image:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name != 'schedule' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     strategy:
       fail-fast: false
       matrix:

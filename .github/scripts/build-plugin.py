@@ -30,27 +30,48 @@ def current_entry(package):
     return next((p for p in json.loads(data)["plugins"] if p["package"] == package), {})
 
 
+def codex_lock():
+    path = ROOT / "build/codex-lock.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["python3", ROOT / "scripts/build-codex-plugin.py", "resolve", "--output", path], check=True)
+    return path
+
+
+def check_upstream():
+    previous = current_entry(IDS["codex"])
+    if previous.get("buildId") == json.loads(codex_lock().read_text())["buildId"]:
+        print("The published Codex package is current.")
+        return
+    subprocess.run(["gh", "workflow", "run", "build-all.yml", "--ref", os.environ["DEFAULT_BRANCH"]], check=True)
+
+
 def run(plugin):
     os.chdir(ROOT)
     out = ROOT / "build/plugin-artifacts" / plugin
     out.mkdir(parents=True, exist_ok=True)
     package = IDS[plugin]
     previous = current_entry(package)
-    code = int(previous.get("versionCode", 0)) + 1
+    # Give every Actions run disjoint version codes, even if several builds finish before publication.
+    # GitHub permits at most 50 reruns of one workflow run.
+    number = int(os.environ["GITHUB_RUN_NUMBER"])
+    attempt = int(os.environ["GITHUB_RUN_ATTEMPT"])
+    ordinal = 100 * number + attempt
+    published_ordinal = 100 * previous.get("sourceRunNumber", 0) + previous.get("sourceRunAttempt", 0)
+    code = max(ordinal, int(previous.get("versionCode", 0)) + ordinal - published_ordinal)
     abis = list(FLAVORS) if plugin == "android" else ["arm64-v8a", "x86_64"]
     metadata = out / f"{plugin}-build.json"
     if plugin == "codex":
         resolver = ROOT / "scripts/build-codex-plugin.py"
-        lock = ROOT / "build/codex-lock.json"
-        subprocess.run(["python3", resolver, "resolve", "--output", lock], check=True)
+        lock = codex_lock()
         version = json.loads(lock.read_text())["version"]
         parts = [int(n) for n in re.split(r"[.-]", version)]
         major, minor, patch = parts[:3]
-        code = max(code, 1700003, major * 100000000 + minor * 10000 + patch * 100 + sum(parts[3:]) + 2)
+        code = max(code, max(1700003, major * 100000000 + minor * 10000 + patch * 100 + sum(parts[3:]) + 2) + ordinal)
         subprocess.run(["python3", resolver, "build", "--lock", lock, "--version-code", str(code), "--out", out], check=True)
         info = json.loads(metadata.read_text())
     else:
-        version = f"1.0.{code - 1}"
+        previous_patch = int(previous.get("version", "1.0.0").split(".")[-1])
+        version = f"1.0.{max(number, previous_patch)}"
         env = dict(os.environ, POCKETSTUDIO_VERSION_NAME=version, POCKETSTUDIO_VERSION_CODE=str(code))
         module = "android-plugin" if plugin == "android" else f"linux-{plugin}-plugin"
         subprocess.run(["./gradlew", "--no-daemon", f":{module}:assembleRelease"], env=env, check=True)
@@ -69,5 +90,12 @@ def run(plugin):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("plugin", choices=IDS)
-    run(parser.parse_args().plugin)
+    parser.add_argument("plugin", nargs="?", choices=IDS)
+    parser.add_argument("--check-upstream", action="store_true")
+    args = parser.parse_args()
+    if args.check_upstream and args.plugin is None:
+        check_upstream()
+    elif args.plugin and not args.check_upstream:
+        run(args.plugin)
+    else:
+        parser.error("Choose a plugin or --check-upstream")
