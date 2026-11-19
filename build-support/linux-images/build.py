@@ -99,7 +99,8 @@ def build_proot(cache, stage, sdk, digest, ca):
         excluded = ['dev/*', 'proc/*', 'sys/*', 'run/*', 'recipe', 'cache', 'build-ca.crt', 'etc/resolv.conf', 'etc/hosts', 'etc/hostname',
                     '.containerenv', '.dockerenv']
         cmd.extend('--exclude=./' + path for path in excluded)
-        archive = stage / 'debian-rootfs.tar.gz'
+        # AAPT treats .gz assets as expansion requests. Keep the gzip stream opaque.
+        archive = stage / 'debian-rootfs.bin'
         with archive.open('wb') as out, subprocess.Popen(cmd + ['-cf', '-', '.'], stdout=subprocess.PIPE) as tar:
             assert tar.stdout is not None
             subprocess.run(['pigz', '-6', '-n'], stdin=tar.stdout, stdout=out, check=True)
@@ -136,10 +137,11 @@ def build_avf(cache, stage, sdk, stock, ca):
     (stage / 'replace.sh').write_text(script.replace('@STOCK_SHA256SUMS@', '\n'.join(lines)))
     subprocess.run(['sudo', 'unshare', '--mount', '--pid', '--fork', '--mount-proc',
                     'bash', str(HERE / 'build-avf.sh'), str(image), str(cache), str(HERE), sdk, str(ca)], check=True)
-    with (stage / 'debian.img.gz').open('wb') as compressed:
+    archive = stage / 'debian-image.bin'
+    with archive.open('wb') as compressed:
         subprocess.run(['pigz', '-6', '-n', '-c', image], stdout=compressed, check=True)
     image.unlink()
-    (stage / 'debian.img.sha256').write_text(checksum(stage / 'debian.img.gz') + '\n')
+    (stage / 'debian.img.sha256').write_text(checksum(archive) + '\n')
 
 
 def build(abi, variant):

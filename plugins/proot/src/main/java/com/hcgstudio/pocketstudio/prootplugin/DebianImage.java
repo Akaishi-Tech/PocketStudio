@@ -94,7 +94,7 @@ final class DebianImage {
             Process tar = new ProcessBuilder("/system/bin/toybox", "tar", "-xo", "-f", "-")
                     .directory(stage.toFile()).redirectErrorStream(true).redirectOutput(log).start();
             try {
-                try (InputStream asset = app.getAssets().open("debian-rootfs.tar.gz");
+                try (InputStream asset = app.getAssets().open("debian-rootfs.bin");
                      DigestInputStream compressed = new DigestInputStream(asset, digest);
                      InputStream data = new GZIPInputStream(compressed, 128 * 1024);
                      OutputStream out = tar.getOutputStream()) {

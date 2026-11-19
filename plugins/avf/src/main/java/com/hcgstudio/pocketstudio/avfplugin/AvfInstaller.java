@@ -56,7 +56,7 @@ final class AvfInstaller {
         List<Uri> rows = new ArrayList<>();
         try {
             MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            try (InputStream raw = context.getAssets().open("debian.img.gz");
+            try (InputStream raw = context.getAssets().open("debian-image.bin");
                  InputStream image = new DigestInputStream(raw, sha)) {
                 write(resolver, path, "debian.img.gz", image, rows);
             }

@@ -25,7 +25,7 @@ android {
     sourceSets.main.aidl.srcDir('../proot/ipc/aidl')
     sourceSets.main.assets.srcDir(rootProject.file('build-support/linux-editor'))
     buildFeatures { aidl = true; buildConfig = true }
-    androidResources.noCompress += ['gz']
+    androidResources.noCompress += ['bin']
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -41,7 +41,7 @@ architectures.each { flavor, abi ->
     def imageDir = rootProject.file("build/linux-images/${abi}/avf")
     def verify = tasks.register("verify${flavor.capitalize()}DebianImage") {
         doLast {
-            ['debian.img.gz', 'debian.img.sha256', 'replace.sh'].each { name ->
+            ['debian-image.bin', 'debian.img.sha256', 'replace.sh'].each { name ->
                 if (!new File(imageDir, name).isFile()) {
                     throw new GradleException("Build the Debian AVF image first. Missing ${new File(imageDir, name)}")
                 }

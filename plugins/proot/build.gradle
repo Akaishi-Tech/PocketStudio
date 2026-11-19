@@ -22,7 +22,7 @@ android {
     sourceSets.main.aidl.srcDir('ipc/aidl')
     sourceSets.main.assets.srcDir(rootProject.file('build-support/linux-editor'))
     buildFeatures { aidl = true }
-    androidResources { noCompress += 'gz' }
+    androidResources { noCompress += 'bin' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
@@ -37,7 +37,7 @@ androidComponents.onVariants(androidComponents.selector().all()) { variant ->
     def assetDir = rootProject.file("build/linux-images/${abi}/proot/assets")
     tasks.matching { it.name == "merge${variant.name.capitalize()}Assets" }.configureEach {
         doFirst {
-            if (!new File(assetDir, 'debian-rootfs.tar.gz').isFile() ||
+            if (!new File(assetDir, 'debian-rootfs.bin').isFile() ||
                 !new File(assetDir, 'debian-rootfs.sha256').isFile()) {
                 throw new GradleException("Build the ${abi} Debian PRoot image before packaging: ${assetDir}")
             }
