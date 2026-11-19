@@ -41,22 +41,22 @@ class FakeGitHub:
         self.rows.append(row)
         return copy.deepcopy(row)
 
-    def upload(self, rid, path, name, label):
+    def upload(self, rid, path, name):
         row = next(v for v in self.rows if v["id"] == rid)
         assert not r.asset(row, name)
         data = path.read_bytes()
-        item = dict(id=self.new_id(), name=name, label=label, size=len(data), state="uploaded",
+        item = dict(id=self.new_id(), name=name, label=None, size=len(data), state="uploaded",
                     digest="sha256:" + hashlib.sha256(data).hexdigest())
         self.files[item["id"]] = data
         row["assets"].append(item)
         return copy.deepcopy(item)
 
-    def rename(self, old, name, label):
+    def rename(self, old, name):
         if name == self.fail_rename:
             self.fail_rename = None
             raise OSError("Interrupted asset rename")
         item = next(a for row in self.rows for a in row["assets"] if a["id"] == old["id"])
-        item.update(name=name, label=label)
+        item.update(name=name, label="")
         return copy.deepcopy(item)
 
     def remove(self, old):
@@ -90,6 +90,7 @@ class PublishTests(unittest.TestCase):
         release, = self.gh.releases()
         self.assertFalse(release["draft"])
         self.assertIsNone(release["name"])
+        self.assertTrue(all(not a["label"] for a in release["assets"]))
         self.assertEqual({a["name"] for a in release["assets"]}, {f"PocketStudio-{plan['appVersion']}-{abi}.apk" for abi in r.FLAVORS})
         self.assertIsNone(r.prepare(self.gh, self.out))
         os.environ.update(GITHUB_RUN_ID="400", GITHUB_RUN_NUMBER="2")
@@ -105,9 +106,12 @@ class PublishTests(unittest.TestCase):
         for abi in r.FLAVORS:
             path = self.out / r.apk_name(version, abi)
             path.write_bytes(abi.encode())
-            self.gh.upload(draft["id"], path, f"PocketStudio-{abi}.apk", "old APK")
+            self.gh.upload(draft["id"], path, f"PocketStudio-{abi}.apk")
+            self.gh.upload(draft["id"], path, path.name)
+            draft["assets"][-1]["label"] = "old APK"
         r.publish(self.gh, plan, self.out)
         self.assertFalse(draft["name"])
+        self.assertTrue(all(not a["label"] for a in draft["assets"]))
         self.assertEqual({a["name"] for a in draft["assets"]}, {r.apk_name(version, abi) for abi in r.FLAVORS})
 
     def test_version_allocation(self):

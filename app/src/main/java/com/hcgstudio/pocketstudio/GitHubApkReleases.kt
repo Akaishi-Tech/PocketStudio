@@ -17,9 +17,8 @@ internal class GitHubApkReleases(context: Context, abis: List<String> = Build.SU
     private val preferences = context.getSharedPreferences("app-github-release", Context.MODE_PRIVATE)
     private val supportedAbis = abis.toList()
 
-    private fun candidates(version: String) = supportedAbis.flatMap { abi ->
-        listOf("PocketStudio-$version-$abi.apk", "PocketStudio-$abi.apk")
-    }
+    private fun candidates(version: String) = supportedAbis.map { abi -> "PocketStudio-$version-$abi.apk" }
+    private fun universalApk(version: String) = "PocketStudio-$version.apk"
 
     fun latest(): AppRelease? {
         val connection = connect(URL("https://api.github.com/repos/$REPO/releases/latest"))
@@ -60,13 +59,13 @@ internal class GitHubApkReleases(context: Context, abis: List<String> = Build.SU
             val assets = (0 until entries.length()).map(entries::getJSONObject).groupBy { it.getString("name") }
             val tag = TAG.matchEntire(release.getString("tag_name")) ?: throw invalidMetadata()
             val version = tag.groupValues[1]
+            val marker = RELEASE_MARK.findAll(release.getString("body")).singleOrNull() ?: throw invalidMetadata()
+            val code = marker.groupValues[1].toLongOrNull()?.takeIf { it in 1..2_100_000_000L } ?: throw invalidMetadata()
             val fileName = candidates(version).firstOrNull { it in assets }
-                ?: LEGACY_APK.takeIf { assets.keys.none { name -> ABI_APK.matches(name) } }
+                ?: universalApk(version).takeIf { assets.keys.none { name -> ABI_APK.matches(name) } }
                 ?: throw invalidMetadata()
             val asset = assets[fileName]?.singleOrNull() ?: throw invalidMetadata()
-            val match = LABEL.matchEntire(asset.getString("label")) ?: throw invalidMetadata()
-            val code = match.groupValues[2].toLongOrNull()?.takeIf { it in 1..2_100_000_000L } ?: throw invalidMetadata()
-            if (match.groupValues[1] != version || asset.getString("state") != "uploaded" ||
+            if (asset.getString("state") != "uploaded" ||
                 asset.getString("browser_download_url") != downloadUrl(version, fileName)) throw invalidMetadata()
             val size = asset.getLong("size").takeIf { it in 1..MAX_APK } ?: throw invalidMetadata()
             val digest = asset.getString("digest").takeIf { HASH.matches(it) } ?: throw invalidMetadata()
@@ -76,7 +75,8 @@ internal class GitHubApkReleases(context: Context, abis: List<String> = Build.SU
 
     fun download(release: AppRelease, destination: File, progress: (Long, Long) -> Unit) {
         val name = release.assetName ?: throw invalidMetadata()
-        if (name != LEGACY_APK && name !in candidates(release.version)) throw invalidMetadata()
+        if (!TAG.matches("v${release.version}") || (name != universalApk(release.version) && name !in candidates(release.version)))
+            throw invalidMetadata()
         downloadGitHubApk(downloadUrl(release.version, name), release, destination, progress)
     }
 
@@ -84,11 +84,10 @@ internal class GitHubApkReleases(context: Context, abis: List<String> = Build.SU
 
     companion object {
         internal const val REPO = "Akaishi-Tech/PocketStudio"
-        private const val LEGACY_APK = "PocketStudio.apk"
         private const val VERSION = """(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"""
         private val TAG = Regex("v($VERSION)")
         private val ABI_APK = Regex("""PocketStudio-(?:$VERSION-)?(?:arm64-v8a|armeabi-v7a|x86_64|x86)\.apk""")
-        private val LABEL = Regex("""Pocket Studio ($VERSION) \(([0-9]+)\)""")
+        private val RELEASE_MARK = Regex("""<!-- pocketstudio-release run=[0-9]+ versionCode=([0-9]+) -->""")
         private const val MAX_APK = 1_500_000_000L
         private val HASH = Regex("sha256:[0-9a-f]{64}")
         private fun invalidMetadata() = IOException(uiString(R.string.github_apk_invalid_release))

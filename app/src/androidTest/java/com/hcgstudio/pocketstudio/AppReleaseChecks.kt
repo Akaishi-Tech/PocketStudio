@@ -7,16 +7,16 @@ import java.io.File
 
 object AppReleaseChecks {
     private const val version = "1.10.0"
-    private const val url = "https://github.com/Akaishi-Tech/PocketStudio/releases/download/v1.10.0/PocketStudio.apk"
+    private const val universal = "PocketStudio-$version.apk"
+    private const val url = "https://github.com/Akaishi-Tech/PocketStudio/releases/download/v$version/$universal"
     private val hash = "ab".repeat(32)
 
     private fun releaseDocument(): JSONObject {
-        val app = JSONObject().put("name", "PocketStudio.apk").put("state", "uploaded")
-            .put("label", "Pocket Studio $version (18)").put("browser_download_url", url)
+        val app = JSONObject().put("name", universal).put("state", "uploaded")
+            .put("browser_download_url", url)
             .put("size", 245000000L).put("digest", "sha256:$hash")
         val runtime = JSONObject().put("name", "PocketStudio-Codex-Plugin.apk").put("state", "uploaded")
-            .put("label", "Codex 0.170.0 (1700000)")
-            .put("browser_download_url", url.replace("PocketStudio.apk", "PocketStudio-Codex-Plugin.apk"))
+            .put("browser_download_url", url.replace(universal, "PocketStudio-Codex-Plugin.apk"))
             .put("size", 200000000L).put("digest", "sha256:" + "cd".repeat(32))
         return JSONObject().put("tag_name", "v$version").put("draft", false).put("prerelease", false)
             .put("body", "<!-- pocketstudio-release run=123 versionCode=18 -->")
@@ -26,29 +26,22 @@ object AppReleaseChecks {
     @JvmStatic fun run(context: Context, verifyArchive: Boolean) {
         val client = AppReleases(context)
         val release = client.parse(releaseDocument().toString())
-        check(release == AppRelease(version, 18L, 245000000L, hash, "PocketStudio.apk"))
+        check(release == AppRelease(version, 18L, 245000000L, hash, universal))
 
         val split = releaseDocument().apply {
             val files = getJSONArray("assets")
             val legacy = files.remove(1) as JSONObject
             for (abi in listOf("x86", "arm64-v8a", "x86_64")) {
-                val name = "PocketStudio-$abi.apk"
+                val name = "PocketStudio-$version-$abi.apk"
                 files.put(JSONObject(legacy.toString()).put("name", name)
                     .put("browser_download_url", url.substringBeforeLast('/') + "/" + name))
             }
         }
         fun selected(vararg abis: String) = GitHubApkReleases(context, abis.toList()).parse(split.toString()).assetName
-        check(selected("x86_64", "x86") == "PocketStudio-x86_64.apk")
-        check(selected("armeabi-v7a", "x86") == "PocketStudio-x86.apk")
+        check(selected("x86_64", "x86") == "PocketStudio-$version-x86_64.apk")
+        check(selected("armeabi-v7a", "x86") == "PocketStudio-$version-x86.apk")
         check(runCatching { selected("riscv64") }.isFailure)
         val files = split.getJSONArray("assets")
-        val currentFile = "PocketStudio-$version-x86.apk"
-        val updated = JSONObject(files.getJSONObject(1).toString()).put("name", currentFile)
-            .put("browser_download_url", url.substringBeforeLast('/') + "/" + currentFile)
-        files.put(updated)
-        check(selected("x86") == currentFile)
-        check(selected("x86_64", "x86") == "PocketStudio-x86_64.apk")
-        files.remove(files.length() - 1)
         files.put(files.getJSONObject(1))
         check(runCatching { selected("x86") }.isFailure)
 
@@ -63,12 +56,14 @@ object AppReleaseChecks {
         reject("missing app asset") { doc, _ -> doc.getJSONArray("assets").remove(1) }
         reject("ambiguous app asset") { doc, app -> doc.getJSONArray("assets").put(app) }
         reject("incomplete asset") { _, app -> app.put("state", "open") }
-        reject("version different from tag") { _, app -> app.put("label", "Pocket Studio 1.9.0 (18)") }
+        reject("version different from tag") { doc, _ -> doc.put("tag_name", "v1.9.0") }
         reject("asset filename version different from tag") { _, app ->
             val wrong = "PocketStudio-1.9.0-x86.apk"
             app.put("name", wrong).put("browser_download_url", url.substringBeforeLast('/') + "/" + wrong)
         }
-        reject("invalid version code") { _, app -> app.put("label", "Pocket Studio $version (0)") }
+        reject("missing release marker") { doc, _ -> doc.put("body", "Android release") }
+        reject("ambiguous release marker") { doc, _ -> doc.put("body", doc.getString("body").repeat(2)) }
+        reject("invalid version code") { doc, _ -> doc.put("body", "<!-- pocketstudio-release run=123 versionCode=0 -->") }
         reject("invalid size") { _, app -> app.put("size", 0) }
         reject("invalid digest") { _, app -> app.put("digest", "sha256:abcd") }
         reject("different release URL") { _, app -> app.put("browser_download_url", url.replace("v1.10.0", "v1.9.0")) }

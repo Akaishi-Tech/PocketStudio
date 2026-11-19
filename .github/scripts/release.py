@@ -97,11 +97,11 @@ class GitHub:
         return self.api("releases", method="POST", body={"tag_name": tag, "body": body,
                         "draft": True, "target_commitish": os.environ["GITHUB_SHA"], "make_latest": "false"})
 
-    def rename(self, item, name, label):
-        return self.api(f"releases/assets/{item['id']}", method="PATCH", body={"name": name, "label": label})
+    def rename(self, item, name):
+        return self.api(f"releases/assets/{item['id']}", method="PATCH", body={"name": name, "label": ""})
 
-    def upload(self, rid, path, name, label):
-        query = urlencode({"name": name, "label": label})
+    def upload(self, rid, path, name):
+        query = urlencode({"name": name})
         url = f"https://uploads.github.com/repos/{self.repo}/releases/{rid}/assets?{query}"
         mime = "application/vnd.android.package-archive"
         return json.loads(subprocess.check_output(["gh", "api", url, "--method", "POST",
@@ -161,30 +161,31 @@ def build(plan, out):
         verify_apk(output, abi, plan["appVersion"], plan["appCode"])
 
 
-def replace_asset(gh, rid, path, label):
+def replace_asset(gh, rid, path):
     """Upload before changing the canonical name. Keep the old bytes until the new asset is readable."""
     release = gh.api(f"releases/{rid}")
     sha, size = digest(path), path.stat().st_size
     old = asset(release, path.name)
     if matches(old, sha, size):
-        if old.get("label") != label:
-            gh.rename(old, path.name, label)
+        if old.get("label"):
+            updated = gh.rename(old, path.name)
+            require(not updated.get("label"), "GitHub did not clear the asset label")
         return
     stage_name = f"stage-{sha}-{path.name}"
     staged = asset(release, stage_name)
     if not matches(staged, sha, size):
         if staged:
             gh.remove(staged)
-        staged = gh.upload(rid, path, stage_name, label)
+        staged = gh.upload(rid, path, stage_name)
         require(matches(staged, sha, size), "GitHub did not confirm the staged asset digest")
     if old:
-        gh.rename(old, f"previous-{old['id']}-{path.name}", old.get("label") or "")
+        gh.rename(old, f"previous-{old['id']}-{path.name}")
     try:
-        current = gh.rename(staged, path.name, label)
-        require(matches(current, sha, size), "Published asset digest mismatch")
+        current = gh.rename(staged, path.name)
+        require(matches(current, sha, size) and not current.get("label"), "Published asset verification failed")
     except Exception:
         if old and not asset(gh.api(f"releases/{rid}"), path.name):
-            gh.rename(old, path.name, old.get("label") or "")
+            gh.rename(old, path.name)
         raise
 
 
@@ -206,7 +207,7 @@ def publish(gh, plan, out):
     rid = release["id"]
     names = tuple(apk_name(plan["appVersion"], abi) for abi in FLAVORS)
     for abi in FLAVORS:
-        replace_asset(gh, rid, out / apk_name(plan["appVersion"], abi), f"Pocket Studio {plan['appVersion']} ({code})")
+        replace_asset(gh, rid, out / apk_name(plan["appVersion"], abi))
     # An interrupted run may have staged old-style APKs before the naming migration.
     # Remove our own obsolete files only after all replacement digests have been verified.
     legacy_names = tuple(f"{APP}-{abi}.apk" for abi in FLAVORS)
