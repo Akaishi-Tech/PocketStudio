@@ -10,16 +10,16 @@ Pocket Studio runs on Android 8.0 or later. The interface follows the device lan
 
 ## Getting started
 
-Install `PocketStudio.apk` from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Choose **New project** on the welcome screen or in the **File** menu. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder and minimum SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest.
+Install `PocketStudio.apk` from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Choose **New project** on the welcome screen. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder, compile SDK and minimum SDK. The new project uses the compile SDK as its target SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest. On phones, the workspace’s top-right menu includes **Find action** for looking up commands. Wide screens also have a menu bar.
 
-On Android 11 or later, install SDK Platform 34 in SDK Manager to build a debug APK. For quick builds of Kotlin projects, also install Kotlin / D8.
+On Android 11 or later, install the project's Android SDK Platform in SDK Manager to build a debug APK. To use another installed platform for quick builds and Gradle, open **Output → Output options → Build SDK**. The selection applies to the current project. For quick builds of Kotlin projects, also install Kotlin / D8.
 
 | Workspace | What you can do |
 | --- | --- |
 | Project | Open a folder with the system picker, expand the project tree, create files and folders, find a file by path or search text across files. |
 | Editor | Edit Java, Kotlin, XML and Gradle files with line numbers, syntax highlighting and identifier completion. Undo, redo, find and replace text, jump to a line and recover unsaved drafts. |
 | Agents | Use Codex in the current project and review chat history, Markdown replies, file operations and build details. |
-| Layout preview | Open a layout XML file and preview it from the View menu. The preview supports common Android views and project string, color and dimension resources. |
+| Layout preview | Open a layout XML file and choose the **Preview layout** action. The preview supports common Android views and project string, color and dimension resources. |
 | Build | Build a single-module Java app offline, package resources, locate compiler errors, sign, export and install the APK. Kotlin projects can use the optional Kotlin / D8 tools. |
 | Gradle | Run the project's Gradle Wrapper on the device for builds, tests, lint or custom tasks. |
 | Git | Clone or initialize repositories, review diffs and stage files or individual hunks, commit changes, inspect file history and blame, manage branches, tags and stashes, and fetch, pull or push. |
@@ -30,17 +30,17 @@ Choose **Clone repository** on the welcome screen or open Git with the branch ic
 
 Clones are stored in the app’s private project storage and appear under **Recent projects**. For a private HTTPS remote, enter a username and access token in the transfer dialog. For SSH, select a private key and a matching OpenSSH `known_hosts` file.
 
-Open Settings with the gear on the welcome screen or **File → Settings** (`Ctrl+Alt+S`) in a project. Choose interface and editor fonts independently, preview JetBrains Mono and ligatures, and customize colors for each editor scheme. Search settings to adjust indentation, save actions, Gradle offline mode or console wrapping.
+Open Settings with the gear on the welcome screen or from the workspace menu (`Ctrl+Alt+S`). Choose interface and editor fonts independently, preview JetBrains Mono and ligatures, and customize colors for each editor scheme. Search settings to adjust indentation, save actions, Gradle offline mode or console wrapping.
 
 Under **Settings → App updates**, choose **Check for updates** to check GitHub Releases at any time. Automatic updates are enabled by default. When you open or return to the app, Studio checks at most once a day and downloads a newer release on an unmetered network. On a metered network, you choose whether to download it. Studio verifies the APK before you confirm installation in Android.
 
-The debug APK action runs the built-in quick builder. To run a task defined by the project, select a Gradle task in the Build menu and run it locally. Its log appears in the build output. [On-device build guide](build-support/README.md)
+Choose **Output → Output options → Build debug APK** to run the quick builder. For a Gradle task, use **Find action** and search for the task name. The Output tab shows the build log. Tap a compiler diagnostic to open the source line. After a successful build, **Install APK** opens the installer and **Export APK** is available in Output options. [On-device build guide](build-support/README.md)
 
 [Phone workspace](docs/screenshots/phone.png) · [Debugger](docs/screenshots/debugger.png)
 
 ## Using Codex in a project
 
-Open **Agents** in a project and choose **Download Codex**. Studio downloads the signed `PocketStudio-Codex.apk` from this repository’s `codex-runtime` GitHub Release, verifies its size, SHA-256 digest, package name and signing certificate, and opens the Android installer. The plugin is named **Pocket Studio - Codex Plugin** in English. It includes the native Codex runtime for ARM64 and x86_64. You can also install it alongside the main APK from the same app release. Studio checks for plugin updates when you open Agents and lets you decide when to install them.
+Open **Settings → Plugins** to see installed plugins and available updates. Choose **Install** next to **Codex Plugin** to enable Codex in the Agents tab. Studio reads the `plugin-store.json` catalog from the repository’s `plugin-store` GitHub Release and verifies the APK size, SHA-256 digest, package, version and signing certificate. If local debugging is connected or can reconnect, Studio installs the plugin through that connection. Otherwise it opens the Android installer. The signed `PocketStudio-Codex-Plugin.apk` includes the native runtime for ARM64 and x86_64 and is also attached to each app release.
 
 Open **Account and usage** in the top-right corner of Agents and choose **Sign in with Codex CLI**. Studio opens the browser on this device. Sign in to ChatGPT there, then return to Studio.
 
@@ -64,15 +64,15 @@ Ask Codex to find text across saved project files, or select code in the editor 
 
 1. Connect to Wi-Fi, open a project and choose **Debug → Debug this device**. Open pairing settings and allow notifications when prompted.
 2. In Android's **Developer options → Wireless debugging**, enable wireless debugging and tap **Pair device with pairing code**. Leave the system dialog open, pull down the notification shade and reply to the Studio notification with the six-digit code.
-3. Studio discovers the local connection port after pairing. Once connected, build and run the project on the device from the Build menu, then attach to its process. You can also attach to an existing debuggable app. Trigger a breakpoint and return to Studio to inspect the stack and local variables or resume execution.
+3. Studio discovers the local connection port after pairing. Tap a Java or Kotlin line number to set a breakpoint, then open the play button at the top right and choose **Debug run**. Studio builds the APK, installs it, launches the app and attaches the debugger. The session notification lets you return to the debugger, step over or resume a paused app, or detach.
 4. On subsequent sessions, enable wireless debugging and choose **Debug this device** to reconnect using the saved key. Remove the device from the paired devices list in Settings to revoke access.
 
 ## Debugging a second Android device
 
 1. Enable USB debugging in Developer options on the target. Use a data-capable USB cable and connect the devices with the phone running Pocket Studio acting as the USB host.
-2. Connect over USB from the Debug menu. Select the target, grant USB access on the host and accept the debugging authorization on the target.
-3. Install and launch a debug APK with debugging information. With the target connected, the build-and-run action in the Build menu builds, installs and launches the project.
-4. Attach to the target application's process. In source code matching the installed APK, tap a line number or enter a loaded class's fully qualified name and an executable line number in the debugger.
+2. Choose **Connect USB** in the Debug tab. Select the target, grant USB access on the host and accept the debugging authorization on the target.
+3. Open matching Java or Kotlin source and tap an executable line number. The breakpoint is saved with the project and can be set before connecting.
+4. Tap the play button and select **Debug run** to build, install, launch and attach. Choose **Run** for a regular launch. For an already running debuggable app, use **Attach process** in the Debug tab.
 5. Trigger that line on the target. On the host, inspect the suspended thread's stack and variables, step or resume. In the sample app, set a breakpoint on `count++;` and tap the target app's button.
 
 For a wireless connection, put both devices on the same LAN. On the target, open **Developer options → Wireless debugging → Pair device with pairing code**. Use wireless pairing on the host with the target's pairing port and six-digit code. After pairing, connect through the port on the target's main Wireless debugging screen. Already paired devices can reconnect directly through this port. [Wireless debugging and verification](docs/wireless-debugging.md)
@@ -104,4 +104,4 @@ tools/test/two-emulators.sh emulator-HOST emulator-TARGET
 
 ## Licenses
 
-Pocket Studio's original code is available under the [MIT license](LICENSE). AOSP code and other bundled components retain their respective licenses. Open **Open-source licenses** from the welcome screen or the workspace's Tools menu to read them on the device. [AOSP source notes](upstream/README.md) · [Third-party notices](build-support/assets/licenses/)
+Pocket Studio's original code is available under the [MIT license](LICENSE). AOSP code and other bundled components retain their respective licenses. Open **Open-source licenses** from the welcome screen or **Find action** to read them on the device. [AOSP source notes](upstream/README.md) · [Third-party notices](build-support/assets/licenses/)

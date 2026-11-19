@@ -1,7 +1,5 @@
 <resources>
     <string name="agents_tab_label">Agents</string>
-    <string name="read_editor_context">Read editor selection and context</string>
-    <string name="read_app_logcat">Read application logs</string>
     <string name="search_query_single_line">Enter a non-empty single line of text to search for.</string>
     <string name="choose_model">Choose model</string>
     <string name="loading_models">Loading models…</string>
@@ -16,4 +14,12 @@
     <string name="effort_max">Max</string>
     <string name="effort_ultra">Ultra</string>
     <string name="fast_mode">Fast</string>
+    <string name="agent_no_provider">No agent installed</string>
+    <string name="agent_open_store">Browse plugins</string>
+    <string name="agent_select_provider">Select agent</string>
+    <string name="agent_message">Message</string>
+    <string name="agent_plugin_changed">The plugin changed. Reopen Agents to reload it.</string>
+    <string name="agent_login_channel">Agent sign-in</string>
+    <string name="agent_login_notification">Waiting for browser verification. Tap to return to Pocket Studio.</string>
+    <string name="manage_agent_usage">Manage usage</string>
 </resources>

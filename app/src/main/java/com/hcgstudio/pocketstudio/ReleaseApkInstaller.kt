@@ -3,6 +3,7 @@ package com.hcgstudio.pocketstudio
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.android.apksig.ApkVerifier
@@ -18,6 +19,18 @@ internal fun releaseVerificationError() = IOException(uiString(R.string.github_a
 @Suppress("DEPRECATION")
 internal fun packageVersionCode(info: PackageInfo): Long =
     if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+
+@Suppress("DEPRECATION")
+internal fun PackageManager.signedPackageInfo(name: String): PackageInfo? {
+    val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+    return try { getPackageInfo(name, flags) } catch (_: PackageManager.NameNotFoundException) { null }
+}
+
+@Suppress("DEPRECATION")
+internal fun PackageInfo.hasReleaseSigner(signer: ByteArray): Boolean {
+    val signers = if (Build.VERSION.SDK_INT >= 28) signingInfo?.apkContentsSigners else signatures
+    return signers?.singleOrNull()?.let { MessageDigest.isEqual(it.toByteArray(), signer) } == true
+}
 
 internal fun releaseFileDigest(file: File): String {
     val digest = MessageDigest.getInstance("SHA-256")
@@ -35,12 +48,17 @@ internal fun releaseFileDigest(file: File): String {
 
 internal class ReleaseApkInstaller(private val app: Context, private val packageName: String, directoryName: String) {
     private val directory = File(app.cacheDir, "install-apks/$directoryName")
-    // The release workflow verifies both PocketStudio.apk and its Codex companion against this certificate.
-    val trustedSigner by lazy { app.resources.openRawResource(R.raw.codex_plugin_signer).use { it.readBytes() } }
+    // The release workflow pins the Studio APK and plugin store packages to this certificate.
+    val trustedSigner by lazy { app.resources.openRawResource(R.raw.release_signer).use { it.readBytes() } }
 
     fun staged(release: AppRelease) = File(directory, "${release.sha256}.apk")
 
     fun prepare(release: AppRelease, source: GitHubApkReleases, progress: (Long, Long) -> Unit): Intent {
+        val apk = prepareFile(release, progress) { destination -> source.download(release, destination, progress) }
+        return installerIntent(apk)
+    }
+
+    fun prepareFile(release: AppRelease, progress: (Long, Long) -> Unit, download: (File) -> Unit): File {
         val target = staged(release)
         Files.createDirectories(directory.toPath())
         val cutoff = System.currentTimeMillis() - 86_400_000L
@@ -59,12 +77,16 @@ internal class ReleaseApkInstaller(private val app: Context, private val package
         } else {
             val temp = Files.createTempFile(directory.toPath(), ".download-", ".apk").toFile()
             try {
-                source.download(release, temp, progress)
+                download(temp)
                 verifyArchive(temp, release)
                 Files.move(temp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             } finally { temp.delete() }
         }
-        val uri = FileProvider.getUriForFile(app, "${app.packageName}.apks", target)
+        return target
+    }
+
+    fun installerIntent(apk: File): Intent {
+        val uri = FileProvider.getUriForFile(app, "${app.packageName}.apks", apk)
         return Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

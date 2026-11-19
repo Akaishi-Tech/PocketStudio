@@ -1,5 +1,7 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.agent.AgentSession
+import com.hcgstudio.pocketstudio.agent.ChatKind
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -47,25 +49,35 @@ object CodexChatChecks {
             .joinToString("") { "%02x".format(it) }
         val history = File(historyRoot, "codex-projects/$partition")
         check(!history.exists())
-        val historyAlias = if (keep) null else File(app.state, "history-alias")
-        var controller = CodexController(workspace, scope, fixtureHistory = historyAlias ?: history)
+        val fixturePartition = MessageDigest.getInstance("SHA-256").digest(("$uri|api-$endpoint").toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val providerHome = File(app.state, "codex-projects/$fixturePartition")
+        var controller: AgentSession? = null
+        fun open(project: Project): AgentSession {
+            val plugin = installedAgentPlugins(app).single { it.packageName == "com.hcgstudio.pocketstudio.codexplugin" }
+            val (provider, resources) = plugin.load(app)
+            return provider.open(WorkspaceAgentHost(workspace, project, resources, scope, plugin.label) { false })
+                .also { controller = it; it.refresh() }
+        }
         var retained = false
         try {
-            if (historyAlias != null) {
+            if (providerHome != history) {
+                providerHome.parentFile!!.mkdirs()
                 Files.createDirectories(history.toPath())
-                Files.createSymbolicLink(historyAlias.toPath(), history.toPath())
+                Files.createSymbolicLink(providerHome.toPath(), history.toPath())
             }
             // This storage resolves exclusively inside the per-run test directory.
-            CodexAuth(app).saveApiConfiguration(endpoint, "local-fixture-only")
             withContext(Dispatchers.Main) {
                 workspace.openProject(uri)
                 await("project open") { !workspace.busy }
                 val project = checkNotNull(workspace.project) { workspace.message.orEmpty() }
                 check(project.root.uri == uri)
-                controller.enter(project)
+                var controller = open(project)
+                await("agent account initialization") { controller.loginState != null }
+                controller.saveApiKey(endpoint, "local-fixture-only", {}, { error(it.message) })
                 await("standalone runtime and initial chat list") {
                     check(controller.error == null) { controller.error.orEmpty() }
-                    controller.checked && controller.version != null && controller.usable && !controller.loading
+                    controller.usable && !controller.loading
                 }
                 controller.newChat()
                 await("failed catalog request") { controller.modelsError != null && !controller.modelsLoading }
@@ -102,9 +114,8 @@ object CodexChatChecks {
                 }
                 awaitHistory("fresh app-server history list")
                 // The stored cwd and the reopened project directory can be aliases on Android.
-                controller.dispose()
-                controller = CodexController(workspace, scope, fixtureHistory = history.takeIf { keep })
-                controller.enter(project)
+                controller.close()
+                controller = open(project)
                 awaitHistory("persisted chat after reopening the project")
                 controller.open(controller.chats.single { it.id == id })
                 await("history items and model choices") { !controller.loading && !controller.modelsLoading }
@@ -139,7 +150,7 @@ object CodexChatChecks {
                     check(draft.dirty && draft.editor.selected == "selected")
                     val activities = controller.lines.filter { it.kind == ChatKind.Activity }
                     val deviceErrors = activities.filter { it.failed }
-                    check(deviceErrors.map { it.category }.sorted() == listOf(R.string.logcat, R.string.inspect_screen).sorted()) {
+                    check(deviceErrors.map { it.category }.sorted() == listOf(uiString(R.string.logcat), uiString(R.string.inspect_screen)).sorted()) {
                         "Expected two disconnected-device errors: " + activities.map { it.category to it.detail }
                     }
                     check(deviceErrors.all { it.detail == uiString(R.string.connect_to_a_target_device_first) })
@@ -169,15 +180,15 @@ object CodexChatChecks {
             "PASS model catalog retry and filtering, turn settings, project read/write, Markdown and resumed chat; " +
                 if (retained) "fixture project ${directory.name}" else "fixture removed"
         } finally {
-            withContext(Dispatchers.Main) { controller.dispose(); workspace.closeProject(); workspace.devices.close(); scope.cancel() }
+            withContext(Dispatchers.Main) { controller?.close(); workspace.closeProject(); workspace.devices.close(); scope.cancel() }
             app.cleanPreferences()
-            historyAlias?.let { Files.deleteIfExists(it.toPath()) }
+            if (Files.isSymbolicLink(providerHome.toPath())) Files.delete(providerHome.toPath())
             app.state.deleteRecursively()
             if (!retained) { directory.deleteRecursively(); history.deleteRecursively() }
         }
     }
 
-    private fun checkTranscript(controller: CodexController) {
+    private fun checkTranscript(controller: AgentSession) {
         val lines = controller.lines
         check(lines.any { it.kind == ChatKind.User && it.text.contains("sample.txt") })
         val fileTools = lines.filter { it.kind == ChatKind.Activity && "sample.txt" in it.text }

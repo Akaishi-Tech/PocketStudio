@@ -14,9 +14,9 @@ object AppReleaseChecks {
         val app = JSONObject().put("name", "PocketStudio.apk").put("state", "uploaded")
             .put("label", "Pocket Studio $version (18)").put("browser_download_url", url)
             .put("size", 245000000L).put("digest", "sha256:$hash")
-        val runtime = JSONObject().put("name", "PocketStudio-Codex.apk").put("state", "uploaded")
+        val runtime = JSONObject().put("name", "PocketStudio-Codex-Plugin.apk").put("state", "uploaded")
             .put("label", "Codex 0.170.0 (1700000)")
-            .put("browser_download_url", url.replace("PocketStudio.apk", "PocketStudio-Codex.apk"))
+            .put("browser_download_url", url.replace("PocketStudio.apk", "PocketStudio-Codex-Plugin.apk"))
             .put("size", 200000000L).put("digest", "sha256:" + "cd".repeat(32))
         return JSONObject().put("tag_name", "v$version").put("draft", false).put("prerelease", false)
             .put("body", "<!-- pocketstudio-release run=123 versionCode=18 -->")
@@ -33,7 +33,7 @@ object AppReleaseChecks {
             mutate(document, document.getJSONArray("assets").getJSONObject(1))
             check(runCatching { client.parse(document.toString()) }.isFailure) { "Accepted $reason" }
         }
-        reject("runtime channel") { doc, _ -> doc.put("tag_name", "codex-runtime") }
+        reject("plugin store channel") { doc, _ -> doc.put("tag_name", "plugin-store") }
         reject("draft release") { doc, _ -> doc.put("draft", true) }
         reject("prerelease") { doc, _ -> doc.put("prerelease", true) }
         reject("missing app asset") { doc, _ -> doc.getJSONArray("assets").remove(1) }

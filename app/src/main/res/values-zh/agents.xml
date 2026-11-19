@@ -1,7 +1,5 @@
 <resources>
     <string name="agents_tab_label">智能体</string>
-    <string name="read_editor_context">读取编辑器选区及上下文</string>
-    <string name="read_app_logcat">读取应用日志</string>
     <string name="search_query_single_line">请输入一行非空的搜索文本。</string>
     <string name="choose_model">选择模型</string>
     <string name="loading_models">正在加载模型…</string>
@@ -16,4 +14,12 @@
     <string name="effort_max">最大</string>
     <string name="effort_ultra">超高</string>
     <string name="fast_mode">Fast</string>
+    <string name="agent_no_provider">尚未安装智能体</string>
+    <string name="agent_open_store">浏览插件</string>
+    <string name="agent_select_provider">选择智能体</string>
+    <string name="agent_message">消息</string>
+    <string name="agent_plugin_changed">插件已更改，请重新打开智能体以重新加载。</string>
+    <string name="agent_login_channel">智能体登录</string>
+    <string name="agent_login_notification">正在等待浏览器验证。点按返回掌上 Studio。</string>
+    <string name="manage_agent_usage">管理用量</string>
 </resources>

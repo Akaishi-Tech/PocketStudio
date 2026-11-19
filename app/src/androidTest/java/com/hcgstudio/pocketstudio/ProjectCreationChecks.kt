@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import com.hcgstudio.pocketstudio.build.EmbeddedBuilder
+import com.hcgstudio.pocketstudio.build.SdkPlatforms
 import com.hcgstudio.pocketstudio.build.KotlinTools
 import java.io.File
 import java.io.IOException
@@ -12,6 +13,21 @@ import java.util.zip.ZipInputStream
 
 /** Run with a writable SAF tree already granted to the IDE and SDK Platform 34 installed. */
 object ProjectCreationChecks {
+    @JvmStatic fun installedCompileSdk(context: Context) {
+        val sdk = SdkPlatforms(context).installed().firstOrNull { it.substringBefore('.').toInt() > 34 } ?: return
+        val parent = File(context.filesDir, "imports/sdk-check-${UUID.randomUUID()}")
+        check(parent.mkdirs())
+        try {
+            val project = Project.createProject(context, Uri.fromFile(parent), "SDK Project", "org.example.sdk",
+                ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, 35, sdk)
+            ProjectWorkspace.open(project).use { workspace ->
+                val apk = EmbeddedBuilder.build(context, workspace.directory.toFile()) {}
+                val info = checkNotNull(context.packageManager.getPackageArchiveInfo(apk.path, 0)?.applicationInfo)
+                check(info.minSdkVersion == 35 && info.targetSdkVersion == sdk.substringBefore('.').toInt())
+            }
+        } finally { parent.deleteRecursively() }
+    }
+
     @JvmStatic fun run(context: Context, tree: String) {
         val parent = Project(context, Uri.parse(tree))
         val name = "测试 & Studio " + UUID.randomUUID()
@@ -53,7 +69,7 @@ object ProjectCreationChecks {
             check(invalid.isFailure && parent.list(parent.root).map { it.name } == siblings)
             for (sdk in listOf(23, 35)) {
                 val invalidSdk = runCatching {
-                    Project.createProject(context, parent.tree, "$name invalid", packageName, ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, sdk)
+                    Project.createProject(context, parent.tree, "$name invalid", packageName, ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, sdk, "34")
                 }
                 check(invalidSdk.isFailure && parent.list(parent.root).map { it.name } == siblings)
             }

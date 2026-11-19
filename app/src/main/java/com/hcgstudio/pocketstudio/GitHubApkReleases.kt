@@ -72,59 +72,71 @@ internal class GitHubApkReleases(
     }
 
     fun download(release: AppRelease, destination: File, progress: (Long, Long) -> Unit) {
-        var url = URL(downloadUrl(release.version))
-        repeat(6) {
-            val conn = connect(url)
-            try {
-                if (conn.responseCode in setOf(301, 302, 303, 307, 308)) {
-                    url = URL(url, conn.getHeaderField("Location") ?: throw invalidMetadata())
-                    if (url.protocol != "https" || url.userInfo != null || url.port !in listOf(-1, 443) ||
-                        !(url.host == "github.com" || url.host.endsWith(".githubusercontent.com"))) throw invalidMetadata()
-                } else {
-                    checkResponse(conn)
-                    if (conn.contentLengthLong >= 0 && conn.contentLengthLong != release.size) throw releaseVerificationError()
-                    var total = 0L
-                    var reported = 0L
-                    conn.inputStream.use { input ->
-                        destination.outputStream().use { out ->
-                            val buffer = ByteArray(128 * 1024)
-                            while (true) {
-                                if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
-                                val n = input.read(buffer)
-                                if (n < 0) break
-                                total += n
-                                if (total > release.size) throw releaseVerificationError()
-                                out.write(buffer, 0, n)
-                                if (total - reported >= 512 * 1024) { progress(total, release.size); reported = total }
-                            }
-                            if (total != release.size) throw releaseVerificationError()
-                            out.fd.sync()
-                        }
-                    }
-                    progress(total, total)
-                    return
-                }
-            } finally { conn.disconnect() }
-        }
-        throw invalidMetadata()
+        downloadGitHubApk(downloadUrl(release.version), release, destination, progress)
     }
 
     private fun downloadUrl(version: String) = "https://github.com/$REPO/releases/download/${tagForVersion(version)}/$fileName"
 
     companion object {
-        private const val REPO = "Akaishi-Tech/PocketStudio"
+        internal const val REPO = "Akaishi-Tech/PocketStudio"
         private const val MAX_APK = 1_500_000_000L
         private val HASH = Regex("sha256:[0-9a-f]{64}")
         private fun invalidMetadata() = IOException(uiString(R.string.github_apk_invalid_release))
-        private fun connect(url: URL) = (url.openConnection() as HttpsURLConnection).apply {
+        internal fun connect(url: URL) = (url.openConnection() as HttpsURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 30_000
             instanceFollowRedirects = false
             setRequestProperty("User-Agent", "PocketStudio")
             setRequestProperty("Accept-Encoding", "identity")
         }
-        private fun checkResponse(connection: HttpsURLConnection) {
+        internal fun checkResponse(connection: HttpsURLConnection) {
             if (connection.responseCode != 200) throw IOException(uiString(R.string.github_apk_http_error, connection.responseCode))
         }
     }
+}
+
+/** Follow GitHub release asset redirects only to GitHub's HTTPS download hosts. */
+internal fun <T> readGitHubAsset(address: String, read: (HttpsURLConnection) -> T): T {
+    var url = URL(address)
+    repeat(6) {
+        val connection = GitHubApkReleases.connect(url)
+        try {
+            if (connection.responseCode in setOf(301, 302, 303, 307, 308)) {
+                val location = connection.getHeaderField("Location") ?: throw releaseVerificationError()
+                url = URL(url, location)
+                if (url.protocol != "https" || url.userInfo != null || url.port !in listOf(-1, 443) ||
+                    !(url.host == "github.com" || url.host.endsWith(".githubusercontent.com")))
+                    throw releaseVerificationError()
+            } else {
+                GitHubApkReleases.checkResponse(connection)
+                return read(connection)
+            }
+        } finally { connection.disconnect() }
+    }
+    throw releaseVerificationError()
+}
+
+internal fun downloadGitHubApk(
+    address: String, release: AppRelease, destination: File, progress: (Long, Long) -> Unit
+) = readGitHubAsset(address) { conn ->
+    if (conn.contentLengthLong >= 0 && conn.contentLengthLong != release.size) throw releaseVerificationError()
+    var total = 0L
+    var reported = 0L
+    conn.inputStream.use { input ->
+        destination.outputStream().use { out ->
+            val buffer = ByteArray(128 * 1024)
+            while (true) {
+                if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
+                val n = input.read(buffer)
+                if (n < 0) break
+                total += n
+                if (total > release.size) throw releaseVerificationError()
+                out.write(buffer, 0, n)
+                if (total - reported >= 512 * 1024) { progress(total, release.size); reported = total }
+            }
+            if (total != release.size) throw releaseVerificationError()
+            out.fd.sync()
+        }
+    }
+    progress(total, total)
 }

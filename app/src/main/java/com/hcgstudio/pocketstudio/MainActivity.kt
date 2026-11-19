@@ -30,6 +30,12 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private lateinit var workspace: Workspace
+    private var notificationPage by mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        notificationPage = intent.action
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -38,9 +44,10 @@ class MainActivity : ComponentActivity() {
             if (workspace.project == null) workspace.openProject(Uri.parse(it), restoreFile = savedInstanceState.getString("document"))
         }
         if (savedInstanceState == null) workspace.reopenLastProject()
+        if (savedInstanceState == null) notificationPage = intent.action
         setContent {
             StudioTheme(workspace.settings) {
-                StudioApp(workspace)
+                StudioApp(workspace, notificationPage) { notificationPage = null }
             }
         }
         if (savedInstanceState == null && Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
@@ -57,11 +64,11 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
-        workspace.codex.setActivityResumed(true)
+        workspace.agents.setActivityResumed(true)
         if (workspace.settings.autoUpdate) workspace.updates.check(automatic = true)
     }
     override fun onPause() {
-        workspace.codex.setActivityResumed(false)
+        workspace.agents.setActivityResumed(false)
         super.onPause()
     }
     override fun onStop() {
@@ -83,7 +90,7 @@ private enum class StudioPage(val depth: Int) {
 }
 
 @Composable
-private fun StudioApp(w: Workspace) {
+private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotification: () -> Unit) {
     val context = w.app
     val p = w.project
     val active = w.active
@@ -93,6 +100,26 @@ private fun StudioApp(w: Workspace) {
     var gradleTask by rememberSaveable { mutableStateOf("assembleDebug") }
     var showTree by rememberSaveable { mutableStateOf(true) }
     val newProjectVisible by w.newProjectVisible.collectAsState()
+    LaunchedEffect(notificationPage, p) {
+        if (p != null && (notificationPage == OPEN_AGENT || notificationPage == OPEN_DEBUG)) {
+            showSettings = false
+            showAgentAccount = false
+            dialog = ""
+            w.tool = if (notificationPage == OPEN_AGENT) Tool.Agents else Tool.Devices
+            consumeNotification()
+        }
+    }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(w.tool) {
+        if (Build.VERSION.SDK_INT >= 33 && w.tool in listOf(Tool.Devices, Tool.Agents) &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            val prefs = context.getSharedPreferences("studio", 0)
+            if (!prefs.getBoolean("requestedSessionNotifications", false)) {
+                prefs.edit().putBoolean("requestedSessionNotifications", true).apply()
+                notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
     val newProject = {
         w.creationError = null
         w.newProjectVisible.value = true
@@ -143,11 +170,13 @@ private fun StudioApp(w: Workspace) {
     val importZip = { import.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
     fun savedDialog(id: String) { w.action { if (w.saveDocuments()) dialog = id } }
     val canEdit = p != null && !w.busy
-    val idle = canEdit && !w.running && !w.codex.working
+    val idle = canEdit && !w.running && !w.agents.working
     val editorVisible = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600 || w.tool == Tool.Editor
     val editor = active?.editor
     val className = remember(editor?.text, active?.node?.name) {
-        val name = active?.node?.name.orEmpty().substringBeforeLast('.')
+        val fileName = active?.node?.name.orEmpty()
+        if (!fileName.endsWith(".java") && !fileName.endsWith(".kt")) return@remember ""
+        val name = fileName.substringBeforeLast('.')
         val pkg = Regex("""(?m)^\s*package\s+([\w.`]+)""").find(editor?.text.orEmpty())?.groupValues?.get(1)?.replace("`", "")
         if (pkg == null) name else "$pkg.$name"
     }
@@ -186,7 +215,13 @@ private fun StudioApp(w: Workspace) {
         add(act("output", context.getString(R.string.build_output), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
         add(act("preview", context.getString(R.string.preview_layout), R.string.view, enabled = active?.node?.path?.contains(Regex("(^|/)res/layout[^/]*/[^/]+\\.xml$")) == true) { dialog = "preview" })
         add(act("build", context.getString(R.string.build_debug_apk), R.string.build, "Ctrl+F9", idle) { w.build() })
-        add(act("run", context.getString(R.string.build_and_run_on_device), R.string.build, "Shift+F10", idle && w.devices.connected && !w.devices.busy) { w.build(true) })
+        fun runOnDevice(debug: Boolean) {
+            if (w.devices.connected) w.build(runOnDevice = true, debug = debug)
+            else w.tool = Tool.Devices
+        }
+        add(act("run", context.getString(R.string.run_app), R.string.build, "Shift+F10", idle && !w.devices.busy) { runOnDevice(false) })
+        add(act("debugRun", context.getString(R.string.debug_run), R.string.debug, "Shift+F9", idle && !w.devices.busy) { runOnDevice(true) })
+        add(act("buildSdk", context.getString(R.string.build_sdk), R.string.build, enabled = idle) { dialog = "buildSdk" })
         add(act("openApk", context.getString(R.string.install_apk_on_this_device), R.string.build, enabled = idle && w.apk != null) {
             w.apk?.let { openApk(Uri.fromFile(it)) }
         })
@@ -200,7 +235,9 @@ private fun StudioApp(w: Workspace) {
             })
         }
         add(act("attach", context.getString(R.string.attach_debugger), R.string.debug, "Ctrl+Alt+F5", w.devices.connected) { w.tool = Tool.Devices; w.devices.processes() })
-        add(act("breakpoint", context.getString(R.string.toggle_line_breakpoint), R.string.debug, "Ctrl+F8", w.devices.attached && editor != null) { w.devices.toggleBreakpoint(className, editor!!.line) })
+        add(act("breakpoint", context.getString(R.string.toggle_line_breakpoint), R.string.debug, "Ctrl+F8", className.isNotEmpty() && editorVisible) {
+            editor?.let { w.devices.toggleBreakpoint(className, it.line) }
+        })
         add(act("step", context.getString(R.string.step_over), R.string.debug, "F8", w.devices.paused, w.devices::stepOver))
         add(act("resume", context.getString(R.string.resume_execution), R.string.debug, "F9", w.devices.paused, w.devices::resume))
         val devices = w.devices
@@ -255,12 +292,13 @@ private fun StudioApp(w: Workspace) {
             val action = if (dialog.isEmpty() && w.git == null && !newProjectVisible && !showAgentAccount && !showSettings) actions.firstOrNull { it.enabled && it.matches(event) } else null
             if (action == null) false else { action.run(); true }
         }.focusRequester(rootFocus).focusable(),
-        contentWindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
-        snackbarHost = { SnackbarHost(snack) },
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal).union(WindowInsets.ime),
+        containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snack, Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            if (p != null && (w.tool == Tool.Codex || showAgentAccount)) {
-                LaunchedEffect(p) { w.codex.enter(p) }
+            if (p != null && (w.tool == Tool.Agents || showAgentAccount)) {
+                LaunchedEffect(p) { w.agents.enter(p) }
             }
             val workbenchState = key(p?.root?.uri) { rememberSaveableStateHolder() }
             val git = w.git
@@ -272,28 +310,32 @@ private fun StudioApp(w: Workspace) {
                 p != null -> StudioPage.Workbench
                 else -> StudioPage.Welcome
             }
-            StudioPageTransition(page, StudioPage::depth, Modifier.fillMaxSize()) { destination ->
+            val pageModifier = if (page == StudioPage.Workbench) Modifier
+                else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical))
+            StudioPageTransition(page, StudioPage::depth, Modifier.fillMaxSize().then(pageModifier)) { destination ->
                 when (destination) {
                     StudioPage.Welcome -> Welcome(w, newProject, openTree, importZip, { dialog = "gitClone" },
                         { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
                     StudioPage.Workbench -> workbenchState.SaveableStateProvider("workbench") {
                         Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
-                            if (w.codex.account != null) w.codex.error = null
-                            else w.codex.refreshInstallation()
-                            showAgentAccount = true
+                            if (w.agents.session == null) dialog = "plugins"
+                            else { w.agents.dismissError(); showAgentAccount = true }
                         }
                     }
                     StudioPage.Settings -> SettingsPage(LocalStudioSettings.current, w::updateSettings, { showSettings = false },
-                        { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) })
+                        { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) }, { dialog = "plugins" })
                     StudioPage.NewProject -> NewProjectPage(w)
                     StudioPage.Git -> git?.let { GitPage(it) }
-                    StudioPage.AgentAccount -> CodexAccountPage(w.codex) {
+                    StudioPage.AgentAccount -> if (w.agents.session == null) {
+                        LaunchedEffect(Unit) { showAgentAccount = false }
+                    } else AgentAccountPage(checkNotNull(w.agents.session)) {
                         showAgentAccount = false
-                        w.tool = Tool.Codex
+                        w.tool = Tool.Agents
                     }
                 }
             }
-            if (w.busy && !newProjectVisible) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (w.busy && !newProjectVisible) LinearProgressIndicator(
+                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
         }
     }
     val dismiss = { dialog = "" }
@@ -301,7 +343,9 @@ private fun StudioApp(w: Workspace) {
         "gitClone" -> GitCloneDialog(dismiss) { directory -> dismiss(); w.openProject(Uri.fromFile(directory)) }
         "licenses" -> LicensePage(dismiss)
         "keymap" -> KeymapDialog(actions, defaults, keymap, dismiss)
+        "plugins" -> PluginStorePage(w.devices, dismiss)
         "sdk" -> SdkManager(dismiss)
+        "buildSdk" -> if (p != null) BuildSdkDialog(w, dismiss)
         "palette" -> ActionPalette(actions, dismiss)
         "file", "folder" -> if (p != null) NameDialog(dialog == "folder", w.selectedDir?.path.orEmpty().ifEmpty { p.root.name }, dismiss) { name ->
             w.create(name, dialog == "folder"); dismiss()
@@ -316,7 +360,7 @@ private fun StudioApp(w: Workspace) {
         "gradle" -> if (p != null) GradleTaskDialog(p, gradleTask, dismiss, { w.tool = Tool.Output; w.log(it) }, w::recordApk) { w.action { w.refreshAfterExternalRun(p) } }
     }
     if (p != null) {
-        if (w.tool == Tool.Codex || showAgentAccount) CodexToolApproval(w.codex)
+        if (w.tool == Tool.Agents || showAgentAccount) AgentToolApproval(w.agents)
     }
     DeviceDialogs(w.devices)
     AppUpdateDialog(w.updates)

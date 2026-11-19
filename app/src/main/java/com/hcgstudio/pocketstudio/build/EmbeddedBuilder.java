@@ -30,6 +30,10 @@ public final class EmbeddedBuilder {
     private EmbeddedBuilder() {}
 
     public static synchronized File build(Context context, File projectRoot, Consumer<String> log) throws Exception {
+        return build(context, projectRoot, null, log);
+    }
+
+    public static synchronized File build(Context context, File projectRoot, String platform, Consumer<String> log) throws Exception {
         File module = new File(projectRoot, "app");
         File main = new File(module, "src/main");
         QuickProject config = new QuickProject(projectRoot);
@@ -44,7 +48,7 @@ public final class EmbeddedBuilder {
         if (!aapt.canExecute()) throw new IOException(uiString(R.string.this_device_s_abi_has_no_executable_built));
         Path temp = Files.createTempDirectory(context.getCacheDir().toPath(), "java-build-");
         try {
-            Path sdk = new SdkPlatforms(context).linkJar(config.platform(), temp);
+            Path sdk = new SdkPlatforms(context).linkJar(platform == null ? config.platform() : platform, temp);
             log.accept(uiString(R.string.aapt2_compiling_resources));
             File res = new File(main, "res");
             Path resources = temp.resolve("resources.zip");

@@ -5,10 +5,12 @@ import static com.hcgstudio.pocketstudio.StudioStrings.uiString;
 import android.content.Context;
 
 import com.hcgstudio.pocketstudio.build.LocalAndroidSdk;
+import com.hcgstudio.pocketstudio.build.SdkPlatforms;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
@@ -16,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,15 +91,18 @@ final class LocalGradle {
             try (GradleWorkspace workspace = GradleWorkspace.open(project, sdk.root, log)) {
                 Path directory = workspace.directory;
                 Map<Path,BasicFileAttributes> before = apkFiles(directory);
-                ProcessBuilder builder = wrapper(context, workspace, java, sdk, tasks);
-                java.configure(builder);
-                log.accept(uiString(R.string.local_gradle_format, tasks));
+                String platform = BuildSdk.selectedBuildSdk(project);
+                Path sdkInit = platform != null ? prepareSdkOverride(context, platform) : null;
                 try {
-                    execute(builder, log);
+                    ProcessBuilder builder = wrapper(context, workspace, java, sdk, tasks, platform, sdkInit);
+                    java.configure(builder);
+                    log.accept(uiString(R.string.local_gradle_format, tasks));
+                    try { execute(builder, log); }
+                    finally { finishProcess(); }
+                    return collectApks(context, directory, before);
                 } finally {
-                    finishProcess();
+                    if (sdkInit != null) Files.deleteIfExists(sdkInit);
                 }
-                return collectApks(context, directory, before);
             }
         } catch (Exception e) {
             for (Throwable cleanup : e.getSuppressed()) {
@@ -115,7 +121,20 @@ final class LocalGradle {
         }
     }
 
-    private static ProcessBuilder wrapper(Context context, GradleWorkspace workspace, LocalJava java, LocalAndroidSdk sdk, String tasks) throws IOException {
+    private static Path prepareSdkOverride(Context context, String platform) throws IOException {
+        if (!new SdkPlatforms(context).installed().contains(platform))
+            throw new IOException(uiString(R.string.use_sdk_manager_to_install_android_sdk_platform_format, platform));
+        Path init = Files.createTempFile(context.getCacheDir().toPath(), "build-sdk-", ".gradle");
+        try (InputStream in = context.getAssets().open("build-sdk.gradle")) {
+            Files.copy(in, init, StandardCopyOption.REPLACE_EXISTING);
+            return init;
+        } catch (IOException error) {
+            Files.deleteIfExists(init);
+            throw error;
+        }
+    }
+
+    private static ProcessBuilder wrapper(Context context, GradleWorkspace workspace, LocalJava java, LocalAndroidSdk sdk, String tasks, String platform, Path sdkInit) throws IOException {
         StudioSettings settings = StudioSettings.load(context);
         List<String> command = new ArrayList<>(Arrays.asList(
                 "/system/bin/setsid", "/system/bin/sh", "-c", "echo $$; read -r ready || exit 1; exec \"$@\"", "gradle-session",
@@ -126,6 +145,8 @@ final class LocalGradle {
                 "-Dorg.gradle.native=false", "-Dorg.gradle.vfs.watch=false",
                 "-Dorg.gradle.internal.instrumentation.agent=false",
                 "-Pandroid.builder.sdkDownload=false", "-Pandroid.aapt2FromMavenOverride=" + sdk.aapt2));
+        if (sdkInit != null)
+            command.addAll(Arrays.asList("--init-script", sdkInit.toString(), "-PpocketStudioCompileSdk=" + platform));
         if (settings.getGradleOffline()) command.add("--offline");
         if (settings.getGradleStacktrace()) command.add("--stacktrace");
         if (workspace.projectCache != null) {

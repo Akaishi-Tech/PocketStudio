@@ -17,7 +17,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.hcgstudio.pocketstudio.codex.CodexRuntime
+import java.util.zip.ZipFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -78,12 +78,24 @@ internal fun LicensePage(dismiss: () -> Unit) {
     val context = LocalContext.current
     val runtimeNotices by produceState<Map<String, String>>(emptyMap(), context) {
         value = withContext(Dispatchers.IO) {
-            try { CodexRuntime(context).installedNotices() } catch (_: IOException) { emptyMap() }
+            buildMap {
+                for (plugin in installedAgentPlugins(context)) {
+                    try {
+                        ZipFile(plugin.sourceDir).use { apk ->
+                            apk.entries().asSequence().filter { !it.isDirectory && it.name.startsWith("assets/licenses/") &&
+                                it.size in 1..1_000_000L }.forEach { entry ->
+                                val file = entry.name.removePrefix("assets/licenses/")
+                                put("${plugin.label}/$file", apk.getInputStream(entry).bufferedReader().use { it.readText() })
+                            }
+                        }
+                    } catch (_: IOException) { /* A plugin may have been updated during discovery. */ }
+                }
+            }
         }
     }
     val components = remember(runtimeNotices) {
         bundledComponents + runtimeNotices.keys.groupBy { it.substringBefore('/') }.map { (name, files) ->
-            Component(if (name == "codex") "Codex CLI" else "OpenSSL", "Termux", files)
+            Component(name, uiString(R.string.open_source_licenses), files)
         }
     }
     var selection by rememberSaveable { mutableStateOf<String?>(null) }

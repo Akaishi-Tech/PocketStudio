@@ -10,20 +10,20 @@ import sys
 from urllib.parse import urlencode
 
 
-TAG = "codex-runtime"
-RUNTIME = "PocketStudio-Codex.apk"
+TAG = "plugin-store"
+RUNTIME = "PocketStudio-Codex-Plugin.apk"
 APP = "PocketStudio.apk"
-MANIFEST = "codex-plugin.json"
+MANIFEST = "plugin-store.json"
 SCRIPT = "scripts/build-codex-plugin.py"
-PIN = Path("app/src/main/res/raw/codex_plugin_signer.der")
+PIN = Path("app/src/main/res/raw/release_signer.der")
 APP_ID = "com.hcgstudio.pocketstudio"
-RUNTIME_ID = APP_ID + ".codexruntime"
+RUNTIME_ID = APP_ID + ".codexplugin"
 SEMVER = r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 APP_MARK = re.compile(r"<!-- pocketstudio-release run=(\d+) versionCode=(\d+) -->")
 APP_SEQUENCE = re.compile(r"<!-- pocketstudio-app-sequence (\d+) -->")
 RUNTIME_SOURCE = re.compile(r"<!-- pocketstudio-runtime-source ([0-9a-f]{40}) -->")
-CODEX_LABEL = re.compile(r"Codex ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9]+)?) \(([0-9]+)\)")
-RUNTIME_TITLE = "Codex for Pocket Studio"
+CODEX_LABEL = re.compile(r"Codex Plugin ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9]+)?) \(([0-9]+)\)")
+RUNTIME_TITLE = "Pocket Studio Plugin Store"
 
 
 def require(condition, message):
@@ -87,7 +87,47 @@ def matches(item, sha, size):
 
 
 def runtime_label(meta):
-    return f"Codex {meta['version']} ({meta['versionCode']})"
+    return f"Codex Plugin {meta['version']} ({meta['versionCode']})"
+
+
+def validate_store(store):
+    require(store["schemaVersion"] == 1 and isinstance(store["plugins"], list), "Invalid plugin catalog")
+    ids, files = set(), set()
+    for plugin in store["plugins"]:
+        package, name = plugin["package"], plugin["file"]
+        require(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+", package)
+                and package != APP_ID and package not in ids, "Invalid or duplicate plugin package")
+        require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.apk", name) and name not in files and name != APP,
+                "Invalid or duplicate plugin filename")
+        ids.add(package)
+        files.add(name)
+        require(plugin["name"].strip() and plugin["version"].strip(), "Missing plugin name or version")
+        require(0 < plugin["size"] <= 1_500_000_000 and 0 < plugin["versionCode"] <= 2_100_000_000,
+                "Invalid plugin size or version code")
+        require(re.fullmatch("[0-9a-f]{64}", plugin["sha256"]) and plugin["signerSha256"] == digest(PIN),
+                "Invalid plugin digest or signer")
+        require(isinstance(plugin["abis"], list) and all(isinstance(abi, str) and abi for abi in plugin["abis"]),
+                "Invalid plugin ABI list")
+    return store
+
+
+def published_store(gh, release, out):
+    manifest = asset(release, MANIFEST)
+    if not manifest or manifest["state"] != "uploaded":
+        # A runner can stop between renaming the previous catalog and promoting its replacement.
+        backups = [item for item in release.get("assets", [])
+                   if item["state"] == "uploaded" and re.fullmatch(r"previous-\d+-" + re.escape(MANIFEST), item["name"])]
+        manifest = max(backups, key=lambda item: item["id"], default=None)
+        if not manifest:
+            return {"schemaVersion": 1, "plugins": []}
+    require(0 < manifest["size"] <= 262144, "Invalid plugin catalog size")
+    dest = out / "published-store.json"
+    gh.download(manifest, dest)
+    return validate_store(read_json(dest))
+
+
+def codex_entry(store):
+    return next((entry for entry in store["plugins"] if entry["package"] == RUNTIME_ID), None)
 
 
 def validate_manifest(meta):
@@ -145,10 +185,11 @@ class GitHub:
 
 def prepare(gh, out):
     channel = os.environ["CHANNEL"]
-    require(channel in {"app", "runtime", "scheduled"}, "Unknown release channel")
+    require(channel in {"app", "plugins", "scheduled"}, "Unknown release channel")
     releases = gh.releases()
     fixed = next((r for r in releases if r["tag_name"] == TAG), {})
-    if channel == "scheduled" and (not fixed or fixed["draft"]):
+    migrating = any(r["tag_name"] == "codex-runtime" and not r["draft"] for r in releases)
+    if channel == "scheduled" and (not fixed or fixed["draft"]) and not migrating:
         print("First publication is manual. Skipping the scheduled run.")
         return None
     if channel == "app":
@@ -164,7 +205,7 @@ def prepare(gh, out):
     if previous_source and previous_source[1] != source:
         comparison = gh.api(f"compare/{previous_source[1]}...{source}")
         if comparison["status"] not in ("identical", "ahead"):
-            print("The runtime channel already uses a newer or diverged source revision. Skipping this run.")
+            print("The plugin store already uses a newer or diverged source revision. Skipping this run.")
             return None
     plan = {"channel": channel}
     if channel == "app":
@@ -183,16 +224,15 @@ def prepare(gh, out):
     upstream = plugin_version(lock["version"])
     require(re.fullmatch("[0-9a-f]{64}", lock["buildId"]), "Invalid resolved Codex build ID")
     apk = asset(fixed, RUNTIME)
-    manifest = asset(fixed, MANIFEST)
-    previous = None
+    store = published_store(gh, fixed, out)
+    previous = codex_entry(store)
     established = False
-    if manifest and manifest["state"] == "uploaded":
-        require(0 < manifest["size"] < 65536, "Invalid published manifest size")
-        gh.download(manifest, out / MANIFEST)
-        previous = read_json(out / MANIFEST)
+    if previous:
         validate_manifest(previous)
         require(upstream >= plugin_version(previous["version"]), "Upstream Codex version would downgrade installed devices")
         established = (not fixed["draft"] and matches(apk, previous["sha256"], previous["size"])
+                       and matches(asset(fixed, MANIFEST), digest(out / "published-store.json"),
+                                   (out / "published-store.json").stat().st_size)
                        and apk.get("label") == runtime_label(previous)
                        and previous["buildId"] == lock["buildId"] and previous["version"] == lock["version"])
     plan["buildRuntime"] = not established
@@ -200,6 +240,7 @@ def prepare(gh, out):
         if channel != "app":
             print(f"Codex {lock['version']} and its build inputs are current.")
             return None
+        write_json(out / MANIFEST, store)
         gh.download(apk, out / RUNTIME)
         plan["runtimeCode"] = previous["versionCode"]
     else:
@@ -232,7 +273,8 @@ def build(plan, out):
     if plan["buildRuntime"]:
         subprocess.run([sys.executable, SCRIPT, "build", "--lock", str(lock_path), "--out", str(out),
                         "--version-code", str(plan["runtimeCode"])], check=True)
-    meta = read_json(out / MANIFEST)
+    meta = codex_entry(validate_store(read_json(out / MANIFEST)))
+    require(meta is not None, "Missing Codex plugin entry")
     validate_manifest(meta)
     require(meta["buildId"] == lock["buildId"] and meta["version"] == lock["version"]
             and meta["versionCode"] == plan["runtimeCode"], "Built runtime does not match the release plan")
@@ -275,12 +317,13 @@ def replace_asset(gh, rid, path, label):
 
 
 def publish(gh, plan, out):
-    meta = read_json(out / MANIFEST)
+    meta = codex_entry(validate_store(read_json(out / MANIFEST)))
+    require(meta is not None, "Missing Codex plugin entry")
     releases = gh.releases()
     if plan["buildRuntime"]:
         release = next((r for r in releases if r["tag_name"] == TAG), None)
         source = os.environ["GITHUB_SHA"]
-        notes = f"Android runtime updates for Pocket Studio.\n\n<!-- pocketstudio-runtime-source {source} -->"
+        notes = f"Install and update Pocket Studio plugins from Settings.\n\n<!-- pocketstudio-runtime-source {source} -->"
         if not release:
             release = gh.create(TAG, RUNTIME_TITLE, notes)
         rid = release["id"]
@@ -288,7 +331,10 @@ def publish(gh, plan, out):
             # Reserve this source revision before moving assets, including if the runner is interrupted.
             gh.api(f"releases/{rid}", method="PATCH", body={"body": notes, "make_latest": "false"})
         replace_asset(gh, rid, out / RUNTIME, runtime_label(meta))
-        replace_asset(gh, rid, out / MANIFEST, "Codex package metadata")
+        store = published_store(gh, release, out)
+        store["plugins"] = [entry for entry in store["plugins"] if entry["package"] != RUNTIME_ID] + [meta]
+        write_json(out / MANIFEST, validate_store(store))
+        replace_asset(gh, rid, out / MANIFEST, "Pocket Studio plugin catalog")
         gh.api(f"releases/{rid}", method="PATCH", body={"draft": False, "make_latest": "false"})
         for item in gh.api(f"releases/{rid}")["assets"]:
             if item["name"].startswith(("previous-", "stage-")) and item["name"].endswith(("-" + RUNTIME, "-" + MANIFEST)):

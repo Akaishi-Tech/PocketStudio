@@ -1,0 +1,22 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.hcgstudio.pocketstudio.codexplugin.apk'
+    compileSdk { version = release(37) }
+    defaultConfig {
+        applicationId 'com.hcgstudio.pocketstudio.codexplugin'
+        minSdk 26
+        targetSdk 35
+        versionCode providers.gradleProperty('pluginVersionCode').orElse('1').get().toInteger()
+        versionName providers.gradleProperty('pluginVersionName').orElse('dev').get()
+    }
+    // PackageManager only extracts upstream non-lib*.so helpers for debuggable packages.
+    buildTypes.release.debuggable = true
+    packaging.jniLibs.useLegacyPackaging = true
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { implementation project(':codex-plugin') }

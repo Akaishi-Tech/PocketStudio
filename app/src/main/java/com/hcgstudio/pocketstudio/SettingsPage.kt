@@ -61,9 +61,10 @@ internal fun SettingsPage(
     dismiss: () -> Unit,
     onKeymap: () -> Unit,
     onSdk: () -> Unit,
-    onCheckUpdates: () -> Unit
+    onCheckUpdates: () -> Unit,
+    onPlugins: () -> Unit
 ) {
-    val groups = settingsGroups(settings, editorPalette(settings), onChange, onKeymap, onSdk, onCheckUpdates)
+    val groups = settingsGroups(settings, editorPalette(settings), onChange, onKeymap, onSdk, onCheckUpdates, onPlugins)
     var selected by rememberSaveable { mutableStateOf<Int?>(null) }
     val categoryListState = rememberLazyListState()
     val categoryState = rememberSaveableStateHolder()
@@ -127,7 +128,7 @@ internal fun SettingsPage(
                     else Row(Modifier.fillMaxSize()) {
                         if (wide) {
                             SettingsCategoryList(groups, current?.title, true, categoryListState, Modifier.width(sidebarWidth)) {
-                                selected = it
+                                if (it == R.string.plugin_store) onPlugins() else selected = it
                             }
                             VerticalDivider()
                         }
@@ -135,7 +136,7 @@ internal fun SettingsPage(
                             StudioPageTransition(current?.title, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { title ->
                                 if (title == null) {
                                     SettingsCategoryList(groups, null, false, categoryListState, Modifier.fillMaxWidth()) {
-                                        selected = it
+                                        if (it == R.string.plugin_store) onPlugins() else selected = it
                                     }
                                 } else {
                                     val group = groups.first { it.title == title }
@@ -420,7 +421,7 @@ private fun themeLabel(theme: StudioThemeMode) = when (theme) {
 
 private fun settingsGroups(
     s: StudioSettings, palette: Map<EditorColorRole, Color>, change: (StudioSettings) -> Unit,
-    keymap: () -> Unit, sdk: () -> Unit, checkUpdates: () -> Unit
+    keymap: () -> Unit, sdk: () -> Unit, checkUpdates: () -> Unit, plugins: () -> Unit
 ): List<SettingsGroup> {
     val sp: (Int) -> String = { "$it sp" }
     return listOf(
@@ -488,6 +489,7 @@ private fun settingsGroups(
             numeric(R.string.settings_console_size, s.consoleFontSize, 10..32, sp) { change(s.copy(consoleFontSize = it)) },
             toggle(R.string.settings_console_wraps, s.consoleSoftWraps) { change(s.copy(consoleSoftWraps = it)) }
         )),
+        SettingsGroup(R.string.plugin_store, listOf(link(R.string.plugin_store, plugins))),
         SettingsGroup(R.string.settings_app_updates, listOf(
             Preference(R.string.check_for_updates) { name ->
                 PreferenceRow(name, checkUpdates) {

@@ -1,0 +1,11 @@
+<resources>
+    <string name="plugin_store">插件</string>
+    <string name="plugin_install">安装</string>
+    <string name="plugin_cannot_install">此设备无法安装这个版本的插件。</string>
+    <string name="plugin_catalog_invalid">无法验证插件目录。</string>
+    <string name="plugin_store_empty">暂无可用插件。</string>
+    <string name="plugin_downloading">下载中 · %1$d%%</string>
+    <string name="plugin_untrusted">签名不受信任</string>
+    <string name="plugin_incompatible">不适用于此设备</string>
+    <string name="plugin_version_update">%1$s → %2$s</string>
+</resources>

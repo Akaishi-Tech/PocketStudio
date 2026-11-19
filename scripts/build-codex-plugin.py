@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve signed Termux packages and build the standalone Pocket Studio Codex APK."""
+"""Resolve signed Termux packages and build the standalone Pocket Studio Codex Plugin APK."""
 import argparse
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -20,11 +20,10 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SUPPORT = ROOT / "build-support/codex-runtime"
-PIN = ROOT / "app/src/main/res/raw/codex_plugin_signer.der"
+SUPPORT = ROOT / "build-support/codex-plugin"
+PIN = ROOT / "app/src/main/res/raw/release_signer.der"
 KEYRING = SUPPORT / "termux-autobuilds.gpg"
-MANIFEST = SUPPORT / "AndroidManifest.xml"
-RESOURCES = SUPPORT / "res"
+PLUGIN_APK = SUPPORT / "apk"
 APACHE = SUPPORT / "termux-Apache-2.0.txt"
 FINGERPRINT = "CC72CF8BA7DBFA0182877D045A897D96E57CF20C"
 REPO = "https://packages.termux.dev/apt/termux-main"
@@ -35,8 +34,8 @@ FILES = {
     "openssl": {"lib/libcrypto.so.3": "libcrypto.so.3", "lib/libssl.so.3": "libssl.so.3"},
 }
 NOTICES = {"codex": {"LICENSE", "NOTICE", "license.md"}, "openssl": {"copyright"}}
-APK_NAME = "PocketStudio-Codex.apk"
-PACKAGE = "com.hcgstudio.pocketstudio.codexruntime"
+APK_NAME = "PocketStudio-Codex-Plugin.apk"
+PACKAGE = "com.hcgstudio.pocketstudio.codexplugin"
 PREFIX = "data/data/com.termux/files/usr/"
 DIGEST = re.compile(r"[0-9a-f]{64}")
 BLOCK = 1024 * 1024
@@ -146,8 +145,11 @@ def lock_for(release_hash, packages):
     require(re.fullmatch(r"\d+\.\d+\.\d+(?:-\d+)?", version) and
             all(row["version"] == version for row in packages if row["name"] == "codex"),
             "Codex ABIs do not have one common Android version")
-    inputs = [Path(__file__).resolve(), MANIFEST, KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN]
-    inputs.extend(p for p in RESOURCES.rglob("*") if p.is_file())
+    inputs = [Path(__file__).resolve(), KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN,
+              ROOT / "build.gradle", ROOT / "settings.gradle", ROOT / "gradle/wrapper/gradle-wrapper.properties"]
+    for module in (SUPPORT, PLUGIN_APK, ROOT / "agent-api"):
+        inputs.append(module / "build.gradle")
+        inputs.extend(p for p in (module / "src/main").rglob("*") if p.is_file())
     recipe = {p.relative_to(ROOT).as_posix(): digest_file(p) for p in inputs}
     return {"version": version, "releaseSha256": release_hash, "packages": packages,
             "buildId": sha(canonical({"recipe": recipe, "packages": packages}))}
@@ -301,15 +303,15 @@ def sdk_tools():
     return build, platform / "android.jar"
 
 
-def assemble(stage, lock, code, output):
-    tools, android = sdk_tools()
+def assemble(stage, lock, code, output, offline):
+    tools, _ = sdk_tools()
     work = stage.parent
-    template = work / "manifest.apk"
-    compiled_resources = work / "resources.zip"
-    subprocess.run([tools / "aapt2", "compile", "--dir", RESOURCES, "-o", compiled_resources], check=True)
-    subprocess.run([tools / "aapt2", "link", "-I", android, "--manifest", MANIFEST, "--version-code", str(code),
-                    "--version-name", lock["version"], "-o", template, compiled_resources], check=True)
+    subprocess.run([ROOT / "gradlew", ":codex-plugin-apk:assembleRelease",
+                    "-PpluginVersionCode=" + str(code), "-PpluginVersionName=" + lock["version"],
+                    *(["--offline"] if offline else [])], check=True, cwd=ROOT)
+    template, = (PLUGIN_APK / "build/outputs/apk/release").glob("*.apk")
     with zipfile.ZipFile(template) as compiled:
+        require("classes.dex" in compiled.namelist(), "Missing agent provider bytecode")
         compiled.extractall(stage)
     # Fixed ZIP metadata also makes offline rebuilds deterministic with the same SDK and signing key.
     with zipfile.ZipFile(work / "unsigned.apk", "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as apk:
@@ -338,7 +340,8 @@ def assemble(stage, lock, code, output):
     info = {"package": PACKAGE, "version": lock["version"], "versionCode": code, "buildId": lock["buildId"],
             "file": APK_NAME, "size": signed.stat().st_size, "sha256": digest_file(signed), "signerSha256": signers[0]}
     os.replace(signed, output / APK_NAME)
-    write_json(output / "codex-plugin.json", info)
+    info.update({"name": "Codex Plugin", "names": {"zh": "Codex 插件"}, "abis": list(ABIS.values())})
+    write_json(output / "plugin-store.json", {"schemaVersion": 1, "plugins": [info]})
     print(json.dumps(info, ensure_ascii=False))
 
 
@@ -361,7 +364,7 @@ def build_plugin(args):
         (assets / "codex-version").write_text(lock["version"], encoding="ascii")
         (assets / "codex-build").write_text(lock["buildId"], encoding="ascii")
         shutil.copyfile(SUPPORT / "OpenSSL-NOTICE.txt", assets / "licenses/openssl/NOTICE.txt")
-        assemble(stage, lock, args.version_code, args.out)
+        assemble(stage, lock, args.version_code, args.out, args.offline)
 
 
 def main():

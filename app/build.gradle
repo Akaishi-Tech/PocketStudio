@@ -45,6 +45,8 @@ apply from: 'embedded.gradle'
 apply from: 'licenses.gradle'
 
 dependencies {
+    implementation project(":agent-api")
+    androidTestImplementation(testFixtures(project(":codex-plugin")))
     implementation project(':aosp-ddmlib')
     implementation 'org.commonmark:commonmark:0.32.0'
     implementation 'org.commonmark:commonmark-ext-gfm-tables:0.32.0'

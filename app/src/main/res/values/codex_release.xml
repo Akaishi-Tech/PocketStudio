@@ -1,6 +1,0 @@
-<resources>
-    <string name="codex_release_not_published">The Codex plugin release is unavailable on GitHub. Try again after it is published.</string>
-    <string name="codex_migrate_runtime_title">Replace the locally signed Codex runtime?</string>
-    <string name="codex_migrate_runtime_message">The new plugin has been downloaded and verified. Android requires you to uninstall the old, locally signed runtime first. Open its app settings and tap Uninstall, then return here to install the new plugin. Your projects, chats and account stay in Pocket Studio.</string>
-    <string name="codex_open_runtime_settings">Open runtime settings</string>
-</resources>

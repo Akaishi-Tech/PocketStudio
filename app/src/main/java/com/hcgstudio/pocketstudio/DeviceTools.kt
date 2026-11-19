@@ -201,10 +201,12 @@ private fun ConnectedDevice(controller: DeviceController, className: String, lin
                 if (controller.attached) {
                     HorizontalDivider()
                     DropdownMenuItem({ Text(stringResource(R.string.loaded_classes)) }, { invoke { controller.classes(className, line) } }, enabled = !controller.busy)
-                    DropdownMenuItem({ Text(stringResource(R.string.set_line_breakpoint)) }, { invoke { controller.breakpoint(className, line) } }, enabled = !controller.busy)
-                    if (controller.hasBreakpoints) {
-                        DropdownMenuItem({ Text(stringResource(R.string.remove_breakpoint)) }, { invoke(controller::removeBreakpoint) }, enabled = !controller.busy)
-                    }
+                }
+                DropdownMenuItem({ Text(stringResource(R.string.set_line_breakpoint)) }, { invoke { controller.breakpoint(className, line) } }, enabled = !controller.busy)
+                if (controller.hasBreakpoints) {
+                    DropdownMenuItem({ Text(stringResource(R.string.remove_breakpoint)) }, { invoke(controller::removeBreakpoint) })
+                }
+                if (controller.attached) {
                     DropdownMenuItem({ Text(stringResource(R.string.detach_debugger)) }, { invoke(controller::detach) }, enabled = !controller.busy)
                 }
                 HorizontalDivider()

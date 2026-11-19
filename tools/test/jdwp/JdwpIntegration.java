@@ -38,18 +38,14 @@ public final class JdwpIntegration {
                 try (JdwpSession session = JdwpSession.attach(socket.getInputStream(),
                         socket.getOutputStream(), socket, listener)) {
                     stoppedThread(stops); // suspend=y sends VM_START even before IDSizes.
+                    // The entry class has not yet been loaded. The watch must survive VM_START.
+                    session.setBreakpoint("BreakpointTarget", breakLine);
+                    session.setBreakpoint("BreakpointTarget", stepLine);
+                    session.removeBreakpoint("BreakpointTarget", stepLine);
                     session.resume();
                     check("READY".equals(output.readLine()), "target fixture readiness");
                     check(session.loadedClasses().contains("BreakpointTarget"), "class not listed");
-                    try {
-                        session.setBreakpoint("BreakpointTarget", 9999);
-                        throw new AssertionError("invalid source line accepted");
-                    } catch (IOException expected) {
-                        check(expected.getMessage().equals(text("noCodeAtLine")), expected.toString());
-                    }
-
-                    session.setBreakpoint("BreakpointTarget", breakLine);
-                    session.setBreakpoint("BreakpointTarget", breakLine);
+                    session.setBreakpoint("BreakpointTarget", breakLine); // idempotent after class prepare
                     target.getOutputStream().write(10);
                     target.getOutputStream().flush();
                     long thread = stoppedThread(stops);

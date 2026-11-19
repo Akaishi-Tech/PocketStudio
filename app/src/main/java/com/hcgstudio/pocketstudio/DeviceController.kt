@@ -60,7 +60,7 @@ internal class DeviceController(context: Context) : Closeable {
     private var activeJob: Future<*>? = null
     private var generation = 0
     val connectionId get() = generation
-    private var attachment = 0
+    private var attachment = java.util.Random().nextInt()
     private var closed = false
     private var target by mutableStateOf<Target?>(null)
     private var debugger by mutableStateOf<JdwpSession?>(null)
@@ -70,6 +70,8 @@ internal class DeviceController(context: Context) : Closeable {
         if (key == LocalPairingService.CONNECT_PENDING) consumePairingResult()
     }
     private var thread by mutableLongStateOf(0)
+    private val breakpointWorker = Executors.newSingleThreadExecutor()
+    private var breakpointKey: String? = null
     private val breakpoints = mutableStateListOf<Pair<String, Int>>()
 
     private var deviceDetails by mutableStateOf("")
@@ -115,6 +117,21 @@ internal class DeviceController(context: Context) : Closeable {
         }
     }
 
+    private val debugCommands = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.getIntExtra("session", attachment.inv()) != attachment || !attached) return
+            when (intent.getStringExtra("command")) {
+                "resume" -> resume()
+                "step" -> stepOver()
+                "detach" -> detach()
+            }
+        }
+    }
+
+    private fun notifyDebugger() {
+        if (attached) DebugNotifications.update(app, process, attachment, paused, true)
+    }
+
     private val monitor = object : Runnable {
         override fun run() {
             if (closed) return
@@ -130,6 +147,8 @@ internal class DeviceController(context: Context) : Closeable {
         val filter = IntentFilter(permissionAction)
         if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("UnspecifiedRegisterReceiverFlag") app.registerReceiver(receiver, filter)
+        androidx.core.content.ContextCompat.registerReceiver(app, debugCommands, IntentFilter(DEBUG_COMMAND),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
         prefs.registerOnSharedPreferenceChangeListener(pairingResult)
         consumePairingResult()
         main.post(monitor)
@@ -199,6 +218,8 @@ internal class DeviceController(context: Context) : Closeable {
         prefs.unregisterOnSharedPreferenceChangeListener(pairingResult)
         main.removeCallbacks(monitor)
         app.unregisterReceiver(receiver)
+        app.unregisterReceiver(debugCommands)
+        breakpointWorker.shutdownNow()
         io.shutdownNow()
     }
 
@@ -342,8 +363,39 @@ internal class DeviceController(context: Context) : Closeable {
                 if (!tcp) prefs.edit().putString("wirelessPort", port.toString()).apply()
                 job(deviceStatus(R.string.connecting_to, address), {
                     if (tcp) UsbAdb.connectTcp(app, address, port) else WirelessAdb.connect(app, address, port)
-                }, ::identify)
+                }) { adb ->
+                    localTarget = address.equals("localhost", ignoreCase = true) ||
+                        (android.util.Patterns.IP_ADDRESS.matcher(address.removeSurrounding("[", "]")).matches() &&
+                            runCatching {
+                                val ip = java.net.InetAddress.getByName(address.removeSurrounding("[", "]"))
+                                ip.isLoopbackAddress || java.net.NetworkInterface.getByInetAddress(ip) != null
+                            }.getOrDefault(false))
+                    if (localTarget && tcp) prefs.edit().putInt("localAdbTcpPort", port).apply()
+                    identify(adb)
+                }
             }
+        }
+    }
+
+    /** Install only on this phone, even when the workbench is debugging a different device. */
+    suspend fun installPluginLocally(file: File): Boolean {
+        val connectedLocal = target?.takeIf { localTarget && it.isConnected }
+        return kotlinx.coroutines.runInterruptible(Dispatchers.IO) {
+            fun install(adb: Target) = file.inputStream().use { adb.install(it, file.length()) }
+            if (connectedLocal != null) {
+                install(connectedLocal)
+                return@runInterruptible true
+            }
+            fun tcp(): Target? = try {
+                UsbAdb.connectTcp(app, "127.0.0.1", prefs.getInt("localAdbTcpPort", 5555))
+            } catch (_: IOException) { null }
+            fun wireless(): Target? = try { LocalWirelessAdb.connect(app, 0) }
+                catch (_: IOException) { null }
+                catch (_: SecurityException) { null }
+            val local = if (prefs.getBoolean("localAdbPaired", false)) wireless() ?: tcp() else tcp() ?: wireless()
+            if (local == null) return@runInterruptible false
+            local.use { install(it) }
+            true
         }
     }
 
@@ -351,8 +403,9 @@ internal class DeviceController(context: Context) : Closeable {
         if (it == null) dialog = DeviceDialog.Message(R.string.connect_to_a_target_device_first)
     }
 
-    fun install(file: File, launchAfter: Boolean = false) {
+    fun install(file: File, launchAfter: Boolean = false, debug: Boolean = false) {
         val adb = currentTarget() ?: return
+        val projectAtInstall = breakpointKey
         job(deviceStatus(R.string.installing, file.name), {
             file.inputStream().use { adb.install(it, file.length()) }
             if (launchAfter) app.packageManager.getPackageArchiveInfo(file.absolutePath, 0)?.packageName
@@ -360,8 +413,8 @@ internal class DeviceController(context: Context) : Closeable {
             else file.name
         }) {
             statusMessage = deviceStatus(R.string.installed_with_detail, it)
-            if (launchAfter) {
-                try { launch(it) } catch (e: IllegalArgumentException) { statusMessage = deviceStatus(R.string.installation_succeeded, e.localizedMessage) }
+            if (launchAfter && (!debug || breakpointKey == projectAtInstall)) {
+                try { launch(it, if (debug) file else null) } catch (e: IllegalArgumentException) { statusMessage = deviceStatus(R.string.installation_succeeded, e.localizedMessage) }
             }
         }
     }
@@ -386,18 +439,42 @@ internal class DeviceController(context: Context) : Closeable {
         }
     }
 
-    private fun launch(pkg: String) {
+    private fun launch(pkg: String, debugApk: File? = null) {
         val adb = currentTarget() ?: return
         require(pkg.matches(Regex("[A-Za-z_]\\w*(\\.[A-Za-z_]\\w*)+"))) { app.getString(R.string.enter_a_valid_app_package_name) }
         prefs.edit().putString("launchPkg", pkg).apply()
+        if (debugApk != null) {
+            detach()
+            DebugNotifications.update(app, pkg, attachment, false, false)
+        }
+        val launchAttachment = attachment
         job(deviceStatus(R.string.launching_app), {
             val component = adb.shell("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $pkg")
                 .trim().lineSequence().last().trim()
             if (!component.matches(Regex("[A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+"))) throw IOException(app.getString(R.string.launcher_activity_not_found, pkg))
+            if (debugApk != null) {
+                val info = app.packageManager.getPackageArchiveInfo(debugApk.absolutePath, android.content.pm.PackageManager.GET_ACTIVITIES)
+                val activity = component.substringAfter('/').let { if (it.startsWith('.')) pkg + it else it }
+                val processName = info?.activities?.find { it.name == activity }?.processName ?: pkg
+                require(processName.matches(Regex("[A-Za-z0-9_.:]+")))
+                val started = adb.shell("am start -S -D -n '$component'")
+                if (started.contains("Error", ignoreCase = true) || started.contains("Exception")) throw IOException(started.trim())
+                val deadline = android.os.SystemClock.elapsedRealtime() + 15_000L
+                while (android.os.SystemClock.elapsedRealtime() < deadline) {
+                    val pid = adb.shell("pidof '$processName'").trim().split(' ').first()
+                    if (pid.matches(Regex("[0-9]+"))) return@job pid
+                    Thread.sleep(120)
+                }
+                throw IOException(app.getString(R.string.debug_process_missing))
+            }
             val result = adb.shell("am start -W -n '$component'")
             if (!result.contains("Status: ok") && !result.contains("brought to the front")) throw IOException(result.trim())
             result
-        }) { stopLog(); output = it; statusMessage = deviceStatus(R.string.launched, pkg) }
+        }, { if (debugApk != null) DebugNotifications.notice.clear(app) }) {
+            if (debugApk != null) {
+                if (attachment == launchAttachment) attach(adb, it, pkg, starting = true)
+            } else { stopLog(); output = it; statusMessage = deviceStatus(R.string.launched, pkg) }
+        }
     }
 
     private suspend fun queryDevice(read: suspend (Target) -> String): String = withContext(Dispatchers.Main.immediate) {
@@ -459,11 +536,14 @@ internal class DeviceController(context: Context) : Closeable {
         debugger = null
         thread = 0
         process = ""
-        breakpoints.clear()
+        DebugNotifications.notice.clear(app)
     }
 
-    private fun attach(adb: Target, pid: String, name: String) {
-        detach()
+    private fun attach(adb: Target, pid: String, name: String, starting: Boolean = false) {
+        if (!starting) {
+            detach()
+            DebugNotifications.update(app, name.ifBlank { pid }, attachment, false, false)
+        }
         stopLog()
         output = ""
         val id = attachment
@@ -473,6 +553,7 @@ internal class DeviceController(context: Context) : Closeable {
                     if (id == attachment) {
                         thread = threadId
                         statusMessage = deviceStatus(reason)
+                        notifyDebugger()
                         if (attached && !busy) stack()
                     }
                 }
@@ -488,42 +569,74 @@ internal class DeviceController(context: Context) : Closeable {
                 }
             }
         }
+        val initial = breakpoints.toSet()
         job(deviceStatus(R.string.attaching), {
             val stream = adb.open("jdwp:$pid")
-            JdwpSession.attach(stream.input(), stream.output(), stream, listener)
-        }) { session ->
+            val session = JdwpSession.attach(stream.input(), stream.output(), stream, listener)
+            try {
+                for ((cls, line) in initial) session.setBreakpoint(cls, line)
+            } catch (failure: Exception) {
+                session.close()
+                throw failure
+            }
+            session
+        }, { DebugNotifications.notice.clear(app) }) { session ->
+            if (id != attachment) { closeLater(session); return@job }
             debugger = session
             process = name.ifBlank { pid }
+            notifyDebugger()
+            for (removed in initial - breakpoints.toSet()) bindBreakpoint(session, removed, false)
+            for (added in breakpoints - initial) bindBreakpoint(session, added, true)
             if (paused) stack()
         }
     }
 
+    fun selectBreakpointProject(project: String?) {
+        if (breakpointKey == project) return
+        detach()
+        breakpointKey = project
+        breakpoints.clear()
+        project?.let {
+            for (entry in prefs.getStringSet("breakpoints:$it", emptySet()).orEmpty()) {
+                val line = entry.substringAfterLast(':').toIntOrNull() ?: continue
+                breakpoints.add(entry.substringBeforeLast(':') to line)
+            }
+        }
+    }
+
     fun breakpoint(className: String, line: Int) {
-        if (!attached) { dialog = DeviceDialog.Message(R.string.attach_to_a_target_app_process_first); return }
         dialog = DeviceDialog.Form(R.string.set_line_breakpoint, listOf(DeviceDialog.Field(R.string.fully_qualified_class_name, className),
             DeviceDialog.Field(R.string.source_line, line.toString(), true)), R.string.set) {
             val cls = it[0].trim()
             val n = it[1].toIntOrNull()
-            require(cls.isNotEmpty() && n != null && n > 0) { app.getString(R.string.enter_a_fully_qualified_class_name_and_a) }
+            require(cls.isNotEmpty() && cls.none { it in "*/;:[" || it.isWhitespace() } && n != null && n > 0) { app.getString(R.string.enter_a_fully_qualified_class_name_and_a) }
             setBreakpoint(cls to n, true)
         }
     }
 
     fun toggleBreakpoint(className: String, line: Int) {
-        if (!attached || className.isBlank()) { breakpoint(className, line); return }
+        if (className.isBlank()) { breakpoint(className, line); return }
         val existing = breakpoints.firstOrNull { it.second == line && (it.first == className || it.first.startsWith(className + '$')) }
         setBreakpoint(existing ?: (className to line), existing == null)
     }
 
     private fun setBreakpoint(point: Pair<String, Int>, add: Boolean) {
-        val session = debugger ?: return
-        val (cls, line) = point
-        job(deviceStatus(if (add) R.string.setting_breakpoint else R.string.removing_breakpoint), {
-            if (add) session.setBreakpoint(cls, line) else session.removeBreakpoint(cls, line)
-        }) {
-            if (add && point !in breakpoints) breakpoints.add(point)
-            if (!add) breakpoints.remove(point)
-            statusMessage = deviceStatus(if (add) R.string.breakpoint_set else R.string.breakpoint_removed, "$cls:$line")
+        if (add && point !in breakpoints) breakpoints.add(point)
+        if (!add) breakpoints.remove(point)
+        breakpointKey?.let { key ->
+            prefs.edit().putStringSet("breakpoints:$key", breakpoints.map { "${it.first}:${it.second}" }.toSet()).apply()
+        }
+        statusMessage = deviceStatus(if (add) R.string.breakpoint_set else R.string.breakpoint_removed, "${point.first}:${point.second}")
+        debugger?.let { bindBreakpoint(it, point, add) }
+    }
+
+    private fun bindBreakpoint(session: JdwpSession, point: Pair<String, Int>, add: Boolean) {
+        breakpointWorker.execute {
+            try {
+                if (add) session.setBreakpoint(point.first, point.second) else session.removeBreakpoint(point.first, point.second)
+            } catch (e: IOException) {
+                main.post { if (debugger === session) statusMessage = deviceStatus(e.localizedMessage.orEmpty()) }
+            }
         }
     }
 
@@ -571,11 +684,12 @@ internal class DeviceController(context: Context) : Closeable {
         val stopped = thread
         val id = attachment
         thread = 0
+        notifyDebugger()
         job(deviceStatus(if (step) R.string.stepping else R.string.resuming), {
             try {
                 if (step) session.stepOver(stopped) else session.resume()
             } catch (e: Exception) {
-                main.post { if (id == attachment && !paused) thread = stopped }
+                main.post { if (id == attachment && !paused) { thread = stopped; notifyDebugger() } }
                 throw e
             }
         }) {

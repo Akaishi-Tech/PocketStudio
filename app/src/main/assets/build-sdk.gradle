@@ -1,0 +1,14 @@
+// Loaded by the on-device wrapper only when the user selects a compile platform for this project.
+def selected = gradle.startParameter.projectProperties['pocketStudioCompileSdk'].split(/\./)
+gradle.beforeProject { project ->
+    project.plugins.withId('com.android.base') {
+        project.extensions.getByName('androidComponents').finalizeDsl { android ->
+            android.compileSdk = selected[0].toInteger()
+            if (android.hasProperty('compileSdkMinor')) {
+                android.compileSdkMinor = selected.size() > 1 ? selected[1].toInteger() : null
+            } else if (selected.size() > 1 && selected[1] != '0') {
+                throw new GradleException("This Android Gradle plugin does not support SDK minor API levels.")
+            }
+        }
+    }
+}

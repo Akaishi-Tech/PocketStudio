@@ -13,8 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -28,7 +30,7 @@ public final class JdwpSession implements Closeable {
         void onDisconnected(String reason);
     }
 
-    private static final int SINGLE_STEP = 1, BREAKPOINT = 2, VM_START = 90, VM_DEATH = 99;
+    private static final int SINGLE_STEP = 1, BREAKPOINT = 2, CLASS_PREPARE = 8, VM_START = 90, VM_DEATH = 99;
     private static final int SUSPEND_ALL = 2;
     private final Listener listener;
     private final JdwpWire wire;
@@ -38,7 +40,15 @@ public final class JdwpSession implements Closeable {
         return worker;
     });
     private final CountDownLatch sizesReady = new CountDownLatch(1);
-    private final Map<String, List<Integer>> breakpoints = new HashMap<>();
+    private final Map<String, SourceBreakpoint> breakpoints = new HashMap<>();
+    private final Map<Integer, SourceBreakpoint> prepareRequests = new HashMap<>();
+
+    private static final class SourceBreakpoint {
+        final int line;
+        final List<Integer> locations = new ArrayList<>(), watches = new ArrayList<>();
+        final Set<Long> boundTypes = new HashSet<>();
+        SourceBreakpoint(int line) { this.line = line; }
+    }
     private int methodSize, objectSize, typeSize, frameSize;
     private int stepRequest;
     private volatile boolean closing;
@@ -111,42 +121,47 @@ public final class JdwpSession implements Closeable {
         }
     }
 
-    /** Binds each loaded definition of the class that contains code for this source line. */
+    /** Watches future definitions first, then binds classes already prepared during attachment. */
     public synchronized void setBreakpoint(String binaryClassName, int line) throws IOException {
         String name = binaryClassName.trim();
-        if (name.isEmpty() || line <= 0) throw new IOException(text("classAndLineRequired"));
+        if (name.isEmpty() || name.indexOf('*') >= 0 || line <= 0) throw new IOException(text("classAndLineRequired"));
         String key = name + ":" + line;
         if (breakpoints.containsKey(key)) return;
-        String signature = "L" + name.replace('.', '/') + ";";
-        DataInputStream classes = wire.command(1, 2, out -> writeString(out, signature));
-        int count = readCount(classes);
-        boolean prepared = false;
-        List<Integer> installed = new ArrayList<>();
+        SourceBreakpoint point = new SourceBreakpoint(line);
+        breakpoints.put(key, point);
         try {
-            for (int i = 0; i < count; i++) {
-                int tag = classes.readUnsignedByte();
-                long type = readId(classes, typeSize);
-                if ((classes.readInt() & 2) == 0) continue;
-                prepared = true;
-                installAtLine(tag, type, line, installed);
-            }
-            if (!prepared) throw new IOException(text("classNotLoaded"));
-            if (installed.isEmpty()) {
-                // An editor names the outer class even when a line belongs to an anonymous listener.
-                String nestedPrefix = signature.substring(0, signature.length() - 1) + "$";
-                eachLoaded((tag, type, candidate) -> {
-                    if (candidate.startsWith(nestedPrefix)) installAtLine(tag, type, line, installed);
-                });
-            }
-            if (installed.isEmpty()) throw new IOException(text("noCodeAtLine"));
-            breakpoints.put(key, installed);
+            watchClass(name, point);
+            watchClass(name + "$*", point);
+            String exact = "L" + name.replace('.', '/');
+            eachLoaded((tag, type, signature) -> {
+                if (signature.equals(exact + ";") || signature.startsWith(exact + "$")) bind(point, tag, type);
+            });
         } catch (IOException failure) {
-            for (int request : installed) {
-                try { clearRequest(BREAKPOINT, request); }
-                catch (IOException rollback) { wire.terminate(rollback); break; }
-            }
+            try { removeBreakpoint(name, line); }
+            catch (IOException rollback) { wire.terminate(rollback); }
             throw failure;
         }
+    }
+
+    private void watchClass(String pattern, SourceBreakpoint point) throws IOException {
+        int request = wire.command(15, 1, out -> {
+            out.writeByte(CLASS_PREPARE);
+            out.writeByte(SUSPEND_ALL);
+            out.writeInt(1);
+            out.writeByte(5); // ClassMatch
+            writeString(out, pattern);
+        }).readInt();
+        prepareRequests.put(request, point);
+        point.watches.add(request);
+    }
+
+    private void bind(SourceBreakpoint point, int tag, long type) throws IOException {
+        if (point.boundTypes.add(type)) installAtLine(tag, type, point.line, point.locations);
+    }
+
+    private synchronized void classPrepared(int request, int tag, long type) throws IOException {
+        SourceBreakpoint point = prepareRequests.get(request);
+        if (point != null) bind(point, tag, type);
     }
 
     private void installAtLine(int tag, long type, int line, List<Integer> installed) throws IOException {
@@ -176,8 +191,16 @@ public final class JdwpSession implements Closeable {
 
     public synchronized void removeBreakpoint(String binaryClassName, int line) throws IOException {
         String key = binaryClassName.trim() + ":" + line;
-        List<Integer> requests = breakpoints.get(key);
-        if (requests == null) return;
+        SourceBreakpoint point = breakpoints.get(key);
+        if (point == null) return;
+        while (!point.watches.isEmpty()) {
+            int last = point.watches.size() - 1;
+            int request = point.watches.get(last);
+            clearRequest(CLASS_PREPARE, request);
+            point.watches.remove(last);
+            prepareRequests.remove(request);
+        }
+        List<Integer> requests = point.locations;
         while (!requests.isEmpty()) {
             int last = requests.size() - 1;
             clearRequest(BREAKPOINT, requests.get(last));
@@ -412,7 +435,16 @@ public final class JdwpSession implements Closeable {
             String reason = null;
             for (int i = 0; i < count; i++) {
                 int kind = event.readUnsignedByte();
-                event.readInt(); // request ID
+                int request = event.readInt();
+                if (kind == CLASS_PREPARE) {
+                    readId(event, objectSize); // preparing thread, possibly absent
+                    int tag = event.readUnsignedByte();
+                    long type = readId(event, typeSize);
+                    readString(event); // signature
+                    event.readInt(); // class status
+                    classPrepared(request, tag, type);
+                    continue;
+                }
                 if (kind == VM_DEATH) {
                     wire.terminate(new IOException(text("targetExited")));
                     return;
@@ -431,7 +463,10 @@ public final class JdwpSession implements Closeable {
                     reason = kind == BREAKPOINT ? text("breakpointHit") : text("stepComplete");
                 }
             }
-            if (!closing && policy != 0 && reason != null) listener.onStopped(thread, reason);
+            if (!closing && policy != 0) {
+                if (reason != null) listener.onStopped(thread, reason);
+                else wire.command(1, 9, JdwpWire.EMPTY); // release this class-prepare suspension
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (IOException e) {

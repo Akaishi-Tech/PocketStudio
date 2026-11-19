@@ -1,0 +1,11 @@
+<resources>
+    <string name="plugin_store">Plugins</string>
+    <string name="plugin_install">Install</string>
+    <string name="plugin_cannot_install">This plugin version cannot be installed on this device.</string>
+    <string name="plugin_catalog_invalid">The plugin catalog could not be verified.</string>
+    <string name="plugin_store_empty">No plugins available.</string>
+    <string name="plugin_downloading">Downloading · %1$d%%</string>
+    <string name="plugin_untrusted">Unrecognized signature</string>
+    <string name="plugin_incompatible">Unavailable for this device</string>
+    <string name="plugin_version_update">%1$s → %2$s</string>
+</resources>

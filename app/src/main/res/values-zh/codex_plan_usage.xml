@@ -1,4 +1,0 @@
-<resources>
-    <string name="manage_chatgpt_usage">管理用量</string>
-    <string name="chatgpt_usage_limit_reached">已达到 ChatGPT 用量上限</string>
-</resources>

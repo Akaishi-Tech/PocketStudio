@@ -32,7 +32,7 @@ internal enum class ProjectTemplate(private val starter: String) {
     fun entryPath(packageName: String, language: ProjectLanguage): String =
         if (this == NO_ACTIVITY) MANIFEST else "$MAIN/java/${packageName.replace('.', '/')}/${language.activityFile}"
 
-    fun writeFiles(project: Project, name: String, packageName: String, language: ProjectLanguage, minSdk: Int) {
+    fun writeFiles(project: Project, name: String, packageName: String, language: ProjectLanguage, minSdk: Int, compileSdk: String) {
         val directories = mutableMapOf("" to project.root)
         fun directory(path: String): Project.Node = directories.getOrPut(path) {
             project.createExact(directory(path.substringBeforeLast('/', "")), path.substringAfterLast('/'), true)
@@ -47,7 +47,14 @@ internal enum class ProjectTemplate(private val starter: String) {
         for (path in listOf("settings.gradle", "build.gradle", "gradlew", "gradle/wrapper/gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.jar")) {
             copy(path)
         }
-        copy("app/build.gradle") { it.replace("__PACKAGE__", packageName).replace("__MIN_SDK__", minSdk.toString()) }
+        val major = compileSdk.substringBefore('.')
+        val minor = compileSdk.substringAfter('.', "0").toInt()
+        val compile = if (minor == 0) "compileSdk $major"
+            else "compileSdk { version = release($major) { minorApiLevel = $minor } }"
+        copy("app/build.gradle") {
+            it.replace("__PACKAGE__", packageName).replace("__MIN_SDK__", minSdk.toString())
+                .replace("__COMPILE_SDK__", compile).replace("__TARGET_SDK__", major)
+        }
         copy("$MAIN/res/values/strings.xml") { it.replace("__APP_NAME__", TextUtils.htmlEncode(name)) }
 
         val starterDir = "project-starters/$starter"
@@ -64,7 +71,6 @@ internal enum class ProjectTemplate(private val starter: String) {
 
     companion object {
         const val MIN_SDK = 24
-        const val MAX_SDK = 34
         const val DEFAULT_MIN_SDK = 26
         private const val MAIN = "app/src/main"
         private const val MANIFEST = "$MAIN/AndroidManifest.xml"

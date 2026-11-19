@@ -86,9 +86,10 @@ class PublishTests(unittest.TestCase):
         if plan["buildRuntime"]:
             apk = self.out / r.RUNTIME
             apk.write_bytes(("signed test fixture " + self.lock["buildId"]).encode())
-            r.write_json(self.out / r.MANIFEST, dict(self.lock, package=r.RUNTIME_ID,
+            meta = dict(self.lock, name="Codex Plugin", abis=["arm64-v8a", "x86_64"], package=r.RUNTIME_ID,
                          file=r.RUNTIME, versionCode=plan["runtimeCode"], sha256=r.digest(apk),
-                         size=apk.stat().st_size, signerSha256=r.digest(r.PIN)))
+                         size=apk.stat().st_size, signerSha256=r.digest(r.PIN))
+            r.write_json(self.out / r.MANIFEST, {"schemaVersion": 1, "plugins": [meta]})
         if plan["channel"] == "app":
             (self.out / r.APP).write_bytes(plan["appVersion"].encode())
 
@@ -126,6 +127,29 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(next_plan["appCode"], int(r.APP_MARK.search(app["body"])[2]) + 1)
         self.assertEqual(r.digest(self.out / r.RUNTIME), r.asset(self.gh.releases()[0], r.RUNTIME)["digest"][7:])
 
+    def test_preserves_other_plugins(self):
+        plan = r.prepare(self.gh, self.out)
+        self.build(plan)
+        r.publish(self.gh, plan, self.out)
+        manifest = self.out / r.MANIFEST
+        store = r.read_json(manifest)
+        other = dict(store["plugins"][0], name="Another Agent", package="org.example.another", file="Another.apk")
+        store["plugins"].append(other)
+        r.write_json(manifest, store)
+        rid = self.gh.releases()[0]["id"]
+        r.replace_asset(self.gh, rid, manifest, "Pocket Studio plugin catalog")
+        item = r.asset(self.gh.releases()[0], r.MANIFEST)
+        self.gh.rename(item, f"previous-{item['id']}-{r.MANIFEST}", item["label"])
+        os.environ["CHANNEL"] = "scheduled"
+        self.lock["buildId"] = "2" * 64
+        plan = r.prepare(self.gh, self.out)
+        self.build(plan)
+        r.publish(self.gh, plan, self.out)
+        self.gh.download(r.asset(self.gh.releases()[0], r.MANIFEST), manifest)
+        entries = r.read_json(manifest)["plugins"]
+        self.assertEqual(len(entries), 2)
+        self.assertIn(other, entries)
+
     def test_superseded_retry(self):
         plan = r.prepare(self.gh, self.out)
         self.build(plan)
@@ -133,7 +157,7 @@ class PublishTests(unittest.TestCase):
         public = self.gh.releases()
         os.environ.update(GITHUB_RUN_ID="400", GITHUB_RUN_NUMBER="2")
         self.assertIsNone(r.prepare(self.gh, self.out))
-        os.environ.update(CHANNEL="runtime", GITHUB_SHA="b" * 40)
+        os.environ.update(CHANNEL="plugins", GITHUB_SHA="b" * 40)
         self.gh.commit_comparison = "behind"
         self.assertIsNone(r.prepare(self.gh, self.out))
         self.assertEqual(self.gh.releases(), public)
@@ -145,7 +169,7 @@ class PublishTests(unittest.TestCase):
         self.gh.rows[0]["assets"][0]["state"] = "starter"
         os.environ["CHANNEL"] = "scheduled"
         self.assertIsNone(r.prepare(self.gh, self.out))  # an incomplete manual bootstrap stays manual
-        os.environ["CHANNEL"] = "runtime"
+        os.environ["CHANNEL"] = "plugins"
         plan = r.prepare(self.gh, self.out)
         self.assertTrue(plan["buildRuntime"])
         self.build(plan)

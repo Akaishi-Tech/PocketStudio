@@ -7,6 +7,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,7 +127,7 @@ private data class ToolItem(val tool: Tool, @get:StringRes val label: Int, val i
 private val tools = listOf(
     ToolItem(Tool.Project, R.string.project, R.drawable.studio_account_tree),
     ToolItem(Tool.Editor, R.string.editor, R.drawable.studio_code),
-    ToolItem(Tool.Codex, R.string.agents_tab_label, R.drawable.studio_chat),
+    ToolItem(Tool.Agents, R.string.agents_tab_label, R.drawable.studio_chat),
     ToolItem(Tool.Devices, R.string.debug, R.drawable.studio_bug_report),
     ToolItem(Tool.Output, R.string.output, R.drawable.studio_terminal)
 )
@@ -142,20 +143,23 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
         val sideWidth = if (desktop) 260.dp else if (maxWidth >= 760.dp) 220.dp else 182.dp
         val height = maxHeight
         fun select(tool: Tool) {
-            if (tool == Tool.Project && wide) setTree(w.tool == Tool.Codex || !tree)
-            w.tool = if (wide && w.tool == tool && tool in listOf(Tool.Devices, Tool.Output, Tool.Codex)) Tool.Editor else tool
+            if (tool == Tool.Project && wide) setTree(w.tool == Tool.Agents || !tree)
+            w.tool = if (wide && w.tool == tool && tool in listOf(Tool.Devices, Tool.Output, Tool.Agents)) Tool.Editor else tool
         }
-        Column(Modifier.fillMaxSize().background(colors.surface)) {
-            if (w.tool != Tool.Codex) {
+        val bottomInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+        val outerInsets = if (wide) Modifier.windowInsetsPadding(bottomInset) else Modifier
+        Column(Modifier.fillMaxSize().background(colors.surface).then(outerInsets)) {
+            if (w.tool == Tool.Agents) {
+                Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
+            } else {
                 WorkspaceBar(w, actions, desktop)
-                HorizontalDivider(color = colors.outlineVariant)
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (wide) {
                     Column(Modifier.width(60.dp).fillMaxHeight().background(colors.surfaceContainerLow).padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         tools.filter { it.tool != Tool.Editor }.forEach { item ->
-                            val selected = if (item.tool == Tool.Project) tree && w.tool != Tool.Codex else w.tool == item.tool
+                            val selected = if (item.tool == Tool.Project) tree && w.tool != Tool.Agents else w.tool == item.tool
                             val action = { select(item.tool) }
                             if (selected) FilledTonalIconButton(action) { Symbol(item.icon, stringResource(item.label)) }
                             else StudioIconButton(item.icon, stringResource(item.label), onClick = action)
@@ -165,14 +169,14 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                         StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = actions.first { it.id == "settings" }.run)
                     }
                     VerticalDivider(color = colors.outlineVariant)
-                    if (tree && w.tool != Tool.Codex) {
+                    if (tree && w.tool != Tool.Agents) {
                         ProjectPane(w, actions, Modifier.width(sideWidth).fillMaxHeight(), openEntry)
                         VerticalDivider(color = colors.outlineVariant)
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     val tool = w.tool
-                    val mainPane = if (wide && tool != Tool.Codex) Tool.Editor else tool
+                    val mainPane = if (wide && tool != Tool.Agents) Tool.Editor else tool
                     StudioPageTransition(mainPane, { 0 }, Modifier.fillMaxWidth().weight(1f)) { pane ->
                         when (pane) {
                             Tool.Editor -> EditorPane(w, className, Modifier.fillMaxSize()) {
@@ -180,7 +184,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                                 w.tool = Tool.Project
                             }
                             Tool.Project -> ProjectPane(w, actions, Modifier.fillMaxSize(), openEntry)
-                            Tool.Codex -> CodexPane(w, openAgentAccount)
+                            Tool.Agents -> AgentPane(w, openAgentAccount)
                             Tool.Devices -> DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1)
                             Tool.Output -> OutputPane(w, actions, Modifier.fillMaxSize())
                         }
@@ -198,7 +202,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                     }
                 }
             }
-            if (settings.showStatusBar && ((wide && w.tool != Tool.Codex) || (w.tool == Tool.Editor && w.active != null))) {
+            if (settings.showStatusBar && ((wide && w.tool != Tool.Agents) || (w.tool == Tool.Editor && w.active != null))) {
                 HorizontalDivider(color = colors.outlineVariant)
                 Row(Modifier.fillMaxWidth().heightIn(min = if (settings.compactMode) 22.dp else 28.dp)
                     .background(colors.surfaceContainerLow).padding(horizontal = 14.dp),
@@ -209,7 +213,8 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                         style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }
-            if (!wide) NavigationBar(modifier = if (settings.compactMode) Modifier.height(56.dp) else Modifier,
+            if (!wide) NavigationBar(modifier = Modifier.background(colors.surfaceContainerLow)
+                .windowInsetsPadding(bottomInset).then(if (settings.compactMode) Modifier.height(56.dp) else Modifier),
                 containerColor = colors.surfaceContainerLow, windowInsets = WindowInsets(0,0,0,0)) {
                 tools.forEach { item -> NavigationBarItem(w.tool == item.tool, { select(item.tool) },
                     icon = { Symbol(item.icon, if (settings.compactMode) stringResource(item.label) else null) },
@@ -219,54 +224,74 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WorkspaceBar(w: Workspace, actions: List<StudioAction>, desktop: Boolean) {
-    val groups = actions.map { it.group }.distinct()
-    var menu by remember { mutableStateOf<Int?>(null) }
-    val theme = MaterialTheme.colorScheme
+    val colors = MaterialTheme.colorScheme
     val settings = LocalStudioSettings.current
-    val height = when {
-        settings.compactMode -> 48.dp
-        desktop -> 52.dp
-        else -> 56.dp
-    }
-    Row(Modifier.fillMaxWidth().heightIn(min = height).background(theme.surfaceContainerLow).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        if (desktop) {
-            Image(painterResource(R.drawable.ic_studio), null, Modifier.padding(horizontal = 8.dp).size(28.dp))
-            // Anchor each group beneath its label, so the bar also works with a mouse.
-            groups.forEach { group ->
+    val projectName = w.project?.root?.name.orEmpty()
+    val topInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+    if (!desktop) {
+        TopAppBar(
+            title = { Text(projectName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            actions = {
+                if (settings.showMainToolbarActions) RunOptions(actions)
                 Box {
-                    TextButton({ menu = group }, contentPadding = PaddingValues(horizontal = 7.dp)) { Text(stringResource(group), maxLines = 1) }
-                    ActionsMenu(menu == group, { menu = null }, actions.filter { it.group == group })
+                    var open by remember { mutableStateOf(false) }
+                    StudioIconButton(R.drawable.studio_more_vert, stringResource(R.string.main_menu)) { open = true }
+                    DropdownMenu(open, { open = false }) {
+                        listOf("palette", "findFile", "saveAll", "git-status", "settings").forEach { id ->
+                            val action = actions.first { it.id == id }
+                            val label = if (id == "git-status") stringResource(R.string.git) else action.label
+                            DropdownMenuItem({ Text(label) }, { open = false; action.run() }, enabled = action.enabled)
+                        }
+                    }
                 }
-            }
-            Spacer(Modifier.width(12.dp))
-        } else {
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.surface),
+            expandedHeight = if (settings.compactMode) 48.dp else 64.dp,
+            windowInsets = topInset
+        )
+        return
+    }
+
+    var menu by remember { mutableStateOf<Int?>(null) }
+    Row(Modifier.fillMaxWidth().background(colors.surfaceContainerLow).windowInsetsPadding(topInset)
+        .heightIn(min = if (settings.compactMode) 48.dp else 52.dp).padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Image(painterResource(R.drawable.ic_studio), null, Modifier.padding(horizontal = 8.dp).size(28.dp))
+        actions.map { it.group }.distinct().forEach { group ->
             Box {
-                StudioIconButton(R.drawable.studio_menu, uiString(R.string.main_menu)) { menu = R.string.main_menu }
-                DropdownMenu(menu == R.string.main_menu, { menu = null }) {
-                    groups.forEach { g -> DropdownMenuItem({ Text(stringResource(g)) }, { menu = g }, trailingIcon = { Symbol(R.drawable.studio_chevron_right, null) }) }
-                }
-                ActionsMenu(menu in groups, { menu = null }, actions.filter { it.group == menu })
+                TextButton({ menu = group }, contentPadding = PaddingValues(horizontal = 7.dp)) { Text(stringResource(group), maxLines = 1) }
+                ActionsMenu(menu == group, { menu = null }, actions.filter { it.group == group })
             }
         }
-        Text(w.project?.root?.name.orEmpty(), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            style = if (desktop) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium)
-        if (w.running) CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
+        Text(projectName, Modifier.weight(1f).padding(horizontal = 12.dp), maxLines = 1,
+            overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
         if (settings.showMainToolbarActions) {
-            if (!w.running) {
-                val build = actions.first { it.id == "build" }
-                StudioIconButton(R.drawable.studio_build, build.label, build.enabled, build.run)
-            }
-            if (w.devices.connected) {
-                val run = actions.first { it.id == "run" }
-                StudioIconButton(R.drawable.studio_play_arrow, run.label, run.enabled, run.run)
-            }
-            StudioIconButton(R.drawable.studio_search, uiString(R.string.find_action), onClick = actions.first { it.id == "palette" }.run)
+            RunOptions(actions)
+            StudioIconButton(R.drawable.studio_search, stringResource(R.string.find_action), onClick = actions.first { it.id == "palette" }.run)
         }
     }
 }
+
+@Composable
+private fun RunOptions(actions: List<StudioAction>) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilledTonalIconButton({ open = true }) {
+            Symbol(R.drawable.studio_play_arrow, stringResource(R.string.run_options))
+        }
+        DropdownMenu(open, { open = false }) {
+            listOf("run" to R.drawable.studio_play_arrow, "debugRun" to R.drawable.studio_bug_report).forEach { (id, icon) ->
+                val action = actions.first { it.id == id }
+                DropdownMenuItem({ Text(action.label) }, { open = false; action.run() },
+                    leadingIcon = { Symbol(icon, null) }, enabled = action.enabled)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ActionsMenu(open: Boolean, close: () -> Unit, actions: List<StudioAction>) {
     DropdownMenu(open, close, modifier = Modifier.heightIn(max = 480.dp)) {
@@ -345,7 +370,9 @@ private fun EditorPane(w: Workspace, className: String, modifier: Modifier, show
         if (doc != null) {
             if (LocalStudioSettings.current.showEditorTabs) EditorTabs(w)
             StudioPageTransition(doc, { 0 }, Modifier.fillMaxSize()) { tab ->
-                StudioEditor(tab.editor, Modifier.fillMaxSize(), w.devices.markersFor(className)) { line -> w.devices.toggleBreakpoint(className, line) }
+                StudioEditor(tab.editor, Modifier.fillMaxSize(), w.devices.markersFor(className)) { line ->
+                    if (className.isNotEmpty()) w.devices.toggleBreakpoint(className, line)
+                }
             }
         } else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             TextButton(showProject) { Symbol(R.drawable.studio_folder_open, null); Spacer(Modifier.width(10.dp)); Text(stringResource(R.string.select_a_project_file)) }
@@ -386,40 +413,70 @@ private fun EditorTabs(w: Workspace) {
 @Composable
 private fun OutputPane(w: Workspace, actions: List<StudioAction>, modifier: Modifier) {
     val colors = MaterialTheme.colorScheme
+    val hasApk = w.apk != null
     Column(modifier.background(colors.surface)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).background(colors.surfaceContainerLow).padding(start = 14.dp),
+        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.build_output), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-            TextButton(actions.first { it.id == "sdk" }.run) { Text(stringResource(R.string.sdk_manager)) }
-            if (w.apk != null) {
-                val export = actions.first { it.id == "exportApk" }
-                StudioIconButton(R.drawable.studio_download, export.label, export.enabled, export.run)
+            Text(stringResource(R.string.build_output), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (hasApk) {
+                val install = actions.first { it.id == "openApk" }
+                TextButton(install.run, enabled = install.enabled) { Text(stringResource(R.string.install_apk)) }
+            }
+            Box {
+                var open by remember { mutableStateOf(false) }
+                StudioIconButton(R.drawable.studio_more_vert, stringResource(R.string.output_options)) { open = true }
+                DropdownMenu(open, { open = false }) {
+                    val entries = listOfNotNull("build", "buildSdk", "sdk", "exportApk".takeIf { hasApk })
+                    entries.forEach { id ->
+                        val action = actions.first { it.id == id }
+                        DropdownMenuItem({ Text(action.label) }, { open = false; action.run() }, enabled = action.enabled)
+                    }
+                }
             }
         }
-        if (w.apk != null) {
-            val install = actions.first { it.id == "openApk" }
-            FilledTonalButton(install.run, Modifier.padding(start = 12.dp, top = 4.dp), enabled = install.enabled) {
-                Symbol(R.drawable.studio_android, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(install.label)
+        Surface(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+            shape = MaterialTheme.shapes.medium, color = colors.surfaceContainerLow) {
+            Column {
+                if (w.running) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (w.output.isBlank()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (!w.running) Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Symbol(R.drawable.studio_terminal, null, Modifier.size(28.dp), colors.onSurfaceVariant)
+                            Text(stringResource(R.string.no_output_yet), Modifier.padding(top = 4.dp),
+                                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                        }
+                    }
+                } else ConsoleLog(w.output, w::diagnostic)
             }
         }
-        if (w.running) LinearProgressIndicator(Modifier.fillMaxWidth())
-        val emptyOutput = stringResource(R.string.no_output_yet)
-        val lines = remember(w.output, emptyOutput) { w.output.trimEnd().ifBlank { emptyOutput }.lines() }
-        val diagnostics = remember { Regex("""([\w.-]+/src/(?:main|debug|test|androidTest)/[^:()]+?\.(?:java|kt|xml|aidl))(?::|\s+\(at line )(\d+)""") }
-        val settings = LocalStudioSettings.current
-        val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace,
-            fontSize = settings.consoleFontSize.sp, lineHeight = (settings.consoleFontSize * 1.42f).sp)
-        val scroll = rememberScrollState()
-        val console = if (settings.consoleSoftWraps) Modifier else Modifier.horizontalScroll(scroll)
-        LazyColumn(Modifier.fillMaxSize().then(console), contentPadding = PaddingValues(12.dp)) {
-            items(lines) { line ->
-                val match = diagnostics.find(line)
-                if (match != null) Text(line, Modifier.clickable { w.diagnostic(match.groupValues[1], match.groupValues[2].toIntOrNull() ?: 1) },
-                    color = colors.primary, style = textStyle, softWrap = settings.consoleSoftWraps)
-                else SelectionContainer { Text(line, style = textStyle, softWrap = settings.consoleSoftWraps) }
-            }
+    }
+}
+
+@Composable
+private fun ConsoleLog(output: String, openDiagnostic: (String, Int) -> Unit) {
+    val lines = remember(output) { output.trimEnd('\n').lines() }
+    val diagnostics = remember { Regex("""([\w.-]+/src/(?:main|debug|test|androidTest)/[^:()]+?\.(?:java|kt|xml|aidl))(?::|\s+\(at line )(\d+)""") }
+    val settings = LocalStudioSettings.current
+    val textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace,
+        fontSize = settings.consoleFontSize.sp, lineHeight = (settings.consoleFontSize * 1.5f).sp)
+    val state = rememberLazyListState()
+    var follow by remember { mutableStateOf(true) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.isScrollInProgress to state.canScrollForward }.collect { (scrolling, canScrollForward) ->
+            if (scrolling) follow = !canScrollForward
+        }
+    }
+    LaunchedEffect(output) {
+        if (follow && !state.isScrollInProgress) state.scrollToItem(lines.lastIndex)
+    }
+    val console = if (settings.consoleSoftWraps) Modifier else Modifier.horizontalScroll(rememberScrollState())
+    LazyColumn(Modifier.fillMaxSize().then(console), state = state, contentPadding = PaddingValues(12.dp)) {
+        items(lines) { line ->
+            val match = diagnostics.find(line)
+            if (match == null) SelectionContainer { Text(line, style = textStyle, softWrap = settings.consoleSoftWraps) }
+            else Text(line, Modifier.clickable { openDiagnostic(match.groupValues[1], match.groupValues[2].toIntOrNull() ?: 1) },
+                color = MaterialTheme.colorScheme.primary, style = textStyle, softWrap = settings.consoleSoftWraps)
         }
     }
 }

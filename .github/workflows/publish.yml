@@ -45,9 +45,7 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
           echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
-          if [[ "$CHANNEL" == app ]]; then
-            git submodule update --init --depth=1 --filter=blob:none -- upstream/release/tools/base
-          fi
+          git submodule update --init --depth=1 --filter=blob:none -- upstream/release/tools/base
       - name: Build and verify signed APKs
         if: steps.plan.outputs.publish == 'true'
         env:

@@ -49,6 +49,17 @@ internal fun NewProjectPage(w: Workspace) {
     val packageName = customPackage ?: suggestedPackage(name)
     var language by rememberSaveable { mutableStateOf(ProjectLanguage.JAVA) }
     var minSdk by rememberSaveable { mutableIntStateOf(ProjectTemplate.DEFAULT_MIN_SDK) }
+    var installed by remember { mutableStateOf(emptyList<String>()) }
+    var selectedSdk by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try { installed = withContext(Dispatchers.IO) { com.hcgstudio.pocketstudio.build.SdkPlatforms(w.app).installed() }
+            .filter { it.substringBefore('.').toInt() >= ProjectTemplate.MIN_SDK } }
+        catch (e: java.io.IOException) { w.report(e) }
+    }
+    val platforms = installed.ifEmpty { listOf(android.os.Build.VERSION.SDK_INT.toString()) }
+    val compileSdk = selectedSdk?.takeIf { it in platforms } ?: platforms.first()
+    val majorSdk = compileSdk.substringBefore('.').toInt()
+    val effectiveMin = minSdk.coerceAtMost(majorSdk)
     var parent by rememberSaveable { mutableStateOf<Uri?>(null) }
     val focus = LocalFocusManager.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -105,8 +116,10 @@ internal fun NewProjectPage(w: Workspace) {
                                     w.creationError = null
                                 }
                             }
-                            ProjectChoice(stringResource(R.string.wizard_min_sdk), minSdk,
-                                (ProjectTemplate.MIN_SDK..ProjectTemplate.MAX_SDK).toList(), { "API $it" }, enabled) {
+                            ProjectChoice(stringResource(R.string.wizard_compile_sdk), compileSdk, platforms,
+                                { "API $it" }, enabled) { selectedSdk = it }
+                            ProjectChoice(stringResource(R.string.wizard_min_sdk), effectiveMin,
+                                (ProjectTemplate.MIN_SDK..majorSdk).toList(), { "API $it" }, enabled) {
                                 minSdk = it
                                 w.creationError = null
                             }
@@ -127,7 +140,7 @@ internal fun NewProjectPage(w: Workspace) {
                         parent?.let {
                             focus.clearFocus()
                             w.creationError = null
-                            w.createProject(it, name.trim(), packageName.trim(), template, language, minSdk)
+                            w.createProject(it, name.trim(), packageName.trim(), template, language, effectiveMin, compileSdk)
                         }
                     } else configuring = true
                 }, enabled = w.canSwitchProject && (!configuring || (nameError == null && packageError == null && parent != null)),

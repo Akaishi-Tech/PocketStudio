@@ -1,11 +1,11 @@
 plugins { id 'com.android.application' }
 android {
     namespace '__PACKAGE__'
-    compileSdk 34
+    __COMPILE_SDK__
     defaultConfig {
         applicationId '__PACKAGE__'
         minSdk __MIN_SDK__
-        targetSdk 34
+        targetSdk __TARGET_SDK__
         versionCode 1
         versionName '1.0'
     }

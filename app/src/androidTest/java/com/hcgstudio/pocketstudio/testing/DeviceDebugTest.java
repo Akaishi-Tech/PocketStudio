@@ -39,7 +39,10 @@ public final class DeviceDebugTest extends Instrumentation {
         Bundle result = new Bundle();
         try {
             if (java.util.Arrays.asList("codexDownload", "codexHandshake", "codexNetwork", "codexVerifyRelease", "codexOfflineInstall").contains(arguments.getString("scenario"))) {
-                result.putString("result", com.hcgstudio.pocketstudio.CodexRuntimeChecks.run(getTargetContext(), arguments.getString("scenario")));
+                result.putString("result", com.hcgstudio.pocketstudio.CodexRuntimeChecks.run(getTargetContext(), getContext(), arguments.getString("scenario")));
+            } else if ("pluginLocalInstall".equals(arguments.getString("scenario"))) {
+                result.putString("result", com.hcgstudio.pocketstudio.PluginStoreChecks.installLocally(getTargetContext(),
+                        Integer.parseInt(arguments.getString("port"))));
             } else if ("apkOpen".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.ApkInstallerChecks.run(getTargetContext());
                 result.putString("result", "PASS APK snapshots and provider scope");
@@ -62,7 +65,7 @@ public final class DeviceDebugTest extends Instrumentation {
                         Integer.parseInt(arguments.getString("port")));
                 result.putString("result", "PASS connected Logcat and device UI inspection");
             } else if ("codexAuth".equals(arguments.getString("scenario"))) {
-                com.hcgstudio.pocketstudio.CodexAuthChecks.run(getTargetContext());
+                com.hcgstudio.pocketstudio.codexplugin.CodexAuthChecks.run(getTargetContext(), getContext());
                 result.putString("result", "PASS isolated Codex account credentials");
             } else if ("codexChat".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.CodexChatChecks.run(getTargetContext(),
@@ -87,8 +90,13 @@ public final class DeviceDebugTest extends Instrumentation {
                 if (arguments.getString("tree") != null) message = "PASS two Gradle builds, generated files, reports and deletions in the selected folder";
                 if (androidTemplate) message = "PASS local Gradle Android APK";
                 result.putString("result", message);
+            } else if ("debugRun".equals(arguments.getString("scenario"))) {
+                com.hcgstudio.pocketstudio.DebugRunChecks.run(this, arguments.getString("port"),
+                        Integer.parseInt(arguments.getString("breakLine")));
+                result.putString("result", "PASS offline breakpoint, debug launch and session notification actions");
             } else if ("build".equals(arguments.getString("scenario"))) {
                 EmbeddedBuilderSmoke.run(getTargetContext());
+                com.hcgstudio.pocketstudio.ProjectCreationChecks.installedCompileSdk(getTargetContext());
                 result.putString("result", "PASS embedded build");
             } else {
                 runDebugSession();

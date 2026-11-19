@@ -19,7 +19,7 @@ import org.json.JSONArray
 import java.io.File
 import java.security.MessageDigest
 
-internal enum class Tool { Editor, Project, Devices, Output, Codex }
+internal enum class Tool { Editor, Project, Devices, Output, Agents }
 
 internal class OpenFile(
     val node: Project.Node,
@@ -42,7 +42,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         private set
     val updates = AppUpdates(app, scope)
     val devices = DeviceController(app)
-    val codex = CodexController(this, scope)
+    val agents = Agents(this, scope)
     var project by mutableStateOf<Project?>(null)
         private set
     var git by mutableStateOf<GitSession?>(null)
@@ -59,7 +59,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         private set
     var running by mutableStateOf(false)
         private set
-    val canSwitchProject get() = !busy && !running && !codex.working && git == null
+    val canSwitchProject get() = !busy && !running && !agents.working && git == null
     var output by mutableStateOf("")
         private set
     var apk by mutableStateOf<File?>(null)
@@ -148,7 +148,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             JSONArray().apply { recent.forEach { put(JSONArray().put(it.first).put(it.second)) } }.toString()).apply()
     }
     private fun reset() {
-        codex.reset()
+        agents.reset()
         openVersion++
         tabs.clear(); active = null; folders.clear(); selectedDir = null; selectedNode = null
         apk = null; output = ""; tool = Tool.Project
@@ -165,14 +165,14 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
 
     fun createProject(
         parent: Uri, name: String, packageName: String,
-        template: ProjectTemplate, language: ProjectLanguage, minSdk: Int
+        template: ProjectTemplate, language: ProjectLanguage, minSdk: Int, compileSdk: String
     ) {
         switchProject(template.entryPath(packageName, language), creating = true) {
             if (parent.scheme == "content") {
                 app.contentResolver.takePersistableUriPermission(parent,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
-            Project.createProject(app, parent, name, packageName, template, language, minSdk)
+            Project.createProject(app, parent, name, packageName, template, language, minSdk, compileSdk)
         }
     }
 
@@ -186,6 +186,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 reset()
                 project = next; selectedDir = next.root; folders[""] = roots
                 val location = next.tree ?: next.root.uri
+                devices.selectBreakpointProject(location.toString())
                 rememberProject(location, next.root.name)
                 prefs.edit { putString("openProject", location.toString()) }
                 if (creating) newProjectVisible.value = false
@@ -203,8 +204,9 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     }
 
     fun closeProject() {
-        if (busy || running || codex.working || git != null) return
+        if (busy || running || agents.working || git != null) return
         flushDrafts()
+        devices.selectBreakpointProject(null)
         reset(); project = null
         prefs.edit { putString("openProject", "") }
     }
@@ -264,7 +266,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
 
     fun changeNode(node: Project.Node, op: String, input: String) {
         val p = project ?: return
-        if (busy || running || codex.working || git != null) return
+        if (busy || running || agents.working || git != null) return
         busy = true
         action {
             try {
@@ -434,7 +436,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     }
     fun openGit(tab: GitTab = GitTab.Changes, file: String? = null, diff: Boolean = false) {
         val selected = project ?: return
-        if (busy || running || codex.working || git != null) return
+        if (busy || running || agents.working || git != null) return
         busy = true
         action {
             try {
@@ -451,9 +453,9 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         }
     }
 
-    fun build(runOnDevice: Boolean = false) {
+    fun build(runOnDevice: Boolean = false, debug: Boolean = false) {
         val p = project ?: return
-        if (running || busy || codex.working || git != null) return
+        if (running || busy || agents.working || git != null) return
         val targetId = if (runOnDevice && devices.connected && !devices.busy) devices.connectionId else null
         running = true; output = ""; tool = Tool.Output
         action {
@@ -461,7 +463,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 if (!saveDocuments()) return@action
                 val result = withContext(Dispatchers.IO) {
                     ProjectWorkspace.open(p).use { workspace ->
-                        val built = EmbeddedBuilder.build(app, workspace.directory.toFile()) { msg -> scope.launch { log(msg) } }
+                        val built = EmbeddedBuilder.build(app, workspace.directory.toFile(), selectedBuildSdk(p)) { msg -> scope.launch { log(msg) } }
                         copyResult(p, built)
                     }
                 }
@@ -469,7 +471,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 if (runOnDevice) {
                     if (targetId == devices.connectionId && devices.connected && !devices.busy) {
                         tool = Tool.Devices
-                        devices.install(result, true)
+                        devices.install(result, true, debug)
                     } else log(app.getString(R.string.the_target_device_changed_disconnected_or_became_busy))
                 }
             } catch (e: Exception) { if (e is CancellationException) throw e; log(e.localizedMessage ?: e.toString()) }
@@ -484,5 +486,5 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         val p = project ?: return
         action { val node = io { p.resolve(path) }; if (project === p) openFile(node, line) }
     }
-    override fun onCleared() { codex.dispose(); devices.close(); scope.cancel(); super.onCleared() }
+    override fun onCleared() { agents.reset(); devices.close(); scope.cancel(); super.onCleared() }
 }

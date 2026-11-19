@@ -57,6 +57,17 @@ public final class EmbeddedBuilderSmoke {
             assertRejectedConfig(context, project, config, script.replace("compileSdk 34", "compileSdk 999"), "SDK");
             assertRejectedConfig(context, project, config, script.replace("namespace ", "splits { }\n namespace "), "Gradle");
             assertRejectedConfig(context, project, config, script.replace("'com.android.application'", "'com.android.library'"), "Gradle");
+            // An IDE override must use the selected JAR without rewriting the build script or targetSdk.
+            Files.write(config, script.replace("compileSdk 34", "compileSdk 999").getBytes(StandardCharsets.UTF_8));
+            File overridden = EmbeddedBuilder.build(context, project.toFile(), "34", message -> {});
+            require(pm.getPackageArchiveInfo(overridden.toString(), 0).applicationInfo.targetSdkVersion == 34, "compile SDK override");
+            if (sdk.installed().contains("37.0")) {
+                Path source = project.resolve("app/src/main/java/example/hello/NewApi.java");
+                write(project, project.relativize(source).toString(),
+                        "package example.hello; class NewApi { int level = android.os.Build.VERSION_CODES.VANILLA_ICE_CREAM; }");
+                EmbeddedBuilder.build(context, project.toFile(), "37.0", message -> {});
+                Files.delete(source);
+            }
             Files.write(config, original);
             Path kotlin = project.resolve("app/src/main/java/Unexpected.scala");
             Files.createFile(kotlin);

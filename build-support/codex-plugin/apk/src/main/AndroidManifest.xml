@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Native extraction preserves the executable helper names used by upstream Codex. -->
+    <application android:label="@string/app_name"
+        android:allowBackup="false">
+        <service android:name="com.hcgstudio.pocketstudio.codexplugin.CodexPluginMarker" android:exported="true">
+            <intent-filter><action android:name="com.hcgstudio.pocketstudio.AGENT_PLUGIN"/></intent-filter>
+            <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_ENTRY"
+                android:value="com.hcgstudio.pocketstudio.codexplugin.CodexPlugin"/>
+        </service>
+    </application>
+</manifest>

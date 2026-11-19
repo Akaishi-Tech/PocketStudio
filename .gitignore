@@ -10,3 +10,6 @@ __pycache__/
 *.p12
 *.jks
 *.keystore
+/agent-api/build/
+/build-support/codex-plugin/build/
+/build-support/codex-plugin/apk/build/

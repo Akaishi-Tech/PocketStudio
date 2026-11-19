@@ -3,6 +3,7 @@ package com.hcgstudio.pocketstudio;
 import static com.hcgstudio.pocketstudio.StudioStrings.uiString;
 
 import android.content.Context;
+import com.hcgstudio.pocketstudio.build.SdkPlatforms;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
@@ -99,12 +100,20 @@ final class Project {
 
   static Project createProject(Context context, Uri parentTree, String name, String packageName,
       ProjectTemplate template, ProjectLanguage language, int minSdk) throws IOException {
+    String sdk = new SdkPlatforms(context).installed().stream()
+        .findFirst().orElse(String.valueOf(android.os.Build.VERSION.SDK_INT));
+    return createProject(context, parentTree, name, packageName, template, language, minSdk, sdk);
+  }
+
+  static Project createProject(Context context, Uri parentTree, String name, String packageName,
+      ProjectTemplate template, ProjectLanguage language, int minSdk, String compileSdk) throws IOException {
     name = name.trim();
     packageName = packageName.trim();
     String problem = projectNameError(name);
     if (problem == null) problem = template.packageNameError(packageName, language);
     if (problem != null) throw new IOException(problem);
-    if (minSdk < ProjectTemplate.MIN_SDK || minSdk > ProjectTemplate.MAX_SDK)
+    if (!compileSdk.matches("[1-9][0-9]{0,2}(?:\\.[0-9]{1,2})?") || minSdk < ProjectTemplate.MIN_SDK ||
+        minSdk > Integer.parseInt(compileSdk.split("\\.")[0]))
       throw new IOException(uiString(R.string.invalid_sdk_platform_number));
 
     Project parent = new Project(context, parentTree);
@@ -112,7 +121,7 @@ final class Project {
     try {
       Project project = new Project(context, child.uri);
       if (!name.equals(project.root.name)) throw new IOException(uiString(R.string.a_project_with_that_name_already_exists_or));
-      template.writeFiles(project, name, packageName, language, minSdk);
+      template.writeFiles(project, name, packageName, language, minSdk, compileSdk);
       return project;
     } catch (IOException | RuntimeException e) {
       try { parent.delete(child); } catch (Exception cleanup) { e.addSuppressed(cleanup); }

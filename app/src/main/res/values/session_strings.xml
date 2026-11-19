@@ -1,0 +1,8 @@
+<resources>
+    <string name="agent_run_channel">Agent running</string>
+    <string name="debug_running">Running</string>
+    <string name="debug_paused">Paused</string>
+    <string name="project_sdk">Project SDK</string>
+    <string name="debug_process_missing">The debugger could not find the launched process.</string>
+    <string name="wizard_compile_sdk">Compile SDK</string>
+</resources>
