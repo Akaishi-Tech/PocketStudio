@@ -9,7 +9,6 @@ android {
         // The private Debian filesystem contains both installed tools and user-built programs.
         // This separate app uses Android's compatibility domain for executable app-private files.
         targetSdk 28
-        testInstrumentationRunner 'com.hcgstudio.pocketstudio.prootplugin.RuntimeSmoke'
         versionCode providers.environmentVariable('POCKETSTUDIO_VERSION_CODE').orElse(providers.gradleProperty('pluginVersionCode')).orElse('1').get().toInteger()
         versionName providers.environmentVariable('POCKETSTUDIO_VERSION_NAME').orElse(providers.gradleProperty('pluginVersionName')).orElse('1.0.0').get()
     }
