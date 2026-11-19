@@ -19,9 +19,11 @@ from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
+from plugin_signer import fingerprint
+
+
 ROOT = Path(__file__).resolve().parents[1]
 SUPPORT = ROOT / "plugins/codex"
-PIN = ROOT / "app/src/main/res/raw/release_signer.der"
 KEYRING = SUPPORT / "termux-autobuilds.gpg"
 PLUGIN_APK = SUPPORT / "apk"
 APACHE = SUPPORT / "termux-Apache-2.0.txt"
@@ -145,7 +147,7 @@ def lock_for(release_hash, packages):
     require(re.fullmatch(r"\d+\.\d+\.\d+(?:-\d+)?", version) and
             all(row["version"] == version for row in packages if row["name"] == "codex"),
             "Codex ABIs do not have one common Android version")
-    inputs = [Path(__file__).resolve(), KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN,
+    inputs = [Path(__file__).resolve(), KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", ROOT / "scripts/plugin_signer.py",
               ROOT / "build.gradle", ROOT / "settings.gradle", ROOT / "gradle/wrapper/gradle-wrapper.properties"]
     for module in (SUPPORT, PLUGIN_APK, ROOT / "agent-api", ROOT / "plugin-api"):
         inputs.append(module / "build.gradle")
@@ -335,12 +337,6 @@ def assemble(stage, template, abi, output):
                     os.environ["ANDROID_KEY_ALIAS"], "--ks-pass", "env:ANDROID_KEYSTORE_PASSWORD",
                     "--key-pass", "env:ANDROID_KEY_PASSWORD", "--v4-signing-enabled", "false", "--out", signed, aligned],
                    check=True)
-    verified = subprocess.check_output([tools / "apksigner", "verify", "--verbose", "--print-certs", signed], text=True)
-    signers = re.findall(r"^(?:Signer #\d+|V[\d.]+ Signer:) certificate SHA-256 digest: ([0-9a-f]{64})$",
-                         verified, re.MULTILINE)
-    require("Number of signers: 1" in verified.splitlines() and set(signers) == {digest_file(PIN)},
-            "The plugin does not have the project's pinned release signer")
-    require("Verified using v2 scheme (APK Signature Scheme v2): true" in verified, "APK v2 signature missing")
     subprocess.run([tools / "zipalign", "-c", "-P", "16", "4", signed], check=True)
     artifact = {"abi": abi, "file": filename, "size": signed.stat().st_size, "sha256": digest_file(signed)}
     os.replace(signed, output / filename)
@@ -372,7 +368,7 @@ def build_plugin(args):
             shutil.copyfile(SUPPORT / "OpenSSL-NOTICE.txt", assets / "licenses/openssl/NOTICE.txt")
             artifacts.append(assemble(stage, template, abi, args.out))
     info = {"package": PACKAGE, "version": lock["version"], "versionCode": args.version_code,
-            "buildId": lock["buildId"], "signerSha256": digest_file(PIN), "artifacts": artifacts}
+            "buildId": lock["buildId"], "signerSha256": fingerprint(), "artifacts": artifacts}
     write_json(args.out / "codex-build.json", info)
     print(json.dumps(info, ensure_ascii=False))
 

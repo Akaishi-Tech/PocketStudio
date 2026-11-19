@@ -4,7 +4,10 @@
 
 一个运行在 Android 手机上的原生开发环境。手机用底部导航切换项目、编辑器、智能体、调试和输出，可用宽度达到 600 dp 时，项目树和工作区并排显示。应用可安装在 Android 8.0 及以上版本。界面随系统语言切换，提供简体中文，其他未支持的语言使用英文。
 
-![平板上的项目树与代码编辑器](docs/screenshots/tablet.png)
+<p>
+  <a href="docs/screenshots/phone.png"><img src="docs/screenshots/phone.png" width="216" alt="手机编辑器中打开的 MainActivity.java，底部显示工作区标签栏"></a>
+  <a href="docs/screenshots/tablet.png"><img src="docs/screenshots/tablet.png" width="652" alt="平板上并排显示的项目树和代码编辑器"></a>
+</p>
 
 ## 开始使用
 
@@ -58,7 +61,9 @@ AVF 插件面向 Android 16 系统 Terminal 的 Ferrochrome v4（build 4000000�
 
 点「新聊天」向智能体提问。它可以在当前工程中列出、读取和编辑文件，运行 Gradle 任务前会显示确认。对话中的工具摘要可以展开查看操作和结果。编辑器保留未保存的草稿，文件内容发生冲突时会提示处理。
 
-你可以让 Codex 搜索工程里已保存的文件，也可以在编辑器中选中代码，直接问「这段代码做什么」。它能读取当前标签页的选区和附近尚未保存的改动。连接调试设备后，它还能查看前台界面的控件文字和边界，或读取应用最近的日志。Logcat 默认使用当前工程已构建 APK 的应用 ID。如果还没在 Studio 里构建过，可以在问题中写明已安装的应用 ID。更新 Studio 后，新建聊天即可使用新增工具。
+你可以让 Codex 搜索工程里已保存的文件，也可以在编辑器中选中代码，直接问「这段代码做什么」。它能读取当前标签页的选区和附近尚未保存的改动，也能读取应用最近的日志。Logcat 默认使用当前工程已构建 APK 的应用 ID。如果还没在 Studio 里构建过，可以在问题中写明已安装的应用 ID。
+
+更新 Studio 和 Codex 插件后，在 Android 工程中连接 ADB 调试设备并新建聊天。试着问「点开设置，向下滚动，告诉我有哪些选项」。Agent 会先读取前台控件树，按控件引用点击、长按、输入或滚动，再读取新布局确认结果。对于画布等布局树缺少信息的界面，它可以用截图定位，再按坐标操作。你也可以直接要求截图。返回、回到主屏幕和打开最近任务各有独立工具。
 
 [手机上的聊天与工具详情](docs/screenshots/agents.png)
 
@@ -81,7 +86,7 @@ AVF 插件面向 Android 16 系统 Terminal 的 Ferrochrome v4（build 4000000�
 4. 点右上角播放按钮，选择「调试运行」，Studio 会构建、安装、启动应用并附加调试器。选择「运行」可正常启动应用。对于已经运行的可调试应用，可在调试页手动附加进程。
 5. 在目标手机触发该行。开发机将显示暂停线程的调用栈，可以查看变量、单步或继续。自带示例可在 `count++;` 处设置断点，然后点击目标应用的按钮。
 
-无线连接时，在两台设备上使用同一局域网。目标手机从「开发者选项 → 无线调试 → 使用配对码配对设备」取得六位码和配对端口。在开发机点「调试 → 无线调试 → 使用六位码配对」，成功后再输入目标手机无线调试主页面的连接端口。已配对的两台设备可直接用连接端口重连。[无线调试操作与验证](docs/wireless-debugging.zh-CN.md)
+无线连接时，在两台设备上使用同一局域网。目标手机从「开发者选项 → 无线调试 → 使用配对码配对设备」取得六位码和配对端口。在开发机点「调试 → 无线调试 → 使用六位码配对」，成功后再输入目标手机无线调试主页面的连接端口。已配对的两台设备可直接用连接端口重连。
 
 普通量产手机只会向调试器提供允许调试的进程。源码行和变量检查依赖 APK 保留对应调试信息。「ADB TCP」用于已经启用经典 TCP 监听的设备或开发模拟器。[Android 官方设备调试说明](https://developer.android.com/studio/debug)
 
@@ -109,7 +114,7 @@ adb install -r plugins/android/build/outputs/apk/arm64V8a/debug/android-plugin-a
 
 其他架构使用对应的 Gradle 变体（`armeabiV7a`、`x86_64` 或 `x86`）。运行 `:app:assembleRelease` 可生成全部四个架构的 APK。
 
-双设备回归另外需要 ADB 和两台启动完成的测试模拟器。脚本会把示例安装到指定的目标模拟器，覆盖 Logcat、进程发现、断点、栈、变量、单步、恢复和分离。USB 测试覆盖分帧、断线、并发和 Android Keystore 签名。两台独立模拟器还通过系统 USB Host 授权弹窗和虚拟 USB 批量端点完成了安装及断点调试。实体 OTG 数据线、角色协商和厂商驱动仍待双真机验收。[USB 测试拓扑与复核步骤](docs/usb-verification.zh-CN.md)
+双设备回归另外需要 ADB 和两台启动完成的测试模拟器。脚本会把示例安装到指定的目标模拟器，覆盖 Logcat、进程发现、断点、栈、变量、单步、恢复和分离。USB 测试覆盖分帧、断线、并发和 Android Keystore 签名。两台独立模拟器还通过系统 USB Host 授权弹窗和虚拟 USB 批量端点完成了安装及断点调试。实体 OTG 数据线、角色协商和厂商驱动仍待双真机验收。
 
 ~~~sh
 tools/test/jdwp/run.sh
@@ -117,7 +122,7 @@ tools/test/usb/run.sh emulator-HOST
 tools/test/two-emulators.sh emulator-HOST emulator-TARGET
 ~~~
 
-[手机界面](docs/screenshots/phone.png) · [调试界面](docs/screenshots/debugger.png)
+[调试界面](docs/screenshots/debugger.png)
 
 ## 许可证
 

@@ -8,12 +8,14 @@ import com.hcgstudio.pocketstudio.adb.Target;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParser;
 
 /** Inspects a user-requested snapshot of the connected display's accessibility hierarchy. */
 final class DeviceInspector {
+  static final String SCREEN_COMMAND = "screencap -p";
+  static final int MAX_SCREEN_BYTES = 32 * 1024 * 1024;
+  // Zero-length IEND chunk, including its CRC. BitmapFactory accepts some partial PNG streams.
+  private static final byte[] PNG_END = {0, 0, 0, 0, 'I', 'E', 'N', 'D', (byte) 0xae, 0x42, 0x60, (byte) 0x82};
   static final class Snapshot {
     final Bitmap bitmap;
     final int width, height;
@@ -55,31 +57,17 @@ final class DeviceInspector {
       hierarchy = "";
     }
     byte[] bytes;
-    try (Target.Stream stream = target.open("exec:screencap -p");
+    try (Target.Stream stream = target.open("exec:" + SCREEN_COMMAND);
         ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       byte[] buf = new byte[65536];
       int count;
       while ((count = stream.input().read(buf)) != -1) {
-        if (out.size() + count > 32 * 1024 * 1024) throw new IOException(uiString(R.string.screen_image_exceeds_32_mib));
+        if (out.size() + count > MAX_SCREEN_BYTES) throw new IOException(uiString(R.string.screen_image_exceeds_32_mib));
         out.write(buf, 0, count);
       }
       bytes = out.toByteArray();
     }
-    BitmapFactory.Options options = new BitmapFactory.Options();
-    options.inJustDecodeBounds = true;
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-    if (options.outWidth <= 0
-        || options.outHeight <= 0
-        || (long) options.outWidth * options.outHeight > 32000000)
-      throw new IOException(uiString(R.string.unable_to_read_the_target_screen_image));
-    int width = options.outWidth, height = options.outHeight;
-    options.inSampleSize = 1;
-    while ((long) width * height / options.inSampleSize / options.inSampleSize > 4000000L)
-      options.inSampleSize *= 2;
-    options.inJustDecodeBounds = false;
-    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
-    if (bitmap == null) throw new IOException(uiString(R.string.unable_to_parse_the_screenshot));
-    Snapshot snapshot = new Snapshot(bitmap, width, height);
+    Snapshot snapshot = decodeScreen(bytes);
     try {
       visitNodes(hierarchy, (node, rect, bounds) -> {
         List<String> details = new ArrayList<>();
@@ -97,44 +85,43 @@ final class DeviceInspector {
     return snapshot;
   }
 
-  static JSONObject hierarchyForAgent(String xml) throws Exception {
-    JSONArray nodes = new JSONArray();
-    int[] length = {0};
-    boolean[] clippedText = {false};
-    boolean complete = visitNodes(xml, (node, rect, bounds) -> {
-      if (nodes.length() == 200) return false;
-      JSONObject entry = new JSONObject();
-      entry.put("depth", node.getDepth() - 2);
-      entry.put("bounds", new JSONArray().put(rect.left).put(rect.top).put(rect.right).put(rect.bottom));
-      boolean password = Boolean.parseBoolean(node.getAttributeValue(null, "password"));
-      for (String name : new String[] {"package", "class", "resource-id", "text", "content-desc"}) {
-        if (password && (name.equals("text") || name.equals("content-desc"))) continue;
-        String value = node.getAttributeValue(null, name);
-        if (value == null || value.isEmpty()) continue;
-        if (value.length() > 512) {
-          int end = Character.isHighSurrogate(value.charAt(511)) ? 511 : 512;
-          value = value.substring(0, end);
-          clippedText[0] = true;
-        }
-        entry.put(name, value);
-      }
-      if (password) entry.put("password", true);
-      entry.put("clickable", Boolean.parseBoolean(node.getAttributeValue(null, "clickable")));
-      entry.put("enabled", Boolean.parseBoolean(node.getAttributeValue(null, "enabled")));
-      int size = entry.toString().length() + 1;
-      if (length[0] + size > 24000) return false;
-      length[0] += size;
-      nodes.put(entry);
-      return true;
-    });
-    return new JSONObject().put("nodes", nodes).put("truncated", !complete || clippedText[0]);
+  static Snapshot decodeScreen(byte[] bytes) throws IOException {
+    if (!hasPngEnd(bytes)) throw new IOException(uiString(R.string.unable_to_read_the_target_screen_image));
+    BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inJustDecodeBounds = true;
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+    if (!"image/png".equals(options.outMimeType) || options.outWidth <= 0 || options.outHeight <= 0
+        || (long) options.outWidth * options.outHeight > 32000000)
+      throw new IOException(uiString(R.string.unable_to_read_the_target_screen_image));
+    int width = options.outWidth, height = options.outHeight;
+    options.inSampleSize = 1;
+    while ((long) width * height / options.inSampleSize / options.inSampleSize > 4000000L)
+      options.inSampleSize *= 2;
+    options.inJustDecodeBounds = false;
+    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+    if (bitmap == null) throw new IOException(uiString(R.string.unable_to_parse_the_screenshot));
+    return new Snapshot(bitmap, width, height);
   }
 
-  private interface Visitor {
+  private static boolean hasPngEnd(byte[] bytes) {
+    int start = bytes.length - PNG_END.length;
+    if (start < 0) return false;
+    for (int i = 0; i < PNG_END.length; i++) {
+      if (bytes[start + i] != PNG_END[i]) return false;
+    }
+    return true;
+  }
+
+  interface Visitor {
     boolean visit(XmlPullParser node, Rect rect, String bounds) throws Exception;
   }
 
   private static boolean visitNodes(String hierarchy, Visitor visitor) throws IOException {
+    return visitHierarchy(hierarchy, (node, rect, bounds) -> rect == null || visitor.visit(node, rect, bounds));
+  }
+
+  // Invisible or malformed containers still delimit the ancestry of their descendants.
+  static boolean visitHierarchy(String hierarchy, Visitor visitor) throws IOException {
     int start = hierarchy.indexOf("<hierarchy");
     if (start < 0) throw new IOException(uiString(R.string.the_target_did_not_return_a_view_hierarchy));
     try {
@@ -145,12 +132,18 @@ final class DeviceInspector {
             && "hierarchy".equals(parser.getName())) return true;
         if (parser.getEventType() != XmlPullParser.START_TAG || !"node".equals(parser.getName())) continue;
         String bounds = parser.getAttributeValue(null, "bounds");
-        if (bounds == null) continue;
-        Matcher m = BOUNDS.matcher(bounds);
-        if (!m.matches()) continue;
-        Rect rect = new Rect(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
-            Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
-        if (!rect.isEmpty() && !visitor.visit(parser, rect, bounds)) return false;
+        Rect rect = null;
+        if (bounds != null) {
+          Matcher m = BOUNDS.matcher(bounds);
+          if (m.matches()) {
+            try {
+              Rect parsed = new Rect(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+                  Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)));
+              if (!parsed.isEmpty()) rect = parsed;
+            } catch (NumberFormatException ignored) { /* A malformed container can still have visible children. */ }
+          }
+        }
+        if (!visitor.visit(parser, rect, bounds)) return false;
       }
     } catch (Exception e) {
       throw new IOException(uiString(R.string.unable_to_parse_the_view_hierarchy), e);

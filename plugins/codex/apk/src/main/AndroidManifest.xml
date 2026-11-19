@@ -11,7 +11,7 @@
             <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_API" android:value="1" />
             <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY" android:value="agent" />
             <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER" android:value="Akaishi Tech" />
-            <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_API" android:value="2"/>
             <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_ENTRY"
                 android:value="com.hcgstudio.pocketstudio.codexplugin.CodexPlugin"/>
         </service>

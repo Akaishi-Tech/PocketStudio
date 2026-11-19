@@ -11,24 +11,50 @@ import java.security.MessageDigest
 
 /** Android owns the selected directory grant. Every file call goes through that same Project. */
 internal object AgentProjectTools {
-    val tools = listOf(
+    private val commonTools = listOf(
             spec("list_files", "List one project directory. Use an empty path for its root.", "path"),
             spec("search_project", "Search saved project text for a case-sensitive single-line literal. Returns matching paths, 1-based line numbers, excerpts and match counts.", "query"),
             spec("get_editor_context", "Read the active editor's live selection, cursor, nearby code and unsaved state. Lines and UTF-16 columns are 1-based and selection ends are exclusive."),
-            spec("read_logcat", "Read recent Logcat lines for an installed application on the connected device, including crash logs. Defaults to the current project's built APK; supply its application ID if needed.",
-                properties = json(
-                    "packageName" to json("type" to "string", "description" to "Installed application ID on the connected device."),
-                    "maxLines" to json("type" to "integer", "minimum" to 1, "maximum" to 400, "default" to 150))),
-            spec("inspect_device_ui", "Read the current foreground UI hierarchy on the connected Android device. Returns visible control text, identifiers and screen bounds."),
             spec("read_file", "Read a UTF-8 project file and its revision for editing.", "path"),
             spec("write_file", "Write a UTF-8 file. Supply revision from read_file or 'new' to create. Parent directory must exist.", "path", "revision", "text"),
             spec("move_file", "Move or rename a file to a new relative path. Supply its current revision.", "path", "destination", "revision"),
             spec("delete_file", "Delete one text file after user confirmation. Supply its current revision.", "path", "revision"),
-            spec("create_directory", "Create a directory under an existing project directory.", "path"),
-            spec("run_gradle", "Run this project's Gradle wrapper tasks and return the build output.", "tasks")
+            spec("create_directory", "Create a directory under an existing project directory.", "path")
         )
 
-    val shell = spec("run_shell", "Execute a Bash command in the selected Linux project and return its exit status and output.", "command")
+    val pressBack = spec("press_device_back", "Press Back on the connected Android device.")
+    val pressHome = spec("press_device_home", "Press Home to show the launcher on the connected Android device.")
+    val pressRecents = spec("press_device_recents", "Press the recent apps key to show the task overview on the connected Android device.")
+    private val nodeRef = json("type" to "string", "description" to "Copy the control's ref from the latest inspect_device_ui result.")
+    private val nodeTools = listOf(
+        spec("click_device_node", "Click a control identified in the current Android layout.", "ref",
+            properties = json("ref" to nodeRef)),
+        spec("long_press_device_node", "Touch and hold a control identified in the current Android layout.", "ref",
+            properties = json("ref" to nodeRef)),
+        spec("type_device_node", "Focus an editable layout node and type printable ASCII at its cursor.", "ref", "text",
+            properties = json("ref" to nodeRef, "text" to deviceTextSchema())),
+        spec("scroll_device_node", "Scroll within a scrollable layout node. Down reveals content further down the page. Inspect again to read the new items.", "ref", "direction",
+            properties = json("ref" to nodeRef, "direction" to json("type" to "string",
+                "enum" to JSONArray(listOf("up", "down", "left", "right")))))
+    )
+    val nodeToolNames = nodeTools.map { it.name }.toSet()
+    private val deviceTools = listOf(
+        spec("read_logcat", "Read recent Logcat lines for an installed application on the connected device, including crash logs. Defaults to the current project's built APK; supply its application ID if needed.",
+            properties = json(
+                "packageName" to json("type" to "string", "description" to "Installed application ID on the connected device."),
+                "maxLines" to json("type" to "integer", "minimum" to 1, "maximum" to 400, "default" to 150))),
+        spec("inspect_device_ui", "Start here to interact with the connected Android device. Read the foreground layout, control labels, state, and node refs. Use a returned ref to click, long-press, type or scroll. Device input expires the refs. Inspect again after acting. Bounds are [left, top, right, bottom] in screen pixels."),
+        deviceActionTool, pressBack, pressHome, pressRecents
+    ) + nodeTools
+    val captureScreen = spec("capture_device_screen", "Capture a screenshot when requested or when the layout lacks the visual information needed. Returns an image with screen and image dimensions. For a coordinate gesture, scale image coordinates to screen pixels.")
+    private val gradleTool = spec("run_gradle", "Run this project's Gradle wrapper tasks and return the build output.", "tasks")
+    private val shell = spec("run_shell", "Execute a Bash command in the selected Linux project and return its exit status and output.", "command")
+
+    fun textTools(linux: Boolean, androidAvailable: Boolean): List<AgentTool> {
+        if (linux) return commonTools + shell
+        val tools = commonTools + deviceTools
+        return if (androidAvailable) tools + gradleTool else tools
+    }
 
     private fun spec(name: String, description: String, vararg names: String,
                      properties: JSONObject = JSONObject().apply {

@@ -13,7 +13,6 @@ STORE = "repos/Akaishi-Tech/PocketStudio-Plugins/releases"
 IDS = {name: f"com.hcgstudio.pocketstudio.{name}plugin" for name in ("android", "codex", "avf", "proot")}
 NAMES = {"android": "Android", "codex": "Codex", "avf": "AVF", "proot": "PRoot"}
 FLAVORS = {"arm64-v8a": "arm64V8a", "x86_64": "x86_64", "armeabi-v7a": "armeabiV7a", "x86": "x86"}
-CERT = ROOT / "app/src/main/res/raw/release_signer.der"
 
 
 def sha(path):
@@ -62,7 +61,8 @@ def run(plugin):
             dest = out / f"PocketStudio-{NAMES[plugin]}-Plugin-{abi}.apk"
             shutil.copyfile(folder / apk["outputFile"], dest)
             artifacts.append(dict(abi=abi, file=dest.name, size=dest.stat().st_size, sha256=sha(dest)))
-        info = dict(package=package, version=version, versionCode=code, signerSha256=sha(CERT), artifacts=artifacts)
+        signer = subprocess.check_output(["python3", ROOT / "scripts/plugin_signer.py"], text=True).strip()
+        info = dict(package=package, version=version, versionCode=code, signerSha256=signer, artifacts=artifacts)
     info["sourceCommit"] = os.environ["GITHUB_SHA"]
     metadata.write_text(json.dumps(info, indent=2) + "\n")
 

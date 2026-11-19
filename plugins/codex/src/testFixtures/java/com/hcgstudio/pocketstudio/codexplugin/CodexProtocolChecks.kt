@@ -1,6 +1,8 @@
 package com.hcgstudio.pocketstudio.codexplugin
 
 import android.content.Context
+import android.util.Base64
+import com.hcgstudio.pocketstudio.agent.AgentToolContent
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -54,6 +56,14 @@ object CodexProtocolChecks {
                 check(rpc.request("model/list").has("data"))
             }
         }
-        return "PASS installed Codex $pluginVersion initialize + model/list"
+        val bytes = ByteArray(128) { it.toByte() }
+        val items = toolContentItems(listOf(AgentToolContent.Text("screen"), AgentToolContent.Image("image/png", bytes)))
+        val text = items.getJSONObject(0)
+        check(text.getString("type") == "inputText" && text.getString("text") == "screen")
+        val image = items.getJSONObject(1)
+        val url = image.getString("imageUrl")
+        check(image.getString("type") == "inputImage" && url.startsWith("data:image/png;base64,") && '\n' !in url)
+        check(Base64.decode(url.substringAfter(','), Base64.DEFAULT).contentEquals(bytes))
+        return "PASS installed Codex $pluginVersion initialize, model/list and multimodal tool output"
     }
 }

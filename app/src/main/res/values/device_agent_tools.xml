@@ -6,4 +6,9 @@
     <string name="agent_package_not_installed">The current device user has no installed package named %1$s.</string>
     <string name="agent_package_shared_uid">%1$s shares its Android UID with other packages. Logcat cannot isolate its historical logs.</string>
     <string name="agent_logcat_failed">Could not read app logs from the device. %1$s</string>
+    <string name="agent_device_input_invalid">Invalid device action argument: %1$s.</string>
+    <string name="agent_device_input_failed">The device did not confirm the input action. %1$s</string>
+    <string name="agent_device_node_stale">The layout reference is outdated or ambiguous. Inspect the current layout again and choose a unique control.</string>
+    <string name="agent_device_node_disabled">The control is disabled.</string>
+    <string name="agent_device_node_unsupported">The control cannot perform this action in its current state.</string>
 </resources>

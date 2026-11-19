@@ -31,7 +31,7 @@ internal fun installedAgentPlugins(context: Context): List<InstalledAgentPlugin>
     discoverPlugins(context).mapNotNull { plugin ->
         if (!plugin.trusted || plugin.category != PluginDiscovery.AGENT_CATEGORY) return@mapNotNull null
         val metadata = plugin.service.metaData
-        if (metadata.getInt(AgentPlugin.API) != AgentPlugin.VERSION) return@mapNotNull null
+        if (metadata.getInt(AgentPlugin.API) !in 1..AgentPlugin.VERSION) return@mapNotNull null
         val entry = metadata.getString(AgentPlugin.ENTRY)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         InstalledAgentPlugin(plugin.packageName, plugin.label, plugin.version, plugin.versionCode, plugin.sourceDir, entry)
     }

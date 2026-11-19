@@ -22,7 +22,7 @@ internal fun discoverPlugins(context: Context): List<DiscoveredPlugin> {
         val service = it.serviceInfo
         val metadata = service.metaData ?: return@mapNotNull null
         if (service.packageName in currentPackages || metadata.containsKey(PluginDiscovery.API) ||
-            metadata.getInt(AgentPlugin.API) != AgentPlugin.VERSION ||
+            metadata.getInt(AgentPlugin.API) != 1 ||
             metadata.getString(AgentPlugin.ENTRY).isNullOrBlank()) return@mapNotNull null
         PluginRegistration(service, PluginDiscovery.AGENT_CATEGORY, null, null)
     }

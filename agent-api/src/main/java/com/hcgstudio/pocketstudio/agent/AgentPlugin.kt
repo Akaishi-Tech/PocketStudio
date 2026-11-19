@@ -12,14 +12,14 @@ interface AgentPlugin {
     fun open(host: AgentHost): AgentSession
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val ACTION = "com.hcgstudio.pocketstudio.AGENT_PLUGIN"
         const val ENTRY = "com.hcgstudio.pocketstudio.AGENT_ENTRY"
         const val API = "com.hcgstudio.pocketstudio.AGENT_API"
     }
 }
 
-interface AgentHost {
+interface AgentHost : AgentToolProvider {
     val context: Context
     val pluginContext: Context
     val scope: CoroutineScope
@@ -27,6 +27,9 @@ interface AgentHost {
     val projectIdle: Boolean
     val tools: List<AgentTool>
     suspend fun callTool(name: String, arguments: JSONObject): String
+    override val availableTools: List<AgentTool> get() = tools
+    override suspend fun executeTool(name: String, arguments: JSONObject): List<AgentToolContent> =
+        listOf(AgentToolContent.Text(callTool(name, arguments)))
     fun keepLoginAlive(): Closeable
     /** A short, user-readable current action. Null ends the ongoing notification. */
     fun reportStatus(status: String?)
@@ -34,6 +37,18 @@ interface AgentHost {
 
 /** A host operation and its JSON Schema input object. */
 data class AgentTool(val name: String, val description: String, val inputSchema: JSONObject)
+
+/** API 2 hosts expose their complete tool catalog and ordered, multimodal results here. */
+interface AgentToolProvider {
+    val availableTools: List<AgentTool>
+    suspend fun executeTool(name: String, arguments: JSONObject): List<AgentToolContent>
+}
+
+sealed interface AgentToolContent {
+    data class Text(val text: String) : AgentToolContent
+    /** Encoded image bytes, such as a PNG file, and their media type. */
+    class Image(val mimeType: String, val bytes: ByteArray) : AgentToolContent
+}
 
 data class DeviceCode(val verificationUrl: String, val userCode: String)
 data class AgentProfile(val id: String, val label: String)

@@ -1,16 +1,22 @@
 package com.hcgstudio.pocketstudio
 
+import android.graphics.Bitmap
 import com.hcgstudio.pocketstudio.adb.Target
+import com.hcgstudio.pocketstudio.agent.AgentToolContent
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
+import org.json.JSONObject
 
 internal object DeviceAgentTools {
     private const val LOG_WINDOW_SECONDS = 600
     private const val LOG_BYTES = 32000
     private const val LOG_FAILURE = "STUDIO_LOGCAT_COMMAND_FAILED"
+    private const val IMAGE_BYTES = 1024 * 1024
     private val packageUid = Regex("""package:(\S+) uid:(\d+)""")
     private val applicationId = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+""")
 
@@ -32,9 +38,50 @@ internal object DeviceAgentTools {
         }
     }
 
-    suspend fun inspect(adb: Target): String {
-        val xml = output(adb, DeviceInspector.hierarchyCommand(), 4 * 1024 * 1024).toString(Charsets.UTF_8)
-        return DeviceInspector.hierarchyForAgent(xml).toString()
+    suspend fun layoutXml(adb: Target): String =
+        output(adb, DeviceInspector.hierarchyCommand(), 4 * 1024 * 1024).toString(Charsets.UTF_8)
+
+    suspend fun screenshot(adb: Target): List<AgentToolContent> {
+        val bytes = output(adb, DeviceInspector.SCREEN_COMMAND, DeviceInspector.MAX_SCREEN_BYTES)
+        currentCoroutineContext().ensureActive()
+        val screen = DeviceInspector.decodeScreen(bytes)
+        var bitmap = screen.bitmap
+        try {
+            val image = if (bytes.size <= IMAGE_BYTES && bitmap.width == screen.width && bitmap.height == screen.height) {
+                AgentToolContent.Image("image/png", bytes)
+            } else {
+                // Preserve as much detail as the transport budget permits, even for noisy screens.
+                val encoded = ByteArrayOutputStream()
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 85, encoded))
+                        throw IOException(uiString(R.string.unable_to_parse_the_screenshot))
+                    if (encoded.size() <= IMAGE_BYTES) break
+                    val scaled = Bitmap.createScaledBitmap(bitmap, (bitmap.width / 2).coerceAtLeast(1),
+                        (bitmap.height / 2).coerceAtLeast(1), true)
+                    bitmap.recycle()
+                    bitmap = scaled
+                    encoded.reset()
+                }
+                AgentToolContent.Image("image/jpeg", encoded.toByteArray())
+            }
+            currentCoroutineContext().ensureActive()
+            val size = json("screenWidth" to screen.width, "screenHeight" to screen.height,
+                "imageWidth" to bitmap.width, "imageHeight" to bitmap.height)
+            return listOf(AgentToolContent.Text(size.toString()), image)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    suspend fun act(adb: Target, args: JSONObject, beforeInput: () -> Unit = {}): String {
+        val command = deviceInputCommand(args)
+        currentCoroutineContext().ensureActive()
+        beforeInput()
+        // exec: supplies bytes without an exit status. Confirm every input command completed.
+        val result = output(adb, "$command && echo STUDIO_INPUT_OK", 8192).toString(Charsets.UTF_8).trim()
+        if (result != "STUDIO_INPUT_OK") throw IOException(uiString(R.string.agent_device_input_failed, result.take(500)))
+        return json("action" to args.getString("action"), "ok" to true).toString()
     }
 
     suspend fun logs(adb: Target, pkg: String, maxLines: Int): String {

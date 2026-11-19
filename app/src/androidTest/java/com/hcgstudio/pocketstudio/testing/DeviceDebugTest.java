@@ -78,7 +78,8 @@ public final class DeviceDebugTest extends Instrumentation {
                 result.putString("result", "PASS isolated Codex account credentials");
             } else if ("codexChat".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.CodexChatChecks.run(getTargetContext(),
-                        Integer.parseInt(arguments.getString("port")), "true".equals(arguments.getString("keep"))));
+                        Integer.parseInt(arguments.getString("port")), "true".equals(arguments.getString("keep")),
+                        Integer.parseInt(arguments.getString("devicePort", "0"))));
             } else if ("gitSsh".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.GitRemoteSshChecks.run(getTargetContext(), arguments.getString("url"));
                 result.putString("result", "PASS SSH clone, key authentication and host verification");

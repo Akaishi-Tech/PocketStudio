@@ -6,4 +6,9 @@
     <string name="agent_package_not_installed">设备当前用户尚未安装名为 %1$s 的应用。</string>
     <string name="agent_package_shared_uid">%1$s 与其他应用共享 Android UID，Logcat 无法单独筛出该应用的历史日志。</string>
     <string name="agent_logcat_failed">无法读取设备上的应用日志。%1$s</string>
+    <string name="agent_device_input_invalid">设备操作参数无效：%1$s。</string>
+    <string name="agent_device_input_failed">设备未确认输入操作已完成。%1$s</string>
+    <string name="agent_device_node_stale">布局引用已过期或对应多个控件。请重新读取当前布局，选择可唯一定位的控件。</string>
+    <string name="agent_device_node_disabled">该控件已停用。</string>
+    <string name="agent_device_node_unsupported">该控件在当前状态下无法执行此操作。</string>
 </resources>

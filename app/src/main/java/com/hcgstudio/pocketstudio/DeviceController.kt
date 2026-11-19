@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import com.hcgstudio.pocketstudio.plugin.RemoteConnection
 import com.hcgstudio.pocketstudio.adb.Target
 import com.hcgstudio.pocketstudio.adb.UsbAdb
+import com.hcgstudio.pocketstudio.agent.AgentToolContent
 import com.hcgstudio.pocketstudio.debug.JdwpSession
 import com.android.ddmlib.Log.LogLevel
 import com.hcgstudio.pocketstudio.wireless.LocalWirelessAdb
@@ -31,6 +32,7 @@ import java.util.concurrent.Future
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 
 internal sealed interface DeviceDialog {
     data class Network(val mode: RemoteConnection) : DeviceDialog
@@ -63,7 +65,8 @@ internal class DeviceController(context: Context) : Closeable {
     val connectionId get() = generation
     private var attachment = java.util.Random().nextInt()
     private var closed = false
-    private var target by mutableStateOf<Target?>(null)
+    private var agentDevice by mutableStateOf<DeviceLayoutActions?>(null)
+    private val target get() = agentDevice?.target
     private var debugger by mutableStateOf<JdwpSession?>(null)
     private var waitingUsb: UsbDevice? = null
     private var localTarget = false
@@ -210,8 +213,9 @@ internal class DeviceController(context: Context) : Closeable {
         if (!closed) stopLocalPairing()
         stopLog()
         detach()
+        agentDevice?.disconnect()
         closeLater(target)
-        target = null
+        agentDevice = null
         deviceDetails = ""
         output = ""
         statusMessage = null
@@ -231,7 +235,7 @@ internal class DeviceController(context: Context) : Closeable {
     }
 
     private fun identify(adb: Target) {
-        target = adb
+        agentDevice = DeviceLayoutActions(adb)
         job(deviceStatus(R.string.reading_device_information), { adb.shell("getprop ro.product.model; getprop ro.build.version.release") }) {
             val data = it.trim().lineSequence().map(String::trim).toList()
             deviceDetails = listOfNotNull(data.getOrNull(0),
@@ -475,22 +479,28 @@ internal class DeviceController(context: Context) : Closeable {
         }
     }
 
-    private suspend fun queryDevice(read: suspend (Target) -> String): String = withContext(Dispatchers.Main.immediate) {
-        val selected = target ?: throw IOException(app.getString(R.string.connect_to_a_target_device_first))
+    private suspend fun <T : Any> queryDevice(read: suspend (DeviceLayoutActions) -> T): T = withContext(Dispatchers.Main.immediate) {
+        val selected = agentDevice ?: throw IOException(app.getString(R.string.connect_to_a_target_device_first))
         val result = withTimeoutOrNull(30_000L) {
             withContext(Dispatchers.IO) { read(selected) }
         } ?: throw IOException(app.getString(R.string.agent_device_query_timeout))
-        if (target !== selected || !selected.isConnected) throw IOException(app.getString(R.string.target_device_disconnected))
+        if (agentDevice !== selected || !selected.target.isConnected) throw IOException(app.getString(R.string.target_device_disconnected))
         result
     }
 
-    suspend fun readLogcat(projectApk: File?, packageName: String?, maxLines: Int = 150): String = queryDevice { adb ->
+    suspend fun readLogcat(projectApk: File?, packageName: String?, maxLines: Int = 150): String = queryDevice { device ->
         val pkg = packageName ?: projectApk?.let { app.packageManager.getPackageArchiveInfo(it.absolutePath, 0)?.packageName }
             ?: throw IOException(app.getString(R.string.agent_log_package_required))
-        DeviceAgentTools.logs(adb, pkg, maxLines)
+        DeviceAgentTools.logs(device.target, pkg, maxLines)
     }
 
-    suspend fun inspectDeviceUi(): String = queryDevice { DeviceAgentTools.inspect(it) }
+    suspend fun inspectDeviceUi(): String = queryDevice { it.inspect() }
+
+    suspend fun captureDeviceScreen(): List<AgentToolContent> = queryDevice { DeviceAgentTools.screenshot(it.target) }
+
+    suspend fun performDeviceAction(arguments: JSONObject): String = queryDevice { it.input(arguments) }
+
+    suspend fun performDeviceNodeAction(toolName: String, args: JSONObject): String = queryDevice { it.perform(toolName, args) }
 
     fun inspect() {
         val adb = currentTarget() ?: return

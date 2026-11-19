@@ -2,6 +2,7 @@ package com.hcgstudio.pocketstudio
 
 import com.hcgstudio.pocketstudio.agent.AgentSession
 import com.hcgstudio.pocketstudio.agent.ChatKind
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -29,7 +30,7 @@ object CodexChatChecks {
         @Synchronized fun cleanPreferences() { preferenceFiles.forEach { baseContext.deleteSharedPreferences(it) } }
     }
 
-    @JvmStatic fun run(ctx: Context, port: Int, keep: Boolean): String = runBlocking {
+    @JvmStatic fun run(ctx: Context, port: Int, keep: Boolean, devicePort: Int): String = runBlocking {
         require(port in 1..65535) { "A loopback fixture port is required" }
         val token = UUID.randomUUID().toString()
         val app = FixtureApp(ctx.applicationContext, Files.createTempDirectory(ctx.noBackupFilesDir.toPath(), "chat-check-").toFile(),
@@ -139,6 +140,12 @@ object CodexChatChecks {
                     check(editor.text == "two")
                     editor.replace(0, editor.text.length, "draft\nselected")
                     editor.select(6, 14)
+                    if (devicePort != 0) {
+                        workspace.devices.connectRemote(RemoteConnection.TCP, "127.0.0.1", devicePort)
+                        await("connecting the test emulator") { !workspace.devices.busy }
+                        check(workspace.devices.connected) { workspace.devices.status }
+                        DeviceAgentChecks.openLayoutFixture(ctx)
+                    }
                 }
                 controller.input = "请确认修改已完成。"
                 controller.send()
@@ -150,10 +157,12 @@ object CodexChatChecks {
                     check(draft.dirty && draft.editor.selected == "selected")
                     val activities = controller.lines.filter { it.kind == ChatKind.Activity }
                     val deviceErrors = activities.filter { it.failed }
-                    check(deviceErrors.map { it.category }.sorted() == listOf(uiString(R.string.logcat), uiString(R.string.inspect_screen)).sorted()) {
+                    if (devicePort != 0) check(deviceErrors.isEmpty()) { deviceErrors.map { it.text to it.detail } }
+                    else check(deviceErrors.map { it.category }.sorted() == listOf(uiString(R.string.logcat), uiString(R.string.inspect_screen)).sorted()) {
                         "Expected two disconnected-device errors: " + activities.map { it.category to it.detail }
                     }
                     check(deviceErrors.all { it.detail == uiString(R.string.connect_to_a_target_device_first) })
+                    check(activities.none { "data:image/" in it.detail })
                 }
                 controller.back()
                 awaitHistory("resumed chat after the completed turn")

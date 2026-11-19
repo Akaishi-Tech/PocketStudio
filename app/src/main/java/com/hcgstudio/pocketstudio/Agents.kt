@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.hcgstudio.pocketstudio.agent.AgentHost
 import com.hcgstudio.pocketstudio.agent.AgentSession
+import com.hcgstudio.pocketstudio.agent.AgentToolContent
 import kotlinx.coroutines.*
 import org.json.JSONObject
 
@@ -143,9 +144,8 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
     override val context get() = w.app
     override val projectId = (p.tree ?: p.root.uri).toString()
     override val projectIdle get() = w.project === p && !w.running && !w.busy
-    override val tools get() = if (p.linux == null) {
-        AgentProjectTools.tools.filter { it.name != "run_gradle" || w.androidAvailable }
-    } else AgentProjectTools.tools.filterNot { it.name in setOf("run_gradle", "read_logcat", "inspect_device_ui") } + AgentProjectTools.shell
+    override val tools get() = AgentProjectTools.textTools(p.linux != null, w.androidAvailable)
+    override val availableTools get() = if (p.linux == null) tools + AgentProjectTools.captureScreen else tools
     override fun keepLoginAlive() = AgentLoginService.start(context)
     private var lastStatus: String? = null
     override fun reportStatus(status: String?) {
@@ -160,14 +160,29 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
         return approve(AgentApproval(title, details, CompletableDeferred()))
     }
 
+    override suspend fun executeTool(name: String, arguments: JSONObject): List<AgentToolContent> {
+        if (name == AgentProjectTools.captureScreen.name) {
+            check(w.project === p) { uiString(R.string.project_closed) }
+            require(p.linux == null) { uiString(R.string.unsupported_tool) }
+            return w.devices.captureDeviceScreen()
+        }
+        return super.executeTool(name, arguments)
+    }
+
     override suspend fun callTool(name: String, arguments: JSONObject): String {
         check(w.project === p) { uiString(R.string.project_closed) }
+        require(tools.any { it.name == name }) { uiString(R.string.unsupported_tool) }
         val args = arguments
         try {
             return when (name) {
                 "search_project" -> w.projectOperation(p) { runInterruptible { searchProjectForAgent(p, args.getString("query")) } }
                 "get_editor_context" -> editorContext(w.active).toString()
                 "inspect_device_ui" -> w.devices.inspectDeviceUi()
+                in AgentProjectTools.nodeToolNames -> w.devices.performDeviceNodeAction(name, args)
+                deviceActionTool.name -> w.devices.performDeviceAction(args)
+                AgentProjectTools.pressBack.name -> pressDeviceKey("BACK")
+                AgentProjectTools.pressHome.name -> pressDeviceKey("HOME")
+                AgentProjectTools.pressRecents.name -> pressDeviceKey("APP_SWITCH")
                 "read_logcat" -> {
                     val limit = args.opt("maxLines") ?: 150
                     require(limit is Int) { uiString(R.string.agent_log_line_range) }
@@ -213,4 +228,7 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
                 w.refreshAfterExternalRun(p)
         }
     }
+
+    private suspend fun pressDeviceKey(key: String) =
+        w.devices.performDeviceAction(json("action" to "key", "key" to key))
 }

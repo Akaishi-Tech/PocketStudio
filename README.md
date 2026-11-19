@@ -6,7 +6,10 @@ Pocket Studio is an Android development environment that runs on a phone or tabl
 
 Pocket Studio runs on Android 8.0 or later. The interface follows the device language and falls back to English. A Simplified Chinese translation is included.
 
-![Project tree and code editor on a tablet](docs/screenshots/tablet.png)
+<p>
+  <a href="docs/screenshots/phone.png"><img src="docs/screenshots/phone.png" width="216" alt="MainActivity.java open in the phone editor, with workspace tabs along the bottom"></a>
+  <a href="docs/screenshots/tablet.png"><img src="docs/screenshots/tablet.png" width="652" alt="Project tree and code editor side by side on a tablet"></a>
+</p>
 
 ## Getting started
 
@@ -38,7 +41,7 @@ Under **Settings → App updates**, choose **Check for updates** to check GitHub
 
 Choose **Output → Output options → Build debug APK** to run the quick builder. For a Gradle task, use **Find action** and search for the task name. The Output tab shows the build log. Tap a compiler diagnostic to open the source line. After a successful build, **Install APK** opens the installer and **Export APK** is available in Output options. [On-device build guide](build-support/README.md)
 
-[Phone workspace](docs/screenshots/phone.png) · [Debugger](docs/screenshots/debugger.png)
+[Debugger](docs/screenshots/debugger.png)
 
 ## General Linux projects
 
@@ -60,7 +63,9 @@ To connect with an API key, choose **Use an API key**. Keep the default endpoint
 
 Start a new chat to work with the current project. Codex can list, read and edit files. It asks for confirmation before running Gradle tasks. Expand a tool summary to inspect its actions and results. The editor keeps unsaved drafts and reports conflicts when a file changes on disk.
 
-Ask Codex to find text across saved project files, or select code in the editor and ask about “this selection.” It can read the active tab and nearby unsaved edits. With a debug device connected, it can also inspect the foreground screen’s controls and bounds or read recent logs for your app. Logcat uses the application ID from the current project’s built APK by default. If you haven’t built it in Studio, include the installed application ID in your question. After updating Studio, start a new chat to access newly added tools.
+Ask Codex to find text across saved project files, or select code in the editor and ask about “this selection.” It can read the active tab, nearby unsaved edits and recent logs for your app. Logcat uses the application ID from the current project’s built APK by default. If you haven’t built it in Studio, include the installed application ID in your question.
+
+After updating Studio and the Codex plugin, connect an ADB target in an Android project and start a new chat. Try “Open Settings, scroll down and tell me which options are visible.” The agent reads the foreground layout, uses control references to click, long-press, type or scroll, then reads the updated layout. On surfaces such as a canvas where the layout has too little information, it can use a screenshot and screen coordinates. You can also ask for a screenshot directly. Back, Home and Recents each have a dedicated tool.
 
 [Chat and tool details on a phone](docs/screenshots/agents.png)
 
@@ -83,7 +88,7 @@ Ask Codex to find text across saved project files, or select code in the editor 
 4. Tap the play button and select **Debug run** to build, install, launch and attach. Choose **Run** for a regular launch. For an already running debuggable app, use **Attach process** in the Debug tab.
 5. Trigger that line on the target. On the host, inspect the suspended thread's stack and variables, step or resume. In the sample app, set a breakpoint on `count++;` and tap the target app's button.
 
-For a wireless connection, put both devices on the same LAN. On the target, open **Developer options → Wireless debugging → Pair device with pairing code**. Use wireless pairing on the host with the target's pairing port and six-digit code. After pairing, connect through the port on the target's main Wireless debugging screen. Already paired devices can reconnect directly through this port. [Wireless debugging and verification](docs/wireless-debugging.md)
+For a wireless connection, put both devices on the same LAN. On the target, open **Developer options → Wireless debugging → Pair device with pairing code**. Use wireless pairing on the host with the target's pairing port and six-digit code. After pairing, connect through the port on the target's main Wireless debugging screen. Already paired devices can reconnect directly through this port.
 
 Production Android devices expose processes whose apps allow debugging. Source breakpoints and variable inspection require the corresponding debug information in the APK. The ADB TCP option supports development emulators and devices already listening for classic TCP connections. [Android debugging guide](https://developer.android.com/studio/debug)
 
@@ -109,7 +114,7 @@ adb install -r plugins/android/build/outputs/apk/arm64V8a/debug/android-plugin-a
 
 For another architecture, choose the corresponding Gradle flavor (`armeabiV7a`, `x86_64` or `x86`). `:app:assembleRelease` builds all four architectures.
 
-The two-device tests also use ADB and two running test emulators. They install a sample on the target and exercise Logcat, process discovery, breakpoints, stack inspection, variables, stepping, resuming and detaching. The USB tests cover packet framing, disconnects, concurrency and Android Keystore signatures. A separate end-to-end test uses Android's USB Host permission dialog and virtual bulk endpoints on two independent emulators. Physical OTG cables, role negotiation and vendor drivers still need testing on real devices. [USB test setup and results](docs/usb-verification.md)
+The two-device tests also use ADB and two running test emulators. They install a sample on the target and exercise Logcat, process discovery, breakpoints, stack inspection, variables, stepping, resuming and detaching. The USB tests cover packet framing, disconnects, concurrency and Android Keystore signatures. A separate end-to-end test uses Android's USB Host permission dialog and virtual bulk endpoints on two independent emulators. Physical OTG cables, role negotiation and vendor drivers still need testing on real devices.
 
 ```sh
 tools/test/jdwp/run.sh

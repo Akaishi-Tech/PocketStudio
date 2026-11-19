@@ -2,6 +2,7 @@ package com.hcgstudio.pocketstudio.codexplugin
 
 import com.hcgstudio.pocketstudio.agent.*
 
+import android.util.Base64
 import androidx.compose.runtime.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -469,13 +470,16 @@ internal class CodexController(private val host: AgentHost) : AgentSession {
                     connection = rpc
                     val options = json("cwd" to dir.absolutePath, "sandbox" to "read-only",
                         "approvalPolicy" to "on-request", "developerInstructions" to
-                        "Use the studio namespace tools for the selected project. File paths are relative to its root. Use get_editor_context for live selections and drafts. When run_shell is available it executes inside the project's Linux environment in its working directory. For Android builds use run_gradle when available. The app-server directory is private session storage.")
+                        "Use the studio namespace tools for the selected project and its connected Android device. " +
+                            "Start device interactions by reading the layout. Target controls by ref from the latest layout and read it again after UI changes. " +
+                            "Use screenshots for explicit image requests or missing visual context, and use coordinates when a layout action cannot reach the target. " +
+                            "File paths are relative to the project root. Use get_editor_context for live selections and drafts. When run_shell is available it executes inside the project's Linux environment in its working directory. For Android builds use run_gradle when available. The app-server directory is private session storage.")
                     options.put("model", chosen.model.id)
                     if (savedId == null) {
-                        val tools = host.tools.map { tool -> json("type" to "function", "name" to tool.name,
+                        val tools = host.availableTools.map { tool -> json("type" to "function", "name" to tool.name,
                             "description" to tool.description, "deferLoading" to false, "inputSchema" to tool.inputSchema) }
                         val studio = json("type" to "namespace", "name" to "studio",
-                            "description" to "Work directly on the project the user has opened.", "tools" to JSONArray(tools))
+                            "description" to "Work on the open project and interact with its connected Android device.", "tools" to JSONArray(tools))
                         options.put("dynamicTools", JSONArray().put(studio)).put("environments", JSONArray())
                     } else options.put("threadId", savedId).put("excludeTurns", true)
                     val thread = rpc.request(if (savedId == null) "thread/start" else "thread/resume", options)
@@ -601,16 +605,30 @@ internal class CodexController(private val host: AgentHost) : AgentSession {
             "item/tool/call" -> {
                 val name = params.string("tool"); val args = params.optJSONObject("arguments") ?: JSONObject()
                 var ok = true
-                val text = try {
+                val content = try {
                     check(params.string("namespace") == "studio") { uiString(R.string.unknown_project_tool) }
-                    host.callTool(name, args)
+                    val result = host.executeTool(name, args)
+                    withContext(Dispatchers.Default) { toolContentItems(result) }
                 } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { ok = false; e.localizedMessage ?: uiString(R.string.project_operation_failed) }
-                rpc.answer(id, json("success" to ok, "contentItems" to JSONArray().put(json("type" to "inputText", "text" to text))))
+                catch (e: Exception) {
+                    ok = false
+                    toolContentItems(listOf(AgentToolContent.Text(e.localizedMessage ?: uiString(R.string.project_operation_failed))))
+                }
+                rpc.answer(id, json("success" to ok, "contentItems" to content))
             }
             "item/commandExecution/requestApproval", "item/fileChange/requestApproval" ->
                 rpc.answer(id, json("decision" to "decline"))
             else -> rpc.unsupported(id)
         }
     }
+}
+
+internal fun toolContentItems(content: List<AgentToolContent>): JSONArray = JSONArray().apply {
+    for (item in content) put(when (item) {
+        is AgentToolContent.Text -> json("type" to "inputText", "text" to item.text)
+        is AgentToolContent.Image -> {
+            val data = Base64.encodeToString(item.bytes, Base64.NO_WRAP)
+            json("type" to "inputImage", "imageUrl" to "data:${item.mimeType};base64,$data")
+        }
+    })
 }
