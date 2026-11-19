@@ -10,4 +10,7 @@ android {
     }
 }
 
-dependencies { api 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0' }
+dependencies {
+    api project(':plugin-api')
+    api 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0'
+}

@@ -14,8 +14,8 @@
     <string name="effort_max">Max</string>
     <string name="effort_ultra">Ultra</string>
     <string name="fast_mode">Fast</string>
-    <string name="agent_no_provider">No agent installed</string>
-    <string name="agent_open_store">Browse plugins</string>
+    <string name="agent_no_provider">No agent plugin installed</string>
+    <string name="agent_open_store">Open plugin store</string>
     <string name="agent_select_provider">Select agent</string>
     <string name="agent_message">Message</string>
     <string name="agent_plugin_changed">The plugin changed. Reopen Agents to reload it.</string>

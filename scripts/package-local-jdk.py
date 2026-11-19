@@ -70,6 +70,9 @@ def main():
     args.directory.mkdir(parents=True, exist_ok=True)
     assets = ROOT / "build-support/assets/local-jdk"
     assets.mkdir(parents=True, exist_ok=True)
+    abi_assets = {abi: ROOT / "build-support/abi-assets" / abi / "local-jdk" for abi in IMAGES}
+    for folder in abi_assets.values():
+        folder.mkdir(parents=True, exist_ok=True)
     images = {abi: args.directory / abi if args.from_images else fetch(args.directory, abi) for abi in IMAGES}
     inventories = {}
     for abi, image in images.items():
@@ -91,7 +94,7 @@ def main():
             else:
                 files[name] = sha256(path)
         inventories[abi] = files
-        (assets / (abi + ".links")).write_text("\n".join(links) + "\n")
+        (abi_assets[abi] / (abi + ".links")).write_text("\n".join(links) + "\n")
     first = next(iter(images))
     shared = {name for name, digest in inventories[first].items()
               if all(entries.get(name) == digest for entries in inventories.values())}
@@ -105,7 +108,7 @@ def main():
     with tempfile.TemporaryDirectory() as work:
         for abi, image in images.items():
             extra = inventories[abi].keys() - shared - base
-            package = assets / (abi + ".zip")
+            package = abi_assets[abi] / (abi + ".zip")
             zip_contents(package, extra, image)
             if abi == first:
                 continue

@@ -19,9 +19,9 @@ For cloud providers that expose document URIs and shared folders without direct 
 Use a dedicated emulator and provide the official Android SDK Platform 34 ZIP for the first run. The test creates a temporary Java project and checks resources, DEX, signatures, repeat builds, and diagnostics for missing platforms and unsupported configurations.
 
 ```sh
-./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
-adb -s SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s SERIAL install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+./gradlew :app:assembleX86_64Debug :app:assembleX86_64DebugAndroidTest
+adb -s SERIAL install -r app/build/outputs/apk/x86_64/debug/app-x86_64-debug.apk
+adb -s SERIAL install -r app/build/outputs/apk/androidTest/x86_64/debug/app-x86_64-debug-androidTest.apk
 adb -s SERIAL shell -T 'run-as com.hcgstudio.pocketstudio sh -c "mkdir -p cache && cat >cache/platform-34-test.zip"' < platform-34-ext7_r03.zip
 adb -s SERIAL shell am instrument -w -e scenario build com.hcgstudio.pocketstudio.test/com.hcgstudio.pocketstudio.testing.DeviceDebugTest
 ```
@@ -40,14 +40,12 @@ adb -s SERIAL shell am instrument -w -e scenario gradleAndroid com.hcgstudio.poc
 
 To exercise the system file picker, first open a test folder in Studio. Pass `-e tree` and the granted directory URI to `gradleAndroid`. The scenario creates and removes its test project in that folder. [Bundled OpenJDK sources, verification and repackaging](JDK.md)
 
-## Publishing the two APKs
+## Publishing
 
-In **Release Pocket Studio**, choose **Run workflow**, select `main` and choose the version component to increment (default `patch`). [Manual release workflow](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml) It assigns the next app version, signs both APKs, and publishes them together under a version tag. Install `PocketStudio.apk` for the IDE and `PocketStudio-Codex-Plugin.apk` for the optional Codex plugin. The app can also download the plugin from the fixed `plugin-store` release in **Settings → Plugins**. Android verifies updates against the installed signing certificate.
+Choose the `main` branch and version increment (default `patch`) in **Release Pocket Studio**. The workflow allocates the next app version and publishes a signed `PocketStudio-<abi>.apk` for each of ARM64, ARMv7, x86_64 and x86 on its version tag. [App release workflow](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
 
-The first app or plugin release initializes the catalog. A previously published runtime channel also enables scheduled migration. After that, **Update plugin store** is scheduled daily at 03:23 UTC and checks the signed Termux indexes for ARM64 and x86_64. A change to the Codex packages, required libraries or packaging inputs produces an updated plugin. Its update does not advance the IDE version. The release pipeline packages the native binaries and their notices before distribution.
+The app workflow reads `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` from Actions secrets. The first is the Base64 encoding of the release keystore. The workflow verifies the signer, package name, ABI and version of each APK before publication. [Pinned release certificate](../app/src/main/res/raw/release_signer.der)
 
-The workflows read four repository Actions secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. The first is the Base64 encoding of the release keystore. Keep a separate offline backup of the keystore and password. The app includes only the [public signing certificate](../app/src/main/res/raw/release_signer.der).
+The plugin catalog, icons and per-ABI Codex APKs are published in the dedicated plugins repository. The in-app store selects an APK that matches the device. [Plugin release repository](https://github.com/Akaishi-Tech/PocketStudio-Plugins)
 
-Older development builds may use a different signing certificate. Before replacing a debug-signed IDE with the release build, export any files that exist only in its private storage. The previous Codex runtime has a different Android package ID. Install the new Codex Plugin from Settings to use it with this version of Studio.
-
-The plugin retains the Codex and OpenSSL license notices. The Apache 2.0 text referenced by the OpenSSL package is included in the packaging inputs. [License text](codex-plugin/termux-Apache-2.0.txt)
+Before replacing a differently signed debug build, export any important files from its private storage. Updates to the Codex plugin retain its existing package name and signer.

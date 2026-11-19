@@ -1,5 +1,5 @@
 <resources>
-    <string name="plugin_store">插件</string>
+    <string name="plugin_store">插件商店</string>
     <string name="plugin_install">安装</string>
     <string name="plugin_cannot_install">此设备无法安装这个版本的插件。</string>
     <string name="plugin_catalog_invalid">无法验证插件目录。</string>
@@ -8,4 +8,8 @@
     <string name="plugin_untrusted">签名不受信任</string>
     <string name="plugin_incompatible">不适用于此设备</string>
     <string name="plugin_version_update">%1$s → %2$s</string>
+    <string name="plugin_all">全部</string>
+    <string name="plugin_developer">开发者 · %1$s</string>
+    <string name="plugin_about">介绍</string>
+    <string name="plugin_category_empty">此类别暂无插件。</string>
 </resources>

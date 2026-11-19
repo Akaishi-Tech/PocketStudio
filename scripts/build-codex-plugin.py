@@ -34,7 +34,7 @@ FILES = {
     "openssl": {"lib/libcrypto.so.3": "libcrypto.so.3", "lib/libssl.so.3": "libssl.so.3"},
 }
 NOTICES = {"codex": {"LICENSE", "NOTICE", "license.md"}, "openssl": {"copyright"}}
-APK_NAME = "PocketStudio-Codex-Plugin.apk"
+APK_STEM = "PocketStudio-Codex-Plugin"
 PACKAGE = "com.hcgstudio.pocketstudio.codexplugin"
 PREFIX = "data/data/com.termux/files/usr/"
 DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -147,7 +147,7 @@ def lock_for(release_hash, packages):
             "Codex ABIs do not have one common Android version")
     inputs = [Path(__file__).resolve(), KEYRING, APACHE, SUPPORT / "OpenSSL-NOTICE.txt", PIN,
               ROOT / "build.gradle", ROOT / "settings.gradle", ROOT / "gradle/wrapper/gradle-wrapper.properties"]
-    for module in (SUPPORT, PLUGIN_APK, ROOT / "agent-api"):
+    for module in (SUPPORT, PLUGIN_APK, ROOT / "agent-api", ROOT / "plugin-api"):
         inputs.append(module / "build.gradle")
         inputs.extend(p for p in (module / "src/main").rglob("*") if p.is_file())
     recipe = {p.relative_to(ROOT).as_posix(): digest_file(p) for p in inputs}
@@ -303,13 +303,17 @@ def sdk_tools():
     return build, platform / "android.jar"
 
 
-def assemble(stage, lock, code, output, offline):
-    tools, _ = sdk_tools()
-    work = stage.parent
+def build_template(lock, code, offline):
     subprocess.run([ROOT / "gradlew", ":codex-plugin-apk:assembleRelease",
                     "-PpluginVersionCode=" + str(code), "-PpluginVersionName=" + lock["version"],
                     *(["--offline"] if offline else [])], check=True, cwd=ROOT)
     template, = (PLUGIN_APK / "build/outputs/apk/release").glob("*.apk")
+    return template
+
+
+def assemble(stage, template, abi, output):
+    tools, _ = sdk_tools()
+    work = stage.parent
     with zipfile.ZipFile(template) as compiled:
         require("classes.dex" in compiled.namelist(), "Missing agent provider bytecode")
         compiled.extractall(stage)
@@ -325,7 +329,8 @@ def assemble(stage, lock, code, output, offline):
                 shutil.copyfileobj(src, dst, BLOCK)
     aligned = work / "aligned.apk"
     subprocess.run([tools / "zipalign", "-P", "16", "-f", "4", work / "unsigned.apk", aligned], check=True)
-    signed = work / APK_NAME
+    filename = f"{APK_STEM}-{abi}.apk"
+    signed = work / filename
     subprocess.run([tools / "apksigner", "sign", "--ks", os.environ["ANDROID_KEYSTORE_PATH"], "--ks-key-alias",
                     os.environ["ANDROID_KEY_ALIAS"], "--ks-pass", "env:ANDROID_KEYSTORE_PASSWORD",
                     "--key-pass", "env:ANDROID_KEY_PASSWORD", "--v4-signing-enabled", "false", "--out", signed, aligned],
@@ -337,12 +342,9 @@ def assemble(stage, lock, code, output, offline):
             "The plugin does not have the project's pinned release signer")
     require("Verified using v2 scheme (APK Signature Scheme v2): true" in verified, "APK v2 signature missing")
     subprocess.run([tools / "zipalign", "-c", "-P", "16", "4", signed], check=True)
-    info = {"package": PACKAGE, "version": lock["version"], "versionCode": code, "buildId": lock["buildId"],
-            "file": APK_NAME, "size": signed.stat().st_size, "sha256": digest_file(signed), "signerSha256": signers[0]}
-    os.replace(signed, output / APK_NAME)
-    info.update({"name": "Codex Plugin", "names": {"zh": "Codex 插件"}, "abis": list(ABIS.values())})
-    write_json(output / "plugin-store.json", {"schemaVersion": 1, "plugins": [info]})
-    print(json.dumps(info, ensure_ascii=False))
+    artifact = {"abi": abi, "file": filename, "size": signed.stat().st_size, "sha256": digest_file(signed)}
+    os.replace(signed, output / filename)
+    return artifact
 
 
 def build_plugin(args):
@@ -356,22 +358,30 @@ def build_plugin(args):
             "Lock does not match verified repository metadata and packaging inputs; run resolve again")
     require(0 < args.version_code <= 2_100_000_000, "Invalid Android versionCode")
     args.out.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".plugin-", dir=args.out) as temp:
-        stage = Path(temp) / "contents"
-        for row in lock["packages"]:
-            unpack(package_file(args.cache, row, args.offline), stage, row)
-        assets = stage / "assets"
-        (assets / "codex-version").write_text(lock["version"], encoding="ascii")
-        (assets / "codex-build").write_text(lock["buildId"], encoding="ascii")
-        shutil.copyfile(SUPPORT / "OpenSSL-NOTICE.txt", assets / "licenses/openssl/NOTICE.txt")
-        assemble(stage, lock, args.version_code, args.out, args.offline)
+    template = build_template(lock, args.version_code, args.offline)
+    artifacts = []
+    for arch, abi in ABIS.items():
+        with tempfile.TemporaryDirectory(prefix=".plugin-", dir=args.out) as temp:
+            stage = Path(temp) / "contents"
+            for row in lock["packages"]:
+                if row["architecture"] == arch:
+                    unpack(package_file(args.cache, row, args.offline), stage, row)
+            assets = stage / "assets"
+            (assets / "codex-version").write_text(lock["version"], encoding="ascii")
+            (assets / "codex-build").write_text(lock["buildId"], encoding="ascii")
+            shutil.copyfile(SUPPORT / "OpenSSL-NOTICE.txt", assets / "licenses/openssl/NOTICE.txt")
+            artifacts.append(assemble(stage, template, abi, args.out))
+    info = {"package": PACKAGE, "version": lock["version"], "versionCode": args.version_code,
+            "buildId": lock["buildId"], "signerSha256": digest_file(PIN), "artifacts": artifacts}
+    write_json(args.out / "codex-build.json", info)
+    print(json.dumps(info, ensure_ascii=False))
 
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     actions = cli.add_subparsers(dest="command", required=True)
     resolve_args = actions.add_parser("resolve", help="Validate the upstream indexes and write a package lock")
-    build_args = actions.add_parser("build", help="Verify and build both ABI payloads, then sign the universal APK")
+    build_args = actions.add_parser("build", help="Verify and build both ABI payloads, then sign each ABI APK")
     for action in (resolve_args, build_args):
         action.add_argument("--cache", type=Path, default=Path.home() / ".cache/pocketstudio-codex-plugin")
         action.add_argument("--offline", action="store_true")

@@ -14,8 +14,8 @@
     <string name="effort_max">最大</string>
     <string name="effort_ultra">超高</string>
     <string name="fast_mode">Fast</string>
-    <string name="agent_no_provider">尚未安装智能体</string>
-    <string name="agent_open_store">浏览插件</string>
+    <string name="agent_no_provider">尚未安装智能体插件</string>
+    <string name="agent_open_store">前往插件商店</string>
     <string name="agent_select_provider">选择智能体</string>
     <string name="agent_message">消息</string>
     <string name="agent_plugin_changed">插件已更改，请重新打开智能体以重新加载。</string>

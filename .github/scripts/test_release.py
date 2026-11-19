@@ -75,105 +75,23 @@ class PublishTests(unittest.TestCase):
         self.gh = FakeGitHub()
         self.enterContext(patch.dict(os.environ, CHANNEL="app", BUMP="patch", GITHUB_RUN_ID="401",
                                     GITHUB_RUN_NUMBER="3", GITHUB_SHA="a" * 40))
-        self.lock = {"version": "0.170.0", "buildId": "1" * 64}
-        self.resolver = self.enterContext(patch.object(r.subprocess, "run", side_effect=self.resolve))
 
-    def resolve(self, args, check):
-        assert args[1:4] == [r.SCRIPT, "resolve", "--output"] and check
-        r.write_json(Path(args[4]), self.lock)
-
-    def build(self, plan):
-        if plan["buildRuntime"]:
-            apk = self.out / r.RUNTIME
-            apk.write_bytes(("signed test fixture " + self.lock["buildId"]).encode())
-            meta = dict(self.lock, name="Codex Plugin", abis=["arm64-v8a", "x86_64"], package=r.RUNTIME_ID,
-                         file=r.RUNTIME, versionCode=plan["runtimeCode"], sha256=r.digest(apk),
-                         size=apk.stat().st_size, signerSha256=r.digest(r.PIN))
-            r.write_json(self.out / r.MANIFEST, {"schemaVersion": 1, "plugins": [meta]})
-        if plan["channel"] == "app":
-            (self.out / r.APP).write_bytes(plan["appVersion"].encode())
-
-    def test_manual_bootstrap_retry_and_daily_update(self):
-        os.environ["CHANNEL"] = "scheduled"
-        self.assertIsNone(r.prepare(self.gh, self.out))
-        self.resolver.assert_not_called()
-        os.environ["CHANNEL"] = "app"
+    def test_publishes_only_abi_apks_and_resumes_partial_upload(self):
         plan = r.prepare(self.gh, self.out)
-        self.build(plan)
-        self.assertEqual(plan["runtimeCode"], 1700002)
-        r.publish(self.gh, plan, self.out)
-        fixed, app = self.gh.releases()
-        self.assertEqual({a["name"] for a in fixed["assets"]}, {r.RUNTIME, r.MANIFEST})
-        self.assertEqual({a["name"] for a in app["assets"]}, {r.RUNTIME, r.APP})
-        self.assertEqual(r.asset(fixed, r.RUNTIME)["digest"], r.asset(app, r.RUNTIME)["digest"])
-        self.assertFalse(app["draft"])
-        self.assertIsNone(r.prepare(self.gh, self.out))  # same manual run retried after publishing
-        os.environ["CHANNEL"] = "scheduled"
-        self.assertIsNone(r.prepare(self.gh, self.out))  # unchanged signed dependency lock
-        self.lock["buildId"] = "2" * 64
-        plan = r.prepare(self.gh, self.out)
-        self.assertEqual(plan["runtimeCode"], 1700003)
-        self.build(plan)
-        self.gh.fail_rename = r.RUNTIME
+        for abi in r.FLAVORS:
+            (self.out / r.apk_name(abi)).write_bytes(abi.encode())
+        self.gh.fail_rename = r.apk_name("x86_64")
         with self.assertRaises(OSError):
             r.publish(self.gh, plan, self.out)
-        self.assertEqual(r.asset(self.gh.releases()[0], r.RUNTIME)["digest"], r.asset(fixed, r.RUNTIME)["digest"])
-        r.publish(self.gh, plan, self.out)
-        self.assertEqual(self.gh.releases()[1], app)  # daily release must never edit app releases
+        self.assertTrue(self.gh.rows[0]["draft"])
+        retry = r.prepare(self.gh, self.out)
+        self.assertEqual(plan, retry)
+        r.publish(self.gh, retry, self.out)
+        release, = self.gh.releases()
+        self.assertFalse(release["draft"])
+        self.assertEqual({a["name"] for a in release["assets"]}, {r.apk_name(abi) for abi in r.FLAVORS})
         self.assertIsNone(r.prepare(self.gh, self.out))
-        os.environ.update(CHANNEL="app", GITHUB_RUN_ID="403", GITHUB_RUN_NUMBER="4")
-        next_plan = r.prepare(self.gh, self.out)
-        self.assertFalse(next_plan["buildRuntime"])
-        self.assertEqual(next_plan["appCode"], int(r.APP_MARK.search(app["body"])[2]) + 1)
-        self.assertEqual(r.digest(self.out / r.RUNTIME), r.asset(self.gh.releases()[0], r.RUNTIME)["digest"][7:])
-
-    def test_preserves_other_plugins(self):
-        plan = r.prepare(self.gh, self.out)
-        self.build(plan)
-        r.publish(self.gh, plan, self.out)
-        manifest = self.out / r.MANIFEST
-        store = r.read_json(manifest)
-        other = dict(store["plugins"][0], name="Another Agent", package="org.example.another", file="Another.apk")
-        store["plugins"].append(other)
-        r.write_json(manifest, store)
-        rid = self.gh.releases()[0]["id"]
-        r.replace_asset(self.gh, rid, manifest, "Pocket Studio plugin catalog")
-        item = r.asset(self.gh.releases()[0], r.MANIFEST)
-        self.gh.rename(item, f"previous-{item['id']}-{r.MANIFEST}", item["label"])
-        os.environ["CHANNEL"] = "scheduled"
-        self.lock["buildId"] = "2" * 64
-        plan = r.prepare(self.gh, self.out)
-        self.build(plan)
-        r.publish(self.gh, plan, self.out)
-        self.gh.download(r.asset(self.gh.releases()[0], r.MANIFEST), manifest)
-        entries = r.read_json(manifest)["plugins"]
-        self.assertEqual(len(entries), 2)
-        self.assertIn(other, entries)
-
-    def test_superseded_retry(self):
-        plan = r.prepare(self.gh, self.out)
-        self.build(plan)
-        r.publish(self.gh, plan, self.out)
-        public = self.gh.releases()
         os.environ.update(GITHUB_RUN_ID="400", GITHUB_RUN_NUMBER="2")
-        self.assertIsNone(r.prepare(self.gh, self.out))
-        os.environ.update(CHANNEL="plugins", GITHUB_SHA="b" * 40)
-        self.gh.commit_comparison = "behind"
-        self.assertIsNone(r.prepare(self.gh, self.out))
-        self.assertEqual(self.gh.releases(), public)
-
-    def test_interrupted_initial_manifest(self):
-        fixed = self.gh.create(r.TAG, "", "")
-        (self.out / r.MANIFEST).write_bytes(b"")
-        self.gh.upload(fixed["id"], self.out / r.MANIFEST, r.MANIFEST, "")
-        self.gh.rows[0]["assets"][0]["state"] = "starter"
-        os.environ["CHANNEL"] = "scheduled"
-        self.assertIsNone(r.prepare(self.gh, self.out))  # an incomplete manual bootstrap stays manual
-        os.environ["CHANNEL"] = "plugins"
-        plan = r.prepare(self.gh, self.out)
-        self.assertTrue(plan["buildRuntime"])
-        self.build(plan)
-        r.publish(self.gh, plan, self.out)
         self.assertIsNone(r.prepare(self.gh, self.out))
 
     def test_version_allocation(self):

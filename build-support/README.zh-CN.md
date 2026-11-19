@@ -19,9 +19,9 @@
 使用一台专用模拟器，将官方 Android SDK Platform 34 ZIP 提供给首次运行的测试。测试会构造临时 Java 工程并验证资源、DEX、签名、重复构建、SDK 缺失和不兼容配置的诊断。
 
 ~~~sh
-./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
-adb -s SERIAL install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s SERIAL install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+./gradlew :app:assembleX86_64Debug :app:assembleX86_64DebugAndroidTest
+adb -s SERIAL install -r app/build/outputs/apk/x86_64/debug/app-x86_64-debug.apk
+adb -s SERIAL install -r app/build/outputs/apk/androidTest/x86_64/debug/app-x86_64-debug-androidTest.apk
 adb -s SERIAL shell -T 'run-as com.hcgstudio.pocketstudio sh -c "mkdir -p cache && cat >cache/platform-34-test.zip"' < platform-34-ext7_r03.zip
 adb -s SERIAL shell am instrument -w -e scenario build com.hcgstudio.pocketstudio.test/com.hcgstudio.pocketstudio.testing.DeviceDebugTest
 ~~~
@@ -42,14 +42,12 @@ adb -s SERIAL shell am instrument -w -e scenario gradleAndroid com.hcgstudio.poc
 
 [APK 内置 OpenJDK 的来源、校验与重新打包](JDK.zh-CN.md)
 
-## 发布主应用和 Codex 插件
+## 发布
 
-在 GitHub Actions 打开 **Release Pocket Studio**，点 **Run workflow**，选择 `main` 分支和要增加的版本位（默认 `patch`）。[手动发布](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)工作流取下一个主应用版本号，在对应的版本标签下发布签名的 `PocketStudio.apk` 和 `PocketStudio-Codex-Plugin.apk`。前者是 IDE，后者是可选的「掌上Studio - Codex插件」。也可以只安装 IDE，在「设置 → 插件」中从固定标签 `plugin-store` 下载插件。
+在 **Release Pocket Studio** 选择 `main` 分支和版本增量（默认 `patch`）。工作流分配下一版本，在对应的版本标签下分别上传 ARM64、ARMv7、x86_64 和 x86 的签名 `PocketStudio-<abi>.apk`。[主应用发布工作流](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
 
-首次手动发布主应用或插件会建立插件目录，已有运行时频道也可由定时任务迁移。之后 **Update plugin store** 每日北京时间 11:23（UTC 03:23）计划检查经过签名验证的 Termux 软件包索引，比较 ARM64、x86_64 的 Codex、所需动态库和打包输入。发生变化时才更新固定标签下的插件。插件在发布前已经封装好原生程序和许可证。[每日插件更新](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/plugin-store.yml)
+主应用工作流使用 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD` 四项 Actions Secrets。首项为发布密钥库的 Base64 编码。工作流根据内置公开证书验证每份 APK 的签名、包名、ABI 和版本。[公开签名证书](../app/src/main/res/raw/release_signer.der)
 
-工作流读取四项仓库 Actions Secrets。`ANDROID_KEYSTORE_BASE64` 是发布密钥库的 Base64 编码，其余三项为 `ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。请离线备份密钥库和密码，应用中只附带[公开签名证书](../app/src/main/res/raw/release_signer.der)。
+插件目录、图标和各 ABI 的 Codex APK 由独立仓库发布。应用的插件商店会选择与设备匹配的安装包。[插件发布仓库](https://github.com/Akaishi-Tech/PocketStudio-Plugins)
 
-旧调试版 IDE 如果使用不同签名，换装正式版前请先导出应用私有目录中的重要文件。旧版 Codex 运行时使用不同的 Android 包名。升级 IDE 后，在「设置 → 插件」安装新版 Codex 插件即可继续使用。
-
-插件包保留 Codex 和 OpenSSL 的许可证。OpenSSL 软件包引用的 Apache 2.0 文本随打包工具提供。[许可证原文](codex-plugin/termux-Apache-2.0.txt)
+旧调试版 IDE 如果使用不同签名，换装正式版前请先导出应用私有目录中的重要文件。Codex 插件的现有包名和签名延续使用，更新可保留已有配置。

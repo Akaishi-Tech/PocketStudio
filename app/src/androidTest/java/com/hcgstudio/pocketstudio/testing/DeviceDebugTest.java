@@ -40,6 +40,12 @@ public final class DeviceDebugTest extends Instrumentation {
         try {
             if (java.util.Arrays.asList("codexDownload", "codexHandshake", "codexNetwork", "codexVerifyRelease", "codexOfflineInstall").contains(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.CodexRuntimeChecks.run(getTargetContext(), getContext(), arguments.getString("scenario")));
+            } else if ("pluginDiscovery".equals(arguments.getString("scenario"))) {
+                result.putString("result", com.hcgstudio.pocketstudio.PluginDiscoveryChecks.run(getTargetContext(),
+                        Boolean.parseBoolean(arguments.getString("legacy", "false")),
+                        Boolean.parseBoolean(arguments.getString("trusted", "true"))));
+            } else if ("pluginCatalog".equals(arguments.getString("scenario"))) {
+                result.putString("result", com.hcgstudio.pocketstudio.PluginStoreChecks.catalog(getTargetContext()));
             } else if ("pluginLocalInstall".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.PluginStoreChecks.installLocally(getTargetContext(),
                         Integer.parseInt(arguments.getString("port"))));

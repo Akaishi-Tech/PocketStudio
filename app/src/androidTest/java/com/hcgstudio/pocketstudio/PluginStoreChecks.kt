@@ -11,13 +11,36 @@ import org.json.JSONObject
 import java.io.File
 
 object PluginStoreChecks {
+    @JvmStatic fun catalog(context: Context): String {
+        val store = PluginStore(context)
+        val cert = context.resources.openRawResource(R.raw.release_signer).use { it.readBytes() }
+        val signer = java.security.MessageDigest.getInstance("SHA-256").digest(cert).joinToString("") { "%02x".format(it) }
+        val catalog = """{"schemaVersion":2,"plugins":[{"package":"com.hcgstudio.pocketstudio.sample","category":"agent",
+            "name":"Sample","developer":"Sample tools","description":"An example agent.","icon":"Sample.png",
+            "version":"1.0","versionCode":1,"signerSha256":"$signer","artifacts":[
+            {"abi":"x86_64","file":"Sample-x86_64.apk","sha256":"${"1".repeat(64)}","size":1234},
+            {"abi":"arm64-v8a","file":"Sample-arm64-v8a.apk","sha256":"${"2".repeat(64)}","size":4567}]}]}"""
+        val plugin = store.parse(catalog).single()
+        check(plugin.category == "agent" && plugin.developer == "Sample tools" && plugin.description == "An example agent.")
+        check(plugin.icon == "Sample.png")
+        check(plugin.artifact(listOf("arm64-v8a", "x86_64"))?.size == 4567L)
+        check(plugin.artifact(listOf("x86", "x86_64"))?.file == "Sample-x86_64.apk")
+        check(plugin.artifact(listOf("armeabi-v7a")) == null)
+        check(runCatching { store.parse(catalog.replace("Sample.png", "../Sample.png")) }.isFailure)
+        check(runCatching { store.parse(catalog.replace("arm64-v8a", "x86_64")) }.isFailure)
+        check(runCatching { store.parse(catalog.replace("arm64-v8a", "universal")) }.isFailure)
+        return "PASS plugin catalog metadata, asset names and ABI selection"
+    }
+
     /** The test emulator exposes its own adbd on the supplied loopback port. */
     @JvmStatic fun installLocally(context: Context, port: Int): String = runBlocking {
         val fixture = File(context.cacheDir, "codex-release-test")
         val store = PluginStore(context)
         val plugin = store.parse(File(fixture, "plugin-store.json").readText()).single()
-        val apk = File(fixture, plugin.file)
-        ReleaseApkInstaller(context, plugin.packageName, plugin.packageName).verifyArchive(apk, plugin.release)
+        val artifact = checkNotNull(plugin.artifact())
+        val release = plugin.release(artifact)
+        val apk = File(fixture, artifact.file)
+        ReleaseApkInstaller(context, plugin.packageName, plugin.packageName).verifyArchive(apk, release)
         withContext(Dispatchers.Main) {
             DeviceController(context).use { devices ->
                 if (port == 5555) {
@@ -33,7 +56,7 @@ object PluginStoreChecks {
             }
         }
         val installed = store.installed(emptyList())[plugin.packageName]
-        check(installed?.trusted == true && installed.versionCode == plugin.release.versionCode)
+        check(installed?.trusted == true && installed.versionCode == plugin.versionCode)
         "PASS installed through unconfigured local adbd, active connection and reconnection"
     }
 
@@ -42,14 +65,15 @@ object PluginStoreChecks {
         if (scenario == "codexDownload") {
             val plugin = store.catalog().single { it.packageName == "com.hcgstudio.pocketstudio.codexplugin" }
             val apk = store.download(plugin) { _, _ -> }
-            check(apk.length() == plugin.release.size)
+            check(apk.length() == checkNotNull(plugin.artifact()).size)
             return "PASS downloaded and verified plugin from the store"
         }
         val fixture = File(context.cacheDir, "codex-release-test")
         val catalog = File(fixture, "plugin-store.json").readText()
         val plugin = store.parse(catalog).single { it.packageName == "com.hcgstudio.pocketstudio.codexplugin" }
-        val release = plugin.release
-        val apk = File(fixture, plugin.file)
+        val artifact = checkNotNull(plugin.artifact())
+        val release = plugin.release(artifact)
+        val apk = File(fixture, artifact.file)
         val installer = ReleaseApkInstaller(context, plugin.packageName, plugin.packageName)
 
         if (scenario == "codexOfflineInstall") {
@@ -81,7 +105,9 @@ object PluginStoreChecks {
         for ((field, value) in listOf("file" to "../foreign.apk", "file" to "https://example.invalid/p.apk",
             "signerSha256" to "0".repeat(64), "package" to context.packageName)) {
             val document = JSONObject(catalog)
-            document.getJSONArray("plugins").getJSONObject(0).put(field, value)
+            val entry = document.getJSONArray("plugins").getJSONObject(0)
+            val target = if (field == "file") entry.optJSONArray("artifacts")?.getJSONObject(0) ?: entry else entry
+            target.put(field, value)
             check(runCatching { store.parse(document.toString()) }.isFailure) { "Accepted invalid $field" }
         }
         val document = JSONObject(catalog)

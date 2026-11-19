@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.hcgstudio.pocketstudio.plugin.PluginDiscovery
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -110,8 +111,9 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         }
     }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    LaunchedEffect(w.tool) {
-        if (Build.VERSION.SDK_INT >= 33 && w.tool in listOf(Tool.Devices, Tool.Agents) &&
+    val usesSessionNotifications = w.tool == Tool.Devices || (w.tool == Tool.Agents && w.agents.session != null)
+    LaunchedEffect(usesSessionNotifications) {
+        if (Build.VERSION.SDK_INT >= 33 && usesSessionNotifications &&
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             val prefs = context.getSharedPreferences("studio", 0)
             if (!prefs.getBoolean("requestedSessionNotifications", false)) {
@@ -318,7 +320,7 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
                         { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
                     StudioPage.Workbench -> workbenchState.SaveableStateProvider("workbench") {
                         Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
-                            if (w.agents.session == null) dialog = "plugins"
+                            if (w.agents.session == null) dialog = "agentPlugins"
                             else { w.agents.dismissError(); showAgentAccount = true }
                         }
                     }
@@ -343,7 +345,8 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         "gitClone" -> GitCloneDialog(dismiss) { directory -> dismiss(); w.openProject(Uri.fromFile(directory)) }
         "licenses" -> LicensePage(dismiss)
         "keymap" -> KeymapDialog(actions, defaults, keymap, dismiss)
-        "plugins" -> PluginStorePage(w.devices, dismiss)
+        "plugins", "agentPlugins" -> PluginStorePage(w.devices,
+            initialCategory = if (dialog == "agentPlugins") PluginDiscovery.AGENT_CATEGORY else null, dismiss = dismiss)
         "sdk" -> SdkManager(dismiss)
         "buildSdk" -> if (p != null) BuildSdkDialog(w, dismiss)
         "palette" -> ActionPalette(actions, dismiss)

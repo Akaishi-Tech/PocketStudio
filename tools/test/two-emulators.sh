@@ -52,11 +52,19 @@ jar cf "$work/target.jar" -C "$work/classes" .
 (cd "$work/dex" && zip -q "$work/target.apk" classes.dex)
 # AGP creates its debug key when assembling the host. Reuse it so rerunning on the same
 # disposable target can update the fixture with adb install -r.
-"$root/gradlew" --offline -p "$root" :app:assembleDebug :app:assembleDebugAndroidTest
+host_abi=$(adb -s "$host" shell getprop ro.product.cpu.abi | tr -d '\r')
+case "$host_abi" in
+    arm64-v8a) flavor=arm64V8a; variant=Arm64V8a ;;
+    armeabi-v7a) flavor=armeabiV7a; variant=ArmeabiV7a ;;
+    x86) flavor=x86; variant=X86 ;;
+    x86_64) flavor=x86_64; variant=X86_64 ;;
+    *) echo "Unsupported host ABI: $host_abi" >&2; exit 1 ;;
+esac
+"$root/gradlew" --offline -p "$root" ":app:assemble${variant}Debug" ":app:assemble${variant}DebugAndroidTest"
 debug_key=${ANDROID_USER_HOME:-"$HOME/.android"}/debug.keystore
 "$build_tools/apksigner" sign --ks "$debug_key" --ks-pass pass:android "$work/target.apk"
-adb -s "$host" install -r "$root/app/build/outputs/apk/debug/app-debug.apk"
-adb -s "$host" install -r "$root/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+adb -s "$host" install -r "$root/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+adb -s "$host" install -r "$root/app/build/outputs/apk/androidTest/$flavor/debug/app-$flavor-debug-androidTest.apk"
 adb -s "$host" shell run-as com.hcgstudio.pocketstudio mkdir -p files
 fixture_copied=true
 adb -s "$host" shell -T 'run-as com.hcgstudio.pocketstudio sh -c "cat >files/studio-test-target.apk"' < "$work/target.apk"

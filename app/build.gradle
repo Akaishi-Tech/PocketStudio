@@ -23,6 +23,14 @@ android {
         versionCode distributionCode
         versionName distributionVersion
     }
+    flavorDimensions += 'architecture'
+    [arm64V8a: 'arm64-v8a', armeabiV7a: 'armeabi-v7a', x86: 'x86', x86_64: 'x86_64'].each { flavor, abi ->
+        productFlavors.create(flavor) {
+            dimension 'architecture'
+            ndk.abiFilters.add(abi)
+        }
+        sourceSets.getByName(flavor).assets.srcDir("../build-support/abi-assets/${abi}")
+    }
     if (signingFile != null) {
         signingConfigs {
             distribution {

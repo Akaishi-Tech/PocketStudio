@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Pocket Studio - Codex Plugin</string>
+    <string name="codex_plugin_description">Use Codex to navigate, edit and debug your Android project in Pocket Studio.</string>
 </resources>

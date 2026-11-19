@@ -1,9 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Native extraction preserves the executable helper names used by upstream Codex. -->
-    <application android:label="@string/app_name"
+    <application android:label="@string/app_name" android:icon="@drawable/codex_plugin_icon"
         android:allowBackup="false">
-        <service android:name="com.hcgstudio.pocketstudio.codexplugin.CodexPluginMarker" android:exported="true">
-            <intent-filter><action android:name="com.hcgstudio.pocketstudio.AGENT_PLUGIN"/></intent-filter>
+        <service android:name="com.hcgstudio.pocketstudio.codexplugin.CodexPluginMarker" android:exported="true"
+            android:description="@string/codex_plugin_description">
+            <intent-filter>
+                <action android:name="com.hcgstudio.pocketstudio.PLUGIN" />
+                <action android:name="com.hcgstudio.pocketstudio.AGENT_PLUGIN" />
+            </intent-filter>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_API" android:value="1" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY" android:value="agent" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER" android:value="Akaishi Tech" />
             <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_API" android:value="1"/>
             <meta-data android:name="com.hcgstudio.pocketstudio.AGENT_ENTRY"
                 android:value="com.hcgstudio.pocketstudio.codexplugin.CodexPlugin"/>

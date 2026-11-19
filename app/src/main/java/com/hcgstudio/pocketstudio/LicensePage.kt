@@ -79,7 +79,7 @@ internal fun LicensePage(dismiss: () -> Unit) {
     val runtimeNotices by produceState<Map<String, String>>(emptyMap(), context) {
         value = withContext(Dispatchers.IO) {
             buildMap {
-                for (plugin in installedAgentPlugins(context)) {
+                for (plugin in discoverPlugins(context).filter { it.trusted }) {
                     try {
                         ZipFile(plugin.sourceDir).use { apk ->
                             apk.entries().asSequence().filter { !it.isDirectory && it.name.startsWith("assets/licenses/") &&

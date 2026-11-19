@@ -1,9 +1,8 @@
 package com.hcgstudio.pocketstudio
 
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import com.hcgstudio.pocketstudio.agent.AgentPlugin
+import com.hcgstudio.pocketstudio.plugin.PluginDiscovery
 import dalvik.system.PathClassLoader
 
 internal data class InstalledAgentPlugin(val packageName: String, val label: String, val version: String,
@@ -28,19 +27,11 @@ internal data class InstalledAgentPlugin(val packageName: String, val label: Str
     }
 }
 
-@Suppress("DEPRECATION")
-internal fun installedAgentPlugins(context: Context): List<InstalledAgentPlugin> {
-    val pm = context.packageManager
-    val signer = context.resources.openRawResource(R.raw.release_signer).use { it.readBytes() }
-    return pm.queryIntentServices(Intent(AgentPlugin.ACTION), PackageManager.GET_META_DATA).mapNotNull { resolved ->
-        val service = resolved.serviceInfo
-        val metadata = service.metaData ?: return@mapNotNull null
+internal fun installedAgentPlugins(context: Context): List<InstalledAgentPlugin> =
+    discoverPlugins(context).mapNotNull { plugin ->
+        if (!plugin.trusted || plugin.category != PluginDiscovery.AGENT_CATEGORY) return@mapNotNull null
+        val metadata = plugin.service.metaData
         if (metadata.getInt(AgentPlugin.API) != AgentPlugin.VERSION) return@mapNotNull null
         val entry = metadata.getString(AgentPlugin.ENTRY)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val info = pm.signedPackageInfo(service.packageName) ?: return@mapNotNull null
-        if (!info.hasReleaseSigner(signer)) return@mapNotNull null
-        val app = info.applicationInfo ?: return@mapNotNull null
-        InstalledAgentPlugin(info.packageName, service.loadLabel(pm).toString(), info.versionName.orEmpty(),
-            packageVersionCode(info), app.sourceDir, entry)
-    }.distinctBy { it.packageName }.sortedBy { it.label }
-}
+        InstalledAgentPlugin(plugin.packageName, plugin.label, plugin.version, plugin.versionCode, plugin.sourceDir, entry)
+    }

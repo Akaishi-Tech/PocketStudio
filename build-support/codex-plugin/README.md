@@ -1,6 +1,6 @@
 # Standalone Codex plugin
 
-`scripts/build-codex-plugin.py` builds `PocketStudio-Codex-Plugin.apk` for ARM64 and x86-64. The package name is `com.hcgstudio.pocketstudio.codexplugin`. The upstream Codex version is the Android `versionName`. The release workflow allocates a monotonic `versionCode` for each new build, including dependency and packaging updates.
+`scripts/build-codex-plugin.py` builds separate `PocketStudio-Codex-Plugin-arm64-v8a.apk` and `PocketStudio-Codex-Plugin-x86_64.apk` packages. The package name is `com.hcgstudio.pocketstudio.codexplugin`. The upstream Codex version is the Android `versionName`. The release workflow allocates a monotonic `versionCode` for each new build, including dependency and packaging updates.
 
 ## Build
 
@@ -12,7 +12,7 @@ python3 scripts/build-codex-plugin.py build --lock build/codex-plugin-inputs/loc
   --version-code "$PLUGIN_VERSION_CODE" --out dist/release
 ```
 
-The signing step reads `ANDROID_KEYSTORE_PATH`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`. The APK must verify with the release certificate pinned in the main app. The Codex entry in `plugin-store.json` records the APK byte length, SHA-256, signer fingerprint, build ID, and Android versions. [Pinned public certificate](../../app/src/main/res/raw/release_signer.der)
+The signing step reads `ANDROID_KEYSTORE_PATH`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`. The APK must verify with the release certificate pinned in the main app. The packager writes `codex-build.json` with the package identity, build ID, signer fingerprint and the size and SHA-256 of each ABI artifact. The dedicated store repository combines that data with its listing and icon. [Plugin release workflow](https://github.com/Akaishi-Tech/PocketStudio-Plugins/actions/workflows/release-plugins.yml) [Pinned public certificate](../../app/src/main/res/raw/release_signer.der)
 
 The resolver verifies the Termux OpenPGP signature on `Release`, then checks both ABI package indexes against its SHA-256 list. The builder checks the size and digest of every Debian package. The build ID covers the selected package records, packager, agent implementation and packaging inputs. An unrelated repository-index update leaves that identity unchanged. [Termux signing key source](https://github.com/termux/termux-packages/blob/b56f93df91fbf9ce6a0aa98f06fe9b504e21f594/packages/termux-keyring/termux-autobuilds.gpg)
 

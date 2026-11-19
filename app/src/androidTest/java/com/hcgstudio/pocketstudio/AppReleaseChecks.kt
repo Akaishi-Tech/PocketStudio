@@ -26,7 +26,24 @@ object AppReleaseChecks {
     @JvmStatic fun run(context: Context, verifyArchive: Boolean) {
         val client = AppReleases(context)
         val release = client.parse(releaseDocument().toString())
-        check(release == AppRelease(version, 18L, 245000000L, hash))
+        check(release == AppRelease(version, 18L, 245000000L, hash, "PocketStudio.apk"))
+
+        val split = releaseDocument().apply {
+            val files = getJSONArray("assets")
+            val legacy = files.remove(1) as JSONObject
+            for (abi in listOf("x86", "arm64-v8a", "x86_64")) {
+                val name = "PocketStudio-$abi.apk"
+                files.put(JSONObject(legacy.toString()).put("name", name)
+                    .put("browser_download_url", url.substringBeforeLast('/') + "/" + name))
+            }
+        }
+        fun selected(vararg abis: String) = GitHubApkReleases(context, abis.toList()).parse(split.toString()).assetName
+        check(selected("x86_64", "x86") == "PocketStudio-x86_64.apk")
+        check(selected("armeabi-v7a", "x86") == "PocketStudio-x86.apk")
+        check(runCatching { selected("riscv64") }.isFailure)
+        val files = split.getJSONArray("assets")
+        files.put(files.getJSONObject(1))
+        check(runCatching { selected("x86") }.isFailure)
 
         fun reject(reason: String, mutate: (JSONObject, JSONObject) -> Unit) {
             val document = releaseDocument()
@@ -53,7 +70,7 @@ object AppReleaseChecks {
             // Supply a matching GitHub API response and release APK in the app's test cache.
             val dir = File(context.cacheDir, "app-release-test")
             val published = client.parse(File(dir, "release.json").readText())
-            val apk = File(dir, "PocketStudio.apk")
+            val apk = File(dir, requireNotNull(published.assetName))
             client.verifyArchive(apk, published)
             check(runCatching { client.verifyArchive(apk, published.copy(versionCode = published.versionCode + 1)) }.isFailure)
             check(runCatching { client.verifyArchive(apk, published.copy(sha256 = "0".repeat(64))) }.isFailure)

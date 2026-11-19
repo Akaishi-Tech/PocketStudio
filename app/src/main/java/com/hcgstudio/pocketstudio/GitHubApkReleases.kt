@@ -1,6 +1,7 @@
 package com.hcgstudio.pocketstudio
 
 import android.content.Context
+import android.os.Build
 import androidx.core.content.edit
 import org.json.JSONException
 import org.json.JSONObject
@@ -11,19 +12,13 @@ import java.io.InterruptedIOException
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
-/** Both Android packages use GitHub's asset digest and the version label set by release.py. */
-internal class GitHubApkReleases(
-    context: Context,
-    preferenceName: String,
-    private val endpoint: String,
-    private val fileName: String,
-    private val label: Regex,
-    private val tagForVersion: (String) -> String
-) {
-    private val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+/** Select an APK from the app release using Android's ABI preference order. */
+internal class GitHubApkReleases(context: Context, abis: List<String> = Build.SUPPORTED_ABIS.toList()) {
+    private val preferences = context.getSharedPreferences("app-github-release", Context.MODE_PRIVATE)
+    private val candidates = abis.map { "PocketStudio-$it.apk" }
 
     fun latest(): AppRelease? {
-        val connection = connect(URL("https://api.github.com/repos/$REPO/releases/$endpoint"))
+        val connection = connect(URL("https://api.github.com/repos/$REPO/releases/latest"))
         try {
             val cached = preferences.getString("release", null)
             if (cached != null) preferences.getString("etag", null)?.let { connection.setRequestProperty("If-None-Match", it) }
@@ -57,28 +52,36 @@ internal class GitHubApkReleases(
         try {
             val release = JSONObject(body)
             if (release.getBoolean("draft") || release.getBoolean("prerelease")) throw invalidMetadata()
-            val assets = release.getJSONArray("assets")
-            val asset = (0 until assets.length()).map(assets::getJSONObject).singleOrNull { it.getString("name") == fileName }
+            val entries = release.getJSONArray("assets")
+            val assets = (0 until entries.length()).map(entries::getJSONObject).groupBy { it.getString("name") }
+            val fileName = candidates.firstOrNull { it in assets }
+                ?: LEGACY_APK.takeIf { assets.keys.none { name -> ABI_APK.matches(name) } }
                 ?: throw invalidMetadata()
-            val match = label.matchEntire(asset.getString("label")) ?: throw invalidMetadata()
+            val asset = assets[fileName]?.singleOrNull() ?: throw invalidMetadata()
+            val match = LABEL.matchEntire(asset.getString("label")) ?: throw invalidMetadata()
             val version = match.groupValues[1]
             val code = match.groupValues[2].toLongOrNull()?.takeIf { it in 1..2_100_000_000L } ?: throw invalidMetadata()
-            if (release.getString("tag_name") != tagForVersion(version) || asset.getString("state") != "uploaded" ||
-                asset.getString("browser_download_url") != downloadUrl(version)) throw invalidMetadata()
+            if (release.getString("tag_name") != "v$version" || asset.getString("state") != "uploaded" ||
+                asset.getString("browser_download_url") != downloadUrl(version, fileName)) throw invalidMetadata()
             val size = asset.getLong("size").takeIf { it in 1..MAX_APK } ?: throw invalidMetadata()
             val digest = asset.getString("digest").takeIf { HASH.matches(it) } ?: throw invalidMetadata()
-            return AppRelease(version, code, size, digest.removePrefix("sha256:"))
+            return AppRelease(version, code, size, digest.removePrefix("sha256:"), fileName)
         } catch (e: JSONException) { throw IOException(uiString(R.string.github_apk_invalid_release), e) }
     }
 
     fun download(release: AppRelease, destination: File, progress: (Long, Long) -> Unit) {
-        downloadGitHubApk(downloadUrl(release.version), release, destination, progress)
+        val name = release.assetName ?: throw invalidMetadata()
+        if (name != LEGACY_APK && name !in candidates) throw invalidMetadata()
+        downloadGitHubApk(downloadUrl(release.version, name), release, destination, progress)
     }
 
-    private fun downloadUrl(version: String) = "https://github.com/$REPO/releases/download/${tagForVersion(version)}/$fileName"
+    private fun downloadUrl(version: String, fileName: String) = "https://github.com/$REPO/releases/download/v$version/$fileName"
 
     companion object {
         internal const val REPO = "Akaishi-Tech/PocketStudio"
+        private const val LEGACY_APK = "PocketStudio.apk"
+        private val ABI_APK = Regex("""PocketStudio-(?:arm64-v8a|armeabi-v7a|x86_64|x86)\.apk""")
+        private val LABEL = Regex("""Pocket Studio ((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)) \(([0-9]+)\)""")
         private const val MAX_APK = 1_500_000_000L
         private val HASH = Regex("sha256:[0-9a-f]{64}")
         private fun invalidMetadata() = IOException(uiString(R.string.github_apk_invalid_release))

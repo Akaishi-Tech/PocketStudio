@@ -5,12 +5,11 @@ import android.content.Intent
 import java.io.File
 import java.io.IOException
 
-internal data class AppRelease(val version: String, val versionCode: Long, val size: Long, val sha256: String)
+internal data class AppRelease(val version: String, val versionCode: Long, val size: Long, val sha256: String, val assetName: String? = null)
 
 internal class AppReleases(context: Context) : AppUpdateSource {
     private val app = context.applicationContext
-    private val releases = GitHubApkReleases(app, "app-github-release", "latest", "PocketStudio.apk",
-        Regex("""Pocket Studio ((?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)) \(([0-9]+)\)""")) { "v$it" }
+    private val releases = GitHubApkReleases(app)
     private val installer = ReleaseApkInstaller(app, app.packageName, "pocket-studio")
 
     override fun latest(): AppRelease? = releases.latest()
