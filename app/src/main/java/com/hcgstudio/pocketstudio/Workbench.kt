@@ -147,26 +147,35 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
         val desktop = maxWidth >= 940.dp * (LocalDensity.current.fontScale * settings.uiFontSize / 14f).coerceAtLeast(1f)
+        val railWidth = 60.dp
         val sideWidth = if (desktop) 260.dp else if (maxWidth >= 760.dp) 220.dp else 182.dp
+        val agentWidth = (maxWidth * .36f).coerceIn(300.dp, 520.dp)
+        val dockAgent = wide && w.tool == Tool.Agents
+        // Allow room for the editor and the three dividers before showing both side panes.
+        val canFitBoth = maxWidth >= railWidth + sideWidth + agentWidth + 240.dp + 3.dp
+        val showTree = tree && (!dockAgent || canFitBoth)
         val height = maxHeight
         fun select(tool: Tool) {
-            if (tool == Tool.Project && wide) setTree(w.tool == Tool.Agents || !tree)
+            if (tool == Tool.Project && wide) {
+                setTree(!showTree)
+                if (dockAgent && canFitBoth) return
+            }
             w.tool = if (wide && w.tool == tool && tool in listOf(Tool.Devices, Tool.Output, Tool.Agents)) Tool.Editor else tool
         }
         val bottomInset = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
         val outerInsets = if (wide) Modifier.windowInsetsPadding(bottomInset) else Modifier
         Column(Modifier.fillMaxSize().background(colors.surface).then(outerInsets)) {
-            if (w.tool == Tool.Agents) {
+            if (!wide && w.tool == Tool.Agents) {
                 Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
             } else {
                 WorkspaceBar(w, actions, desktop)
             }
             Row(Modifier.fillMaxWidth().weight(1f)) {
                 if (wide) {
-                    Column(Modifier.width(60.dp).fillMaxHeight().background(colors.surfaceContainerLow).padding(vertical = 6.dp),
+                    Column(Modifier.width(railWidth).fillMaxHeight().background(colors.surfaceContainerLow).padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         tools.filter { it.tool != Tool.Editor }.forEach { item ->
-                            val selected = if (item.tool == Tool.Project) tree && w.tool != Tool.Agents else w.tool == item.tool
+                            val selected = if (item.tool == Tool.Project) showTree else w.tool == item.tool
                             val action = { select(item.tool) }
                             if (selected) FilledTonalIconButton(action) { Symbol(item.icon, stringResource(item.label)) }
                             else StudioIconButton(item.icon, stringResource(item.label), onClick = action)
@@ -178,14 +187,14 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                         StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = actions.first { it.id == "settings" }.run)
                     }
                     VerticalDivider(color = colors.outlineVariant)
-                    if (tree && w.tool != Tool.Agents) {
+                    if (showTree) {
                         ProjectPane(w, actions, Modifier.width(sideWidth).fillMaxHeight(), openEntry)
                         VerticalDivider(color = colors.outlineVariant)
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     val tool = w.tool
-                    val mainPane = if (wide && tool != Tool.Agents) Tool.Editor else tool
+                    val mainPane = if (wide) Tool.Editor else tool
                     StudioPageTransition(mainPane, { 0 }, Modifier.fillMaxWidth().weight(1f)) { pane ->
                         when (pane) {
                             Tool.Editor -> EditorPane(w, className, Modifier.fillMaxSize()) {
@@ -211,8 +220,12 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                         }
                     }
                 }
+                if (dockAgent) {
+                    VerticalDivider(color = colors.outlineVariant)
+                    AgentPane(w, openAgentAccount, Modifier.width(agentWidth))
+                }
             }
-            if (settings.showStatusBar && ((wide && w.tool != Tool.Agents) || (w.tool == Tool.Editor && w.active != null))) {
+            if (settings.showStatusBar && (wide || (w.tool == Tool.Editor && w.active != null))) {
                 HorizontalDivider(color = colors.outlineVariant)
                 Row(Modifier.fillMaxWidth().heightIn(min = if (settings.compactMode) 22.dp else 28.dp)
                     .background(colors.surfaceContainerLow).padding(horizontal = 14.dp),

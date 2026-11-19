@@ -28,12 +28,12 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-internal fun AgentPane(w: Workspace, openAccount: () -> Unit) {
+internal fun AgentPane(w: Workspace, openAccount: () -> Unit, modifier: Modifier = Modifier) {
     val agents = w.agents
     val c = agents.session
     val colors = MaterialTheme.colorScheme
     BackHandler(c?.detail == true && agents.approval == null) { c?.back() }
-    Column(Modifier.fillMaxSize().background(colors.surface)) {
+    Column(modifier.fillMaxSize().background(colors.surface)) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(start = if (c?.detail == true) 4.dp else 20.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             if (c?.detail == true) StudioIconButton(R.drawable.studio_arrow_back, uiString(R.string.back_to_chats), onClick = c::back)
