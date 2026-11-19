@@ -1,0 +1,14 @@
+PRoot 5.1.107.102 from the Termux project
+https://github.com/termux/proot/tree/v5.1.107.102
+https://github.com/termux/termux-packages/tree/master/packages/proot
+
+talloc 2.5.0 from the Samba team
+https://www.samba.org/ftp/talloc/talloc-2.5.0.tar.gz
+https://github.com/termux/termux-packages/tree/master/packages/libtalloc
+
+libandroid-shmem 0.7
+https://github.com/termux/libandroid-shmem/tree/v0.7
+
+Package binaries are unmodified. For source, build recipes, archive hashes
+and the packaging script, see plugins/proot in Pocket Studio.
+The Debian image includes package copyright information in /usr/share/doc.

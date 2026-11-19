@@ -31,10 +31,16 @@ internal class OpenFile(
     val node: Project.Node,
     savedText: String,
     initial: String,
+    linux: LinuxProject? = null,
     changed: (String) -> Unit
 ) {
     var saved by mutableStateOf(savedText)
-    val editor = StudioEditorState(initial, node.name, onTextChanged = changed)
+    val editor = StudioEditorState(initial, node.name, onTextChanged = changed).also { state ->
+        if (linux != null) linux.languages.firstOrNull { it.matches(node.name) }?.let { language ->
+            state.language = language
+            if (language.server.isNotEmpty()) state.linuxCompletion = LinuxCompletion(linux, node.path, language)
+        }
+    }
     val dirty get() = editor.text != saved
 }
 
@@ -50,11 +56,14 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     val devices = DeviceController(app)
     var androidEnvironment by mutableStateOf<AndroidEnvironment?>(null)
         private set
-    val androidAvailable get() = androidEnvironment != null
+    val androidAvailable get() = androidEnvironment != null && project?.linux == null
+    val linuxShell = LinuxShell(this, scope)
+    var linuxEnvironments by mutableStateOf(emptyList<DiscoveredPlugin>())
+        private set
     private var discovery: Job? = null
     private val packageChanges = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.data?.schemeSpecificPart == AndroidEnvironments.PACKAGE) refreshEnvironment()
+            refreshEnvironment()
         }
     }
     fun refreshEnvironment() {
@@ -65,8 +74,9 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { report(e); null }
             catch (e: LinkageError) { report(e); null }
+            linuxEnvironments = withContext(Dispatchers.IO) { LinuxProjects.registrations(app) }
             if (!androidAvailable) devices.closeRemoteConnection()
-            if (!androidAvailable && tool == Tool.Output) tool = Tool.Editor
+            if (!androidAvailable && project?.linux == null && tool == Tool.Output) tool = Tool.Editor
         }
     }
 
@@ -184,8 +194,10 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             JSONArray().apply { recent.forEach { put(JSONArray().put(it.first).put(it.second)) } }.toString()).apply()
     }
     private fun reset() {
+        linuxShell.reset()
         agents.reset()
         openVersion++
+        tabs.forEach { it.editor.linuxCompletion?.close() }
         tabs.clear(); active = null; folders.clear(); selectedDir = null; selectedNode = null
         apk = null; output = ""; tool = Tool.Project
     }
@@ -197,6 +209,10 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 Project.importZip(app, uri, name ?: "Project")
             } else Project(app, uri)
         }
+    }
+
+    fun openLinuxProject(pkg: String, name: String) {
+        switchProject(null, creating = true) { Project(app, LinuxProjects.uri(pkg, name)) }
     }
 
     override fun projectNameError(name: String): String? = Project.projectNameError(name)
@@ -252,6 +268,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     }
     fun closeTab(d: OpenFile) {
         project?.let { persist(it, d) }
+        d.editor.linuxCompletion?.close()
         tabs.remove(d)
         if (active === d) {
             active = null
@@ -277,7 +294,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             if (project !== p || openVersion != version) return@action
             reveal(p, node)
             if (project !== p || openVersion != version) return@action
-            val doc = OpenFile(node, saved, body) { edited(p, node) }
+            val doc = OpenFile(node, saved, body, p.linux) { edited(p, node) }
             tabs.add(doc); select(doc)
             if (line > 0) doc.editor.go(line)
         }
@@ -403,8 +420,9 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             val old = tabs[index]
             val text = io { p.read(node) }
             if (project !== p || old.dirty) continue
-            val replacement = OpenFile(node, text, text) { edited(p, node) }
+            val replacement = OpenFile(node, text, text, p.linux) { edited(p, node) }
             replacement.editor.go(old.editor.line, old.editor.column)
+            old.editor.linuxCompletion?.close()
             tabs[index] = replacement
             if (active === old) active = replacement
             persist(p, replacement)
@@ -436,8 +454,9 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
             }
             val (node, body) = current
             if (node.uri == old.node.uri && body == old.saved) continue
-            val updated = OpenFile(node, body, body) { edited(p, node) }
+            val updated = OpenFile(node, body, body, p.linux) { edited(p, node) }
             updated.editor.go(old.editor.line, old.editor.column)
+            old.editor.linuxCompletion?.close()
             tabs[index] = updated
             if (active === old) active = updated
             persist(p, updated)
@@ -472,6 +491,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     }
     fun openGit(tab: GitTab = GitTab.Changes, file: String? = null, diff: Boolean = false) {
         val selected = project ?: return
+        if (selected.linux != null) { tool = Tool.Output; linuxShell.start(selected); return }
         if (busy || running || agents.working || git != null) return
         busy = true
         action {
@@ -522,5 +542,5 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         val p = project ?: return
         action { val node = io { p.resolve(path) }; if (project === p) openFile(node, line) }
     }
-    override fun onCleared() { app.unregisterReceiver(packageChanges); agents.reset(); devices.close(); scope.cancel(); super.onCleared() }
+    override fun onCleared() { tabs.forEach { it.editor.linuxCompletion?.close() }; linuxShell.reset(); app.unregisterReceiver(packageChanges); agents.reset(); devices.close(); scope.cancel(); super.onCleared() }
 }

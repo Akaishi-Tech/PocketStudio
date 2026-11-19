@@ -40,7 +40,7 @@ internal class PluginStore(context: Context) {
         MessageDigest.getInstance("SHA-256").digest(signer).joinToString("") { "%02x".format(it) }
     }
 
-    private fun assetBytes(file: String, limit: Int): ByteArray = readGitHubAsset(BASE_URL + file) { connection ->
+    private fun fetch(url: String, limit: Int): ByteArray = readGitHubAsset(url) { connection ->
         if (connection.contentLengthLong > limit) throw invalidCatalog()
         connection.inputStream.use { input ->
             val buffer = ByteArray(8192)
@@ -56,7 +56,15 @@ internal class PluginStore(context: Context) {
     }
 
     fun catalog(): List<StorePlugin> {
-        val json = assetBytes("plugin-store.json", 262_144).toString(Charsets.UTF_8)
+        val release = JSONObject(fetch(RELEASE_API, 2_000_000).toString(Charsets.UTF_8))
+        if (release.getBoolean("draft") || release.getString("tag_name") != "plugin-store") throw invalidCatalog()
+        val lines = release.optString("body").lineSequence().filter { it.startsWith("PocketStudio-Catalog:") }.toList()
+        if (lines.size > 1) throw invalidCatalog()
+        val pointer = lines.singleOrNull()?.let { CATALOG_POINTER.matchEntire(it) ?: throw invalidCatalog() }
+        val bytes = fetch(BASE_URL + (pointer?.groupValues?.get(1) ?: "plugin-store.json"), 262_144)
+        if (pointer != null && MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it) } != pointer.groupValues[2]) throw invalidCatalog()
+        val json = bytes.toString(Charsets.UTF_8)
         return parse(json).also { prefs.edit().putString("catalog", json).apply() }
     }
 
@@ -157,7 +165,7 @@ internal class PluginStore(context: Context) {
         val directory = File(app.cacheDir, "plugin-icons").apply { mkdirs() }
         val cached = File(directory, "$pkg-${plugin.versionCode}-$icon")
         if (cached.isFile) BitmapFactory.decodeFile(cached.path)?.let { return it }
-        val data = assetBytes(icon, 1_048_576)
+        val data = fetch(BASE_URL + icon, 1_048_576)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
         if (bounds.outMimeType != "image/png" || bounds.outWidth !in 1..1024 || bounds.outHeight !in 1..1024) return null
@@ -184,6 +192,8 @@ internal class PluginStore(context: Context) {
     }
 
     companion object {
+        private val CATALOG_POINTER = Regex("""PocketStudio-Catalog: (plugin-store-v[1-9][0-9]*\.json) sha256=([0-9a-f]{64})""")
+        private const val RELEASE_API = "https://api.github.com/repos/Akaishi-Tech/PocketStudio-Plugins/releases/tags/plugin-store"
         private const val BASE_URL = "https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/download/plugin-store/"
         private val PACKAGE = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+""")
         private val APK = Regex("""[A-Za-z0-9][A-Za-z0-9._-]*\.apk""")

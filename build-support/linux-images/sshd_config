@@ -1,0 +1,12 @@
+Port 2222
+HostKey /etc/pocket-studio/ssh_host_ecdsa_key
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+UsePAM no
+AllowUsers studio
+AllowTcpForwarding no
+X11Forwarding no
+PermitTunnel no
+Subsystem sftp internal-sftp

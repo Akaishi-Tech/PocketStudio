@@ -287,15 +287,25 @@ private fun GoDialog(state: StudioEditorState, close: () -> Unit) {
 private fun CompletionDialog(state: StudioEditorState, close: () -> Unit) {
     val range = state.prefix()
     val prefix = state.text.substring(range.min, range.max)
-    val options = remember(state.text, prefix) {
+    var suggestions by remember(state) { mutableStateOf(emptyList<String>()) }
+    var detail by remember(state) { mutableStateOf("") }
+    LaunchedEffect(state, state.text, state.cursor) {
+        val server = state.linuxCompletion ?: return@LaunchedEffect
+        try { suggestions = server.complete(state.text, state.line, state.column) }
+        catch (e: kotlinx.coroutines.TimeoutCancellationException) { detail = e.localizedMessage.orEmpty() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { detail = e.localizedMessage.orEmpty() }
+    }
+    val options = remember(state.text, prefix, suggestions) {
         val words = Regex("""[\p{L}_][\p{L}\p{N}_]*""").findAll(state.text).map { it.value }
-        val keywords = "abstract boolean break case catch class const continue data default do double else enum extends false final float for fun if implements import in int interface internal is long namespace new null object open override package private protected public return static String super suspend switch this throw throws true try val var void when while".split(' ')
-        (words + keywords.asSequence()).filter { it != prefix && it.startsWith(prefix) }.distinct().sorted().take(100).toList()
+        val keywords = state.language?.keywords ?: "abstract boolean break case catch class const continue data default do double else enum extends false final float for fun if implements import in int interface internal is long namespace new null object open override package private protected public return static String super suspend switch this throw throws true try val var void when while".split(' ')
+        (suggestions.asSequence() + words + keywords.asSequence()).filter { it != prefix && it.startsWith(prefix) }.distinct().sorted().take(100).toList()
     }
     AlertDialog(onDismissRequest = close, title = { Text(stringResource(R.string.code_completion)) }, confirmButton = {},
         dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.close)) } },
         text = {
             LazyColumn(Modifier.heightIn(max = 340.dp)) {
+                if (detail.isNotBlank()) item { Text(detail, style = MaterialTheme.typography.bodySmall) }
                 if (options.isEmpty()) item { Text(stringResource(R.string.no_matching_identifiers)) }
                 items(options) { token -> Text(token, Modifier.fillMaxWidth().clickable { state.complete(range, token); close() }
                     .padding(vertical = 12.dp), fontFamily = LocalEditorFontFamily.current) }

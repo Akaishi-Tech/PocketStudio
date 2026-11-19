@@ -1,0 +1,28 @@
+<resources>
+    <string name="avf_name">Debian Linux（AVF）</string>
+    <string name="avf_description">通过系统 Linux 终端和本机 SSH 运行 Debian 开发镜像</string>
+    <string name="avf_setup">安装 Debian 开发环境</string>
+    <string name="avf_help">在开发者选项中启用 Linux 开发环境，打开系统终端并安装其 Debian 虚拟机。允许终端访问共享存储。安装器支持 Android 16 的 Ferrochrome v4 镜像（构建号 4000000）。请先备份系统终端中的文件，再替换虚拟机的 Debian 系统盘。</string>
+    <string name="avf_stage">准备安装文件</string>
+    <string name="avf_confirm_title">替换系统终端的虚拟机系统盘？</string>
+    <string name="avf_confirm">请先备份系统终端虚拟机中的文件和项目。安装内置 Debian 系统可能会清除虚拟机中的应用、软件包和项目文件。下一步将文件准备到下载目录。只有在系统终端中执行命令并再次确认后，才会修改虚拟机磁盘。</string>
+    <string name="avf_confirm_action">准备替换文件</string>
+    <string name="avf_open">打开系统终端</string>
+    <string name="avf_guest_steps">在原系统终端中执行以下命令，按提示输入 REPLACE 并保存脚本打印的 SSH 主机 SHA256 指纹。执行 sudo poweroff 关闭虚拟机，再打开系统终端并在端口转发设置中允许本机端口 2222。</string>
+    <string name="avf_fingerprint">虚拟机主机指纹（SHA256:…）</string>
+    <string name="avf_pair">验证 SSH 连接</string>
+    <string name="avf_copy">复制安装命令</string>
+    <string name="avf_restore">复制回滚命令</string>
+    <string name="avf_restore_help">安装器会保留原来的系统盘。要回滚，在替换后的 Debian 终端中执行此命令并按提示输入 RESTORE，关闭虚拟机后重新打开系统终端。</string>
+    <string name="avf_clear">删除下载目录中的安装文件</string>
+    <string name="avf_clear_confirm">虚拟机安装完成后，从下载目录移除临时镜像、安装脚本和公钥？</string>
+    <string name="avf_running">正在准备安装文件…</string>
+    <string name="avf_checking">正在连接 Debian 开发环境…</string>
+    <string name="avf_paired">已使用 studio 账户连接 Debian。</string>
+    <string name="avf_not_enabled">系统 Linux 终端不可用。请在支持的设备开发者选项中启用 Linux 开发环境。</string>
+    <string name="avf_missing_pin">请输入系统终端显示的 SSH 主机 SHA256 指纹。</string>
+    <string name="avf_save_failed">无法保存设置。</string>
+    <string name="avf_connection_failed">无法打开 AVF 项目。请检查系统终端和端口 2222。%1$s</string>
+    <string name="avf_image_version">系统盘安装需要 Android 16 的 Ferrochrome v4 终端镜像。安装脚本会在写入前核对构建号和分区布局。</string>
+    <string name="avf_wrong_abi">这个镜像适用于 %1$s。请安装与本机架构匹配的插件。</string>
+</resources>

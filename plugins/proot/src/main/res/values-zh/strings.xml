@@ -1,0 +1,11 @@
+<resources>
+    <string name="plugin_name">Debian（PRoot）</string>
+    <string name="plugin_description">在设备上通过 PRoot 运行 Debian，为通用工程提供本地终端和开发工具。</string>
+    <string name="setup_install">安装 Debian</string>
+    <string name="setup_ready">Debian 已就绪。请返回掌上 Studio，打开 Linux 工程。</string>
+    <string name="setup_prompt">将随插件提供的 Debian 工具安装到应用专用空间。工程保存在 studio 用户的主目录中。</string>
+    <string name="setup_upgrade">安装新版镜像</string>
+    <string name="setup_upgrade_text">可安装新版镜像。安装会替换系统软件与设置，并保留 studio 主目录和其中的工程。</string>
+    <string name="setup_busy">正在安装 Debian…</string>
+    <string name="setup_close">完成</string>
+</resources>

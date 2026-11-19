@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <application android:label="@string/plugin_name" android:allowBackup="false"
+        android:icon="@drawable/linux_plugin">
+        <activity android:name=".SetupActivity" android:label="@string/plugin_name" android:exported="true"/>
+        <service android:name=".ProotService" android:exported="true" android:description="@string/plugin_description">
+            <intent-filter><action android:name="com.hcgstudio.pocketstudio.PLUGIN"/></intent-filter>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY" android:value="development-environment"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER" android:value="Akaishi Tech"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.LINUX_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.LINUX_ENTRY" android:value="com.hcgstudio.pocketstudio.prootplugin.ProotEnvironment"/>
+        </service>
+    </application>
+</manifest>

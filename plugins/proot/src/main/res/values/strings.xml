@@ -1,0 +1,11 @@
+<resources>
+    <string name="plugin_name">Debian (PRoot)</string>
+    <string name="plugin_description">Local Debian shell and development tools for general projects. Runs in PRoot on the device.</string>
+    <string name="setup_install">Install Debian</string>
+    <string name="setup_ready">Debian is ready. Return to Pocket Studio and open a Linux project.</string>
+    <string name="setup_prompt">Install the bundled Debian tools in app storage. Your projects live in the studio user’s home directory.</string>
+    <string name="setup_upgrade">Install updated image</string>
+    <string name="setup_upgrade_text">A newer bundled image is available. Installing it replaces system packages and settings. Your studio home directory and projects are kept.</string>
+    <string name="setup_busy">Installing Debian…</string>
+    <string name="setup_close">Done</string>
+</resources>

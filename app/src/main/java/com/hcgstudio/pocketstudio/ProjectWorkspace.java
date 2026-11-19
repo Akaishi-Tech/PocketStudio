@@ -39,6 +39,7 @@ final class ProjectWorkspace implements AutoCloseable {
     }
 
     static ProjectWorkspace open(Project project) throws IOException {
+        if (project.linux != null) throw new IOException(uiString(R.string.linux_use_terminal));
         String key = project.tree == null ? project.root.uri.toString()
                 : DocumentsContract.buildDocumentUri(project.root.uri.getAuthority(),
                         DocumentsContract.getDocumentId(project.root.uri)).toString();

@@ -14,6 +14,8 @@ internal class StudioEditorState(
     cursor: Int = 0,
     private val onTextChanged: (String) -> Unit = {}
 ) {
+    var language: EditorLanguage? = null
+    var linuxCompletion: LinuxCompletion? = null
     var value by mutableStateOf(TextFieldValue(initialText, TextRange(cursor.coerceIn(0, initialText.length))))
         private set
     val text get() = value.text

@@ -6,7 +6,7 @@ Install the Android development environment plugin from the home screen’s Plug
 
 For a Gradle build of the sample Android project, install the project's SDK Platform and **Android SDK Build Tools 36.0.0** in SDK Manager. Download the Build Tools there or import Google's official ZIP (61 MiB). Studio makes this SDK and versions of AAPT2 and ADB built for the device's CPU available to Gradle. Other native programs in Google's ZIP target desktop Linux. Tasks that invoke AIDL or zipalign directly need versions that run on an Android host. [Download Build Tools 36.0.0](https://dl.google.com/android/repository/build-tools_r36_linux.zip)
 
-The quick builder requires Android 11 or later. It supports a single `app` module with constant Gradle configuration values and sources under `src/main/java`, `kotlin`, `res` and `assets`. For Java-only projects, AAPT2 compiles resources, ECJ compiles Java 7 and DX preserves line numbers and local variables. For Kotlin sources, install the optional Kotlin / D8 tools in SDK Manager. The builder uses apksig and an RSA debug key generated in Android Keystore. APKs signed by the same installation of Studio can update each other. AAPT2 uses 16 KiB ELF LOAD alignment on all four Android ABIs. [Component sources and licenses](android-plugin/src/main/assets/licenses/TOOLS.txt)
+The quick builder requires Android 11 or later. It supports a single `app` module with constant Gradle configuration values and sources under `src/main/java`, `kotlin`, `res` and `assets`. For Java-only projects, AAPT2 compiles resources, ECJ compiles Java 7 and DX preserves line numbers and local variables. For Kotlin sources, install the optional Kotlin / D8 tools in SDK Manager. The builder uses apksig and an RSA debug key generated in Android Keystore. APKs signed by the same installation of Studio can update each other. AAPT2 uses 16 KiB ELF LOAD alignment on all four Android ABIs. [Component sources and licenses](../plugins/android/src/main/assets/licenses/TOOLS.txt)
 
 To run Gradle, choose a task from the Build menu, such as `assembleDebug`, `test`, `lint` or `tasks`. Use the custom task option for module-qualified names such as `:app:assembleDebug` or for multiple tasks separated by spaces. Run the task locally to execute the project's own Gradle Wrapper using the bundled OpenJDK 17. The first run may need internet access to download the Gradle distribution, plugins and dependencies. View logs in the build output or stop the running task there. If the task produces multiple APKs, select which one to export or install.
 
@@ -21,7 +21,7 @@ Use a dedicated emulator and provide the official Android SDK Platform 34 ZIP fo
 ```sh
 ./gradlew :app:assembleX86_64Debug :app:assembleX86_64DebugAndroidTest :android-plugin:assembleX86_64Debug
 adb -s SERIAL install -r app/build/outputs/apk/x86_64/debug/app-x86_64-debug.apk
-adb -s SERIAL install -r build-support/android-plugin/build/outputs/apk/x86_64/debug/android-plugin-x86_64-debug.apk
+adb -s SERIAL install -r plugins/android/build/outputs/apk/x86_64/debug/android-plugin-x86_64-debug.apk
 adb -s SERIAL install -r app/build/outputs/apk/androidTest/x86_64/debug/app-x86_64-debug-androidTest.apk
 adb -s SERIAL shell -T 'run-as com.hcgstudio.pocketstudio sh -c "mkdir -p cache && cat >cache/platform-34-test.zip"' < platform-34-ext7_r03.zip
 adb -s SERIAL shell am instrument -w -e scenario build com.hcgstudio.pocketstudio.test/com.hcgstudio.pocketstudio.testing.DeviceDebugTest
@@ -43,7 +43,7 @@ To exercise the system file picker, first open a test folder in Studio. Pass `-e
 
 ## Publishing
 
-Choose the `main` branch and version increment (default `patch`) in **Release Pocket Studio**. The workflow allocates the next app version and publishes a signed `PocketStudio-<abi>.apk` for each of ARM64, ARMv7, x86_64 and x86 on its version tag. [App release workflow](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
+Choose the `main` branch and version increment (default `patch`) in **Release Pocket Studio**. The workflow allocates the next app version and publishes a signed `PocketStudio-<version>-<abi>.apk` for each of ARM64, ARMv7, x86_64 and x86 on its version tag. [App release workflow](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
 
 The app workflow reads `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` from Actions secrets. The first is the Base64 encoding of the release keystore. The workflow verifies the signer, package name, ABI and version of each APK before publication. [Pinned release certificate](../app/src/main/res/raw/release_signer.der)
 

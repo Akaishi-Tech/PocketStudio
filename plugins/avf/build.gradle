@@ -1,0 +1,56 @@
+plugins { id 'com.android.application' }
+
+def architectures = [arm64V8a: 'arm64-v8a', x86_64: 'x86_64']
+
+android {
+    namespace 'com.hcgstudio.pocketstudio.avfplugin'
+    compileSdk { version = release(37) }
+    defaultConfig {
+        applicationId 'com.hcgstudio.pocketstudio.avfplugin'
+        minSdk 36
+        targetSdk 36
+        versionCode providers.environmentVariable('POCKETSTUDIO_VERSION_CODE').orElse(providers.gradleProperty('pluginVersionCode')).orElse('1').get().toInteger()
+        versionName providers.environmentVariable('POCKETSTUDIO_VERSION_NAME').orElse(providers.gradleProperty('pluginVersionName')).orElse('1.0.0').get()
+    }
+    flavorDimensions += 'architecture'
+    architectures.each { flavor, abi ->
+        productFlavors.create(flavor) {
+            dimension 'architecture'
+            ndk.abiFilters.add(abi)
+            buildConfigField "String", "IMAGE_ABI", "\"${abi}\""
+        }
+        sourceSets.getByName(flavor).assets.srcDir(rootProject.file("build/linux-images/${abi}/avf"))
+    }
+    sourceSets.main.java.srcDir('../proot/ipc/java')
+    sourceSets.main.aidl.srcDir('../proot/ipc/aidl')
+    sourceSets.main.assets.srcDir(rootProject.file('build-support/linux-editor'))
+    buildFeatures { aidl = true; buildConfig = true }
+    androidResources.noCompress += ['gz']
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+apply from: rootProject.file('build-support/release-signing.gradle')
+dependencies {
+    compileOnly project(':plugin-api')
+    implementation 'com.github.mwiede:jsch:2.28.8'
+}
+
+architectures.each { flavor, abi ->
+    def imageDir = rootProject.file("build/linux-images/${abi}/avf")
+    def verify = tasks.register("verify${flavor.capitalize()}DebianImage") {
+        doLast {
+            ['debian.img.gz', 'debian.img.sha256', 'replace.sh'].each { name ->
+                if (!new File(imageDir, name).isFile()) {
+                    throw new GradleException("Build the Debian AVF image first. Missing ${new File(imageDir, name)}")
+                }
+            }
+        }
+    }
+    tasks.configureEach { task ->
+        if (task.name.startsWith("merge${flavor.capitalize()}") && task.name.endsWith('Assets')) {
+            task.dependsOn verify
+        }
+    }
+}

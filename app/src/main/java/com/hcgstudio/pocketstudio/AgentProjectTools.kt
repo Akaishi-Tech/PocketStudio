@@ -28,6 +28,8 @@ internal object AgentProjectTools {
             spec("run_gradle", "Run this project's Gradle wrapper tasks and return the build output.", "tasks")
         )
 
+    val shell = spec("run_shell", "Execute a Bash command in the selected Linux project and return its exit status and output.", "command")
+
     private fun spec(name: String, description: String, vararg names: String,
                      properties: JSONObject = JSONObject().apply {
                          for (field in names) put(field, json("type" to "string"))

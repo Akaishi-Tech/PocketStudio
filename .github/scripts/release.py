@@ -93,8 +93,8 @@ class GitHub:
         # The publishing token can see draft releases as well as public ones.
         return self.api("releases?per_page=100", all_pages=True)
 
-    def create(self, tag, title, body):
-        return self.api("releases", method="POST", body={"tag_name": tag, "name": title, "body": body,
+    def create(self, tag, body):
+        return self.api("releases", method="POST", body={"tag_name": tag, "body": body,
                         "draft": True, "target_commitish": os.environ["GITHUB_SHA"], "make_latest": "false"})
 
     def rename(self, item, name, label):
@@ -144,8 +144,8 @@ def verify_apk(path, abi, version, code):
     require(native and native[1].split() == [f"'{abi}'"], f"Wrong native ABI: {path.name}")
 
 
-def apk_name(abi):
-    return f"{APP}-{abi}.apk"
+def apk_name(version, abi):
+    return f"{APP}-{version}-{abi}.apk"
 
 
 def build(plan, out):
@@ -156,7 +156,7 @@ def build(plan, out):
     for abi, flavor in FLAVORS.items():
         variant = directory / flavor / "release"
         apk, = read_json(variant / "output-metadata.json")["elements"]
-        output = out / apk_name(abi)
+        output = out / apk_name(plan["appVersion"], abi)
         shutil.copyfile(variant / apk["outputFile"], output)
         verify_apk(output, abi, plan["appVersion"], plan["appCode"])
 
@@ -202,17 +202,24 @@ def publish(gh, plan, out):
     else:
         seq = int(os.environ["GITHUB_RUN_NUMBER"])
         body = f"Pocket Studio {plan['appVersion']} for Android.\n\n{marker}\n<!-- pocketstudio-app-sequence {seq} -->"
-        release = gh.create(tag, "Pocket Studio " + tag, body)
+        release = gh.create(tag, body)
     rid = release["id"]
-    names = tuple(apk_name(abi) for abi in FLAVORS)
+    names = tuple(apk_name(plan["appVersion"], abi) for abi in FLAVORS)
     for abi in FLAVORS:
-        replace_asset(gh, rid, out / apk_name(abi), f"Pocket Studio {plan['appVersion']} ({code})")
+        replace_asset(gh, rid, out / apk_name(plan["appVersion"], abi), f"Pocket Studio {plan['appVersion']} ({code})")
+    # An interrupted run may have staged old-style APKs before the naming migration.
+    # Remove our own obsolete files only after all replacement digests have been verified.
+    legacy_names = tuple(f"{APP}-{abi}.apk" for abi in FLAVORS)
     for item in gh.api(f"releases/{rid}")["assets"]:
-        if item["name"].startswith(("previous-", "stage-")) and item["name"].endswith(names):
+        name = item["name"]
+        if name in legacy_names or (name.startswith(("previous-", "stage-")) and name.endswith(names + legacy_names)):
             gh.remove(item)
     newer = any(not r["draft"] and re.fullmatch("v" + SEMVER, r["tag_name"])
                 and semver(r["tag_name"][1:]) > semver(tag[1:]) for r in releases)
-    gh.api(f"releases/{rid}", method="PATCH", body={"draft": False, "make_latest": "false" if newer else "true"})
+    update = {"draft": False, "make_latest": "false" if newer else "true"}
+    if release.get("name"):
+        update["name"] = ""  # Resuming a draft created by a previous workflow revision.
+    gh.api(f"releases/{rid}", method="PATCH", body=update)
 
 
 def main():

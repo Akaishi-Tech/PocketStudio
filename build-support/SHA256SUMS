@@ -1,4 +1,4 @@
-d8d1345eb8f3c15d5f18eb7d17c9f79aa06f8ddd243bf3e5357df9f9fd23a753  build-support/android-plugin/src/main/jniLibs/arm64-v8a/libaapt2.so
-1c0150847215a9f61f1d2ebfc65af69684562f7cefa38e8e1e1df03465570a3f  build-support/android-plugin/src/main/jniLibs/armeabi-v7a/libaapt2.so
-1b01e83561a4f8508da38954a715d8f587fa84dd49d359d0fbba823610a20b4f  build-support/android-plugin/src/main/jniLibs/x86/libaapt2.so
-96878eae5d94d21fe663a68de4a67f1fc18d2046379d54589394fa97151171a6  build-support/android-plugin/src/main/jniLibs/x86_64/libaapt2.so
+d8d1345eb8f3c15d5f18eb7d17c9f79aa06f8ddd243bf3e5357df9f9fd23a753  plugins/android/src/main/jniLibs/arm64-v8a/libaapt2.so
+1c0150847215a9f61f1d2ebfc65af69684562f7cefa38e8e1e1df03465570a3f  plugins/android/src/main/jniLibs/armeabi-v7a/libaapt2.so
+1b01e83561a4f8508da38954a715d8f587fa84dd49d359d0fbba823610a20b4f  plugins/android/src/main/jniLibs/x86/libaapt2.so
+96878eae5d94d21fe663a68de4a67f1fc18d2046379d54589394fa97151171a6  plugins/android/src/main/jniLibs/x86_64/libaapt2.so

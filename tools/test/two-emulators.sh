@@ -69,7 +69,7 @@ debug_key=${ANDROID_USER_HOME:-"$HOME/.android"}/debug.keystore
 "$build_tools/apksigner" sign --ks "$debug_key" --ks-pass pass:android "$work/target.apk"
 adb -s "$host" install -r "$root/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
 if [ "$local_device" = false ]; then
-    adb -s "$host" install -r "$root/build-support/android-plugin/build/outputs/apk/$flavor/debug/android-plugin-$flavor-debug.apk"
+    adb -s "$host" install -r "$root/plugins/android/build/outputs/apk/$flavor/debug/android-plugin-$flavor-debug.apk"
 fi
 adb -s "$host" install -r "$root/app/build/outputs/apk/androidTest/$flavor/debug/app-$flavor-debug-androidTest.apk"
 adb -s "$host" shell run-as com.hcgstudio.pocketstudio mkdir -p files

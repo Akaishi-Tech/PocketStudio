@@ -6,7 +6,7 @@
 
 用 Gradle 构建示例 Android 工程时，在 SDK Manager 中安装与项目匹配的 SDK Platform 和「Android SDK Build Tools 36.0.0」。Build Tools 可直接下载，或导入 Google 官方 ZIP（61 MiB）。Studio 会把这套 SDK 和适合当前手机处理器的 AAPT2、ADB 提供给 Gradle。官方 ZIP 中其余原生程序面向桌面 Linux，单独调用 AIDL、zipalign 等程序的任务需要相应的 Android 主机版工具。[下载 Build Tools 36.0.0](https://dl.google.com/android/repository/build-tools_r36_linux.zip)
 
-内置构建器支持 Android 11 及以上宿主、单模块 `app`、常量 Gradle 配置，以及 `src/main/java`、`kotlin`、`res` 和 `assets`。纯 Java 工程使用 AAPT2 编译资源、ECJ 编译 Java 7，并用 DX 保留行号和局部变量。构建含 Kotlin 源码的项目，需先在 SDK Manager 安装可选的 Kotlin / D8 编译工具。apksig 使用 Android Keystore 生成的 RSA 调试密钥签名，支持覆盖安装同一 IDE 安装实例签出的调试包。四种 Android ABI 的 AAPT2 均使用 16 KiB ELF LOAD 对齐。[组件来源和许可证](android-plugin/src/main/assets/licenses/TOOLS.txt)
+内置构建器支持 Android 11 及以上宿主、单模块 `app`、常量 Gradle 配置，以及 `src/main/java`、`kotlin`、`res` 和 `assets`。纯 Java 工程使用 AAPT2 编译资源、ECJ 编译 Java 7，并用 DX 保留行号和局部变量。构建含 Kotlin 源码的项目，需先在 SDK Manager 安装可选的 Kotlin / D8 编译工具。apksig 使用 Android Keystore 生成的 RSA 调试密钥签名，支持覆盖安装同一 IDE 安装实例签出的调试包。四种 Android ABI 的 AAPT2 均使用 16 KiB ELF LOAD 对齐。[组件来源和许可证](../plugins/android/src/main/assets/licenses/TOOLS.txt)
 
 在「构建」菜单选择 Gradle 任务，例如 `assembleDebug`、`test`、`lint` 或 `tasks`。选择「自定义 Gradle 任务」可以输入模块限定名（如 `:app:assembleDebug`），多个任务用空格分隔。点击「在本机运行」后，Studio 使用随插件提供的 OpenJDK 17，在当前手机上执行工程的 Gradle Wrapper。首次运行可能需要联网下载 Wrapper 指定的 Gradle 发行版以及项目插件和依赖。任务日志会显示在「构建输出」，运行中可点击「停止」。任务生成多个 APK 时，可以选择要导出或安装的产物。
 
@@ -21,7 +21,7 @@
 ~~~sh
 ./gradlew :app:assembleX86_64Debug :app:assembleX86_64DebugAndroidTest :android-plugin:assembleX86_64Debug
 adb -s SERIAL install -r app/build/outputs/apk/x86_64/debug/app-x86_64-debug.apk
-adb -s SERIAL install -r build-support/android-plugin/build/outputs/apk/x86_64/debug/android-plugin-x86_64-debug.apk
+adb -s SERIAL install -r plugins/android/build/outputs/apk/x86_64/debug/android-plugin-x86_64-debug.apk
 adb -s SERIAL install -r app/build/outputs/apk/androidTest/x86_64/debug/app-x86_64-debug-androidTest.apk
 adb -s SERIAL shell -T 'run-as com.hcgstudio.pocketstudio sh -c "mkdir -p cache && cat >cache/platform-34-test.zip"' < platform-34-ext7_r03.zip
 adb -s SERIAL shell am instrument -w -e scenario build com.hcgstudio.pocketstudio.test/com.hcgstudio.pocketstudio.testing.DeviceDebugTest
@@ -45,7 +45,7 @@ adb -s SERIAL shell am instrument -w -e scenario gradleAndroid com.hcgstudio.poc
 
 ## 发布
 
-在 **Release Pocket Studio** 选择 `main` 分支和版本增量（默认 `patch`）。工作流分配下一版本，在对应的版本标签下分别上传 ARM64、ARMv7、x86_64 和 x86 的签名 `PocketStudio-<abi>.apk`。[主应用发布工作流](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
+在 **Release Pocket Studio** 选择 `main` 分支和版本增量（默认 `patch`）。工作流分配下一版本，在对应的版本标签下分别上传 ARM64、ARMv7、x86_64 和 x86 的签名 `PocketStudio-<version>-<abi>.apk`。[主应用发布工作流](https://github.com/Akaishi-Tech/PocketStudio/actions/workflows/app-release.yml)
 
 主应用工作流使用 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD` 四项 Actions Secrets。首项为发布密钥库的 Base64 编码。工作流根据内置公开证书验证每份 APK 的签名、包名、ABI 和版本。[公开签名证书](../app/src/main/res/raw/release_signer.der)
 

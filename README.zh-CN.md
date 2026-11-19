@@ -14,7 +14,7 @@
 
 在 Android 11 及以上设备上，通过「设置 → Gradle 与 SDK → SDK Manager」安装与项目匹配的 SDK Platform，即可构建调试 APK。要为当前项目的快速构建和 Gradle 任务改用其他已安装的平台，在「输出 → 输出选项 → 构建 SDK」中选择。快速构建 Kotlin 项目还需安装 Kotlin / D8。
 
-可从 [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) 下载与设备架构对应的 `PocketStudio-<abi>.apk`，可选 arm64-v8a、armeabi-v7a、x86_64 或 x86，也可以[从源码构建](#从源码构建及验证)。
+可从 [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) 下载与设备架构对应的 `PocketStudio-<version>-<abi>.apk`，可选 arm64-v8a、armeabi-v7a、x86_64 或 x86，也可以[从源码构建](#从源码构建及验证)。
 
 | 工作区 | 功能 |
 | --- | --- |
@@ -37,6 +37,12 @@
 在「设置 → 应用更新」中，点「检查更新」可随时查询 GitHub Releases 正式版。自动更新默认开启，打开应用或返回前台时每天最多检查一次。发现新版后，Studio 会在非计费网络上自动下载，在计费网络上会先询问。安装包校验通过后，由你在 Android 系统界面确认安装。
 
 在「输出 → 输出选项」中点「构建调试 APK」即可使用快速构建器。要运行 Gradle 任务，可在「查找操作」中搜索任务名称。输出页会显示构建日志，点编译器诊断可跳到对应源代码行。构建成功后可点「安装 APK」，或从输出选项中导出 APK。[本机构建说明](build-support/README.zh-CN.md)
+
+## 通用 Linux 项目
+
+在「插件商店 → 开发环境」安装 Debian AVF 或 Debian PRoot。进入「新建项目」，选定一种环境，先点「配置环境」，再输入项目名。两种后端分别保存工程；同名项目不会跨环境共享。在终端中可直接克隆已有仓库到当前目录。编辑器、终端和 Agent 访问该环境中的同一份 `/home/studio/projects/<项目名>`。
+
+AVF 插件面向 Android 16 系统 Terminal 的 Ferrochrome v4（build 4000000）。在配置页暂存镜像后，按界面指引在系统 Terminal 确认替换，保留原盘备份，关机重开，再转发端口 2222 并核对 SSH 主机指纹。PRoot 插件在自己的应用目录展开同架构 Debian，直接运行进程。两种镜像都包含 Python、Node/npm、Go、.NET SDK、OpenJDK、GNU GCC、CMake 与语言服务器。打开受支持文件后，可用代码补全读取语言服务器建议。
 
 ## 在项目中使用智能体
 
@@ -98,7 +104,7 @@ git submodule update --init --depth 1 -- upstream/release/tools/base
 
 ~~~sh
 adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk
-adb install -r build-support/android-plugin/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
+adb install -r plugins/android/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
 ~~~
 
 其他架构使用对应的 Gradle 变体（`armeabiV7a`、`x86_64` 或 `x86`）。运行 `:app:assembleRelease` 可生成全部四个架构的 APK。

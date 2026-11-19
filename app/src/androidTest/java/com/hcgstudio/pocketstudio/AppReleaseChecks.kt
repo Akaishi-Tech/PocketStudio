@@ -42,6 +42,13 @@ object AppReleaseChecks {
         check(selected("armeabi-v7a", "x86") == "PocketStudio-x86.apk")
         check(runCatching { selected("riscv64") }.isFailure)
         val files = split.getJSONArray("assets")
+        val currentFile = "PocketStudio-$version-x86.apk"
+        val updated = JSONObject(files.getJSONObject(1).toString()).put("name", currentFile)
+            .put("browser_download_url", url.substringBeforeLast('/') + "/" + currentFile)
+        files.put(updated)
+        check(selected("x86") == currentFile)
+        check(selected("x86_64", "x86") == "PocketStudio-x86_64.apk")
+        files.remove(files.length() - 1)
         files.put(files.getJSONObject(1))
         check(runCatching { selected("x86") }.isFailure)
 
@@ -57,6 +64,10 @@ object AppReleaseChecks {
         reject("ambiguous app asset") { doc, app -> doc.getJSONArray("assets").put(app) }
         reject("incomplete asset") { _, app -> app.put("state", "open") }
         reject("version different from tag") { _, app -> app.put("label", "Pocket Studio 1.9.0 (18)") }
+        reject("asset filename version different from tag") { _, app ->
+            val wrong = "PocketStudio-1.9.0-x86.apk"
+            app.put("name", wrong).put("browser_download_url", url.substringBeforeLast('/') + "/" + wrong)
+        }
         reject("invalid version code") { _, app -> app.put("label", "Pocket Studio $version (0)") }
         reject("invalid size") { _, app -> app.put("size", 0) }
         reject("invalid digest") { _, app -> app.put("digest", "sha256:abcd") }

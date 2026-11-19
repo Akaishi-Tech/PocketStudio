@@ -1,0 +1,14 @@
+[Unit]
+Description=Pocket Studio project shell
+After=network.target
+ConditionPathExists=/etc/pocket-studio/ssh_host_ecdsa_key
+ConditionPathExists=/home/studio/.ssh/authorized_keys
+
+[Service]
+Type=simple
+RuntimeDirectory=sshd
+ExecStart=/usr/sbin/sshd -D -e -f /etc/pocket-studio/sshd_config
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

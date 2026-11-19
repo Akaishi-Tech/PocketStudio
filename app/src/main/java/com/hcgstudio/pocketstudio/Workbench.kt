@@ -135,7 +135,13 @@ private val workspaceTools = listOf(
 @Composable
 internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean, setTree: (Boolean) -> Unit, className: String, openEntry: (Project.Node) -> Unit, openAgentAccount: () -> Unit) {
     val p = w.project ?: return
-    val tools = workspaceTools.filter { it.tool != Tool.Output || w.androidAvailable }
+    val tools = workspaceTools.filter {
+        when (it.tool) {
+            Tool.Output -> w.androidAvailable || p.linux != null
+            Tool.Devices -> p.linux == null
+            else -> true
+        }
+    }.map { if (it.tool == Tool.Output && p.linux != null) it.copy(label = R.string.linux_terminal) else it }
     val colors = MaterialTheme.colorScheme
     val settings = LocalStudioSettings.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -189,7 +195,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                             Tool.Project -> ProjectPane(w, actions, Modifier.fillMaxSize(), openEntry)
                             Tool.Agents -> AgentPane(w, openAgentAccount)
                             Tool.Devices -> DeviceToolWindow(w.devices, w.androidEnvironment, className, w.active?.editor?.line ?: 1)
-                            Tool.Output -> if (w.androidAvailable) OutputPane(w, actions, Modifier.fillMaxSize())
+                            Tool.Output -> if (p.linux != null) LinuxTerminalPane(w, Modifier.fillMaxSize()) else if (w.androidAvailable) OutputPane(w, actions, Modifier.fillMaxSize())
                         }
                     }
                     if (wide) {
@@ -199,6 +205,7 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                                 HorizontalDivider()
                                 val panel = Modifier.fillMaxWidth().height((height * .39f).coerceIn(120.dp, 370.dp))
                                 if (pane == Tool.Devices) DeviceToolWindow(w.devices, w.androidEnvironment, className, w.active?.editor?.line ?: 1, panel)
+                                else if (p.linux != null) LinuxTerminalPane(w, panel)
                                 else if (w.androidAvailable) OutputPane(w, actions, panel)
                             }
                         }

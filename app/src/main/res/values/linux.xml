@@ -1,0 +1,15 @@
+<resources>
+    <string name="linux_invalid_name">Use 1–64 letters, digits, dots, underscores or hyphens. Start with a letter or digit.</string>
+    <string name="linux_plugin_missing">Install the Linux environment used by this project to reopen it.</string>
+    <string name="linux_project">Linux project</string>
+    <string name="linux_open_project">Open or create project</string>
+    <string name="linux_setup">Set up environment</string>
+    <string name="linux_terminal">Terminal</string>
+    <string name="linux_shell_input">Shell input</string>
+    <string name="linux_send">Send</string>
+    <string name="linux_start_shell">Start shell</string>
+    <string name="linux_stop_shell">Stop shell</string>
+    <string name="linux_exit">Process exited with status %1$d</string>
+    <string name="linux_run_command">Run command in project</string>
+    <string name="linux_use_terminal">Run this operation in the project terminal.</string>
+</resources>

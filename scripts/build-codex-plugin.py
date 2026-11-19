@@ -20,7 +20,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SUPPORT = ROOT / "build-support/codex-plugin"
+SUPPORT = ROOT / "plugins/codex"
 PIN = ROOT / "app/src/main/res/raw/release_signer.der"
 KEYRING = SUPPORT / "termux-autobuilds.gpg"
 PLUGIN_APK = SUPPORT / "apk"

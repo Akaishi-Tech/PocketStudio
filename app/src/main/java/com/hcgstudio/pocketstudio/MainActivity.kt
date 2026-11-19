@@ -141,7 +141,7 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { w.openProject(it, import = true) } }
     val openApk = rememberOpenApk(w::report)
     fun openEntry(node: Project.Node) {
-        if (!node.folder && node.name.endsWith(".apk", ignoreCase = true)) {
+        if (p?.linux == null && !node.folder && node.name.endsWith(".apk", ignoreCase = true)) {
             w.selectedNode = node
             openApk(node.uri)
         } else w.openFile(node)
@@ -216,7 +216,9 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         add(act("nextTab", context.getString(R.string.next_tab), R.string.navigate, "Alt+Right", w.tabs.size > 1) { switchTab(1) })
         add(act("prevTab", context.getString(R.string.previous_tab), R.string.navigate, "Alt+Left", w.tabs.size > 1) { switchTab(-1) })
         add(act("project", context.getString(R.string.project_files), R.string.view, "Alt+1", canEdit) { showTree = true; w.tool = Tool.Project })
-        add(act("devices", context.getString(R.string.devices_and_debugging), R.string.view, "Alt+5", canEdit) { w.tool = Tool.Devices })
+        if (p?.linux != null)
+            add(act("terminal", context.getString(R.string.linux_terminal), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
+        if (p?.linux == null) add(act("devices", context.getString(R.string.devices_and_debugging), R.string.view, "Alt+5", canEdit) { w.tool = Tool.Devices })
         if (w.androidAvailable) {
             add(act("output", context.getString(R.string.build_output), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
             add(act("preview", context.getString(R.string.preview_layout), R.string.view, enabled = active?.node?.path?.contains(Regex("(^|/)res/layout[^/]*/[^/]+\\.xml$")) == true) { dialog = "preview" })

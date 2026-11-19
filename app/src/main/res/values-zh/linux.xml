@@ -1,0 +1,15 @@
+<resources>
+    <string name="linux_invalid_name">项目名限 1–64 个英文字母、数字、点、下划线或短横线，须以字母或数字开头。</string>
+    <string name="linux_plugin_missing">请安装此项目使用的 Linux 环境，再重新打开项目。</string>
+    <string name="linux_project">Linux 项目</string>
+    <string name="linux_open_project">打开或创建项目</string>
+    <string name="linux_setup">配置环境</string>
+    <string name="linux_terminal">终端</string>
+    <string name="linux_shell_input">Shell 输入</string>
+    <string name="linux_send">发送</string>
+    <string name="linux_start_shell">启动 Shell</string>
+    <string name="linux_stop_shell">停止 Shell</string>
+    <string name="linux_exit">进程已退出，退出码 %1$d</string>
+    <string name="linux_run_command">在项目中运行命令</string>
+    <string name="linux_use_terminal">请在项目终端中执行此操作。</string>
+</resources>

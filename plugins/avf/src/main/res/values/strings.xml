@@ -1,0 +1,28 @@
+<resources>
+    <string name="avf_name">Debian Linux (AVF)</string>
+    <string name="avf_description">A Debian development image with local SSH for Android’s Linux Terminal</string>
+    <string name="avf_setup">Debian for Linux Terminal</string>
+    <string name="avf_help">Enable the Linux development environment in Developer options, start the system Terminal, and install its Debian VM. Allow Terminal to access shared storage. Installation supports the Android 16 Ferrochrome v4 image (build 4000000). Back up your Terminal VM before replacing its system disk.</string>
+    <string name="avf_stage">Prepare installation files</string>
+    <string name="avf_confirm_title">Replace the Terminal VM system disk?</string>
+    <string name="avf_confirm">Back up files and projects from the existing Terminal VM. Installing the bundled Debian system can erase its apps, packages and project files. The next step prepares files in Downloads. Disk changes start only after you run the command in Terminal and confirm there.</string>
+    <string name="avf_confirm_action">Prepare replacement</string>
+    <string name="avf_open">Open system Terminal</string>
+    <string name="avf_guest_steps">Run the command in the original Terminal guest and type REPLACE when prompted. Save the printed SHA256 host fingerprint, shut down the VM using sudo poweroff, then reopen Terminal and allow local port 2222 in its port forwarding settings.</string>
+    <string name="avf_fingerprint">Guest host key (SHA256:…)</string>
+    <string name="avf_pair">Verify SSH connection</string>
+    <string name="avf_copy">Copy installation command</string>
+    <string name="avf_restore">Copy rollback command</string>
+    <string name="avf_restore_help">The installer preserves the original system disk. To roll back, run this command in the replacement Debian terminal, type RESTORE when prompted, then shut down the VM and reopen Terminal.</string>
+    <string name="avf_clear">Remove staged Downloads files</string>
+    <string name="avf_clear_confirm">Remove the temporary image, installer and public key from Downloads after the guest installation finishes?</string>
+    <string name="avf_running">Preparing files…</string>
+    <string name="avf_checking">Connecting to the Debian environment…</string>
+    <string name="avf_paired">Connected to Debian as studio.</string>
+    <string name="avf_not_enabled">Linux Terminal is unavailable. Enable the Linux development environment on a supported device.</string>
+    <string name="avf_missing_pin">Enter the SSH SHA256 fingerprint printed in the system Terminal.</string>
+    <string name="avf_save_failed">Could not save setup state.</string>
+    <string name="avf_connection_failed">Unable to open the AVF project. Check Terminal and port 2222. %1$s</string>
+    <string name="avf_image_version">System disk installation requires Android 16 with the supported Ferrochrome v4 Terminal image. The guest installer checks the build ID and partition layout before writing.</string>
+    <string name="avf_wrong_abi">This image uses %1$s. Install the plugin for this device’s CPU.</string>
+</resources>

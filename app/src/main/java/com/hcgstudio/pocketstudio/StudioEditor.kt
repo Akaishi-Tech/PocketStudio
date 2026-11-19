@@ -50,12 +50,12 @@ private val codeTokens = Pattern.compile(
     """(//[^\n]*|/\*[\s\S]*?(?:\*/|\z)|<!--[\s\S]*?(?:-->|\z))|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|\b(abstract|annotation|as|assert|boolean|break|by|byte|case|catch|char|class|companion|const|constructor|continue|data|default|do|double|else|enum|extends|false|final|finally|float|for|fun|if|implements|import|in|instanceof|int|interface|internal|is|lateinit|long|native|new|null|object|open|out|override|package|private|protected|public|return|sealed|short|static|super|suspend|switch|synchronized|this|throw|throws|transient|true|try|typealias|typeof|val|var|void|volatile|when|where|while)\b|(@[\w.]+|\b[A-Z]\w*\b)|\b(\d+(?:\.\d+)?)\b"""
 )
 
-private fun highlight(text: String, colors: Map<EditorColorRole, Color>): AnnotatedString {
+private fun highlight(text: String, colors: Map<EditorColorRole, Color>, language: EditorLanguage?): AnnotatedString {
     if (text.length > 160_000) return AnnotatedString(text)
     val builder = AnnotatedString.Builder(text)
     val roles = listOf(EditorColorRole.COMMENT, EditorColorRole.STRING, EditorColorRole.KEYWORD,
         EditorColorRole.TYPE, EditorColorRole.NUMBER)
-    val match = codeTokens.matcher(text)
+    val match = (language?.tokens ?: codeTokens).matcher(text)
     while (match.find()) {
         val index = (1..roles.size).first { match.start(it) >= 0 } - 1
         builder.addStyle(SpanStyle(color = colors.getValue(roles[index])), match.start(), match.end())
@@ -98,7 +98,7 @@ private fun EditorContent(
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val tabs = remember(state.text, settings.indentSize) { EditorTabStops(state.text, settings.indentSize) }
     val highlighted = remember(tabs, colors, preview) {
-        val code = highlight(tabs.display, colors)
+        val code = highlight(tabs.display, colors, state.language)
         if (preview) {
             val selection = tabs.display.indexOf("Studio")
             AnnotatedString.Builder(code).apply {
@@ -112,7 +112,7 @@ private fun EditorContent(
             else {
                 // The input session may lay out a committed edit before composition catches up.
                 val updated = EditorTabStops(source.text, settings.indentSize)
-                TransformedText(highlight(updated.display, colors), updated)
+                TransformedText(highlight(updated.display, colors, state.language), updated)
             }
         }
     }

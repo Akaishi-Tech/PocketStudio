@@ -1,0 +1,24 @@
+Pocket Studio Debian images
+
+The Debian packages come from the signed trixie and trixie-security APT
+repositories frozen at 2026-11-18 00:00 UTC. The installed binary and source
+package names and versions are recorded in debian-packages.tsv in this directory.
+Package copyright information lives in /usr/share/doc/<package>/copyright.
+Source package index: https://snapshot.debian.org/
+Debian slim image: https://github.com/debuerreotype/docker-debian-artifacts
+
+The AVF root disk derives from Google's unmodified Terminal/Ferrochrome v4
+Debian 13 image. The Android plugin stages the new disk for a guest-side
+installer, following the production installation flow documented by
+nix-community. The installer verifies the source VM and atomically exchanges
+the root disk file with a backup. The stock boot and guest services come from
+the Google distribution.
+https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/tags/android-16.0.0_r4/
+https://github.com/nix-community/nixos-avf-image-app/tree/d75282ac722feec71b374594f09a7d3a5e97bf3f
+
+Additional tool distributions, shipped with their upstream notices:
+.NET SDK 10.0.404: https://dotnet.microsoft.com/download/dotnet/10.0
+TypeScript 5.8.3: https://github.com/microsoft/TypeScript
+typescript-language-server 4.3.4: https://github.com/typescript-language-server/typescript-language-server
+Eclipse JDT LS 1.48.0: https://github.com/eclipse-jdtls/eclipse.jdt.ls
+csharp-ls 0.27.0: https://github.com/razzmatazz/csharp-language-server

@@ -10,7 +10,7 @@ Pocket Studio runs on Android 8.0 or later. The interface follows the device lan
 
 ## Getting started
 
-Install the `PocketStudio-<abi>.apk` matching your device (arm64-v8a, armeabi-v7a, x86_64 or x86) from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Open **Plugin store → Development environment** on the welcome screen and install **Android**. This adds Android project templates, SDK Manager, layout preview, build tools and debugging for a second device. The built-in local debugger can install plugins on this device.
+Install the `PocketStudio-<version>-<abi>.apk` matching your device (arm64-v8a, armeabi-v7a, x86_64 or x86) from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Open **Plugin store → Development environment** on the welcome screen and install **Android**. This adds Android project templates, SDK Manager, layout preview, build tools and debugging for a second device. The built-in local debugger can install plugins on this device.
 
 Choose **New project → Android project**. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder, compile SDK and minimum SDK. The new project uses the compile SDK as its target SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest. On phones, the workspace’s top-right menu includes **Find action** for looking up commands. Wide screens also have a menu bar.
 
@@ -39,6 +39,12 @@ Under **Settings → App updates**, choose **Check for updates** to check GitHub
 Choose **Output → Output options → Build debug APK** to run the quick builder. For a Gradle task, use **Find action** and search for the task name. The Output tab shows the build log. Tap a compiler diagnostic to open the source line. After a successful build, **Install APK** opens the installer and **Export APK** is available in Output options. [On-device build guide](build-support/README.md)
 
 [Phone workspace](docs/screenshots/phone.png) · [Debugger](docs/screenshots/debugger.png)
+
+## General Linux projects
+
+Install Debian AVF or Debian PRoot under **Plugin store → Development environments**. Choose that environment in **New project**, open **Set up environment**, then enter a project name. Each backend keeps its own projects. The editor, terminal and agent all use the same `/home/studio/projects/<name>` directory in the selected environment. You can clone a repository into the current directory from the terminal.
+
+The AVF plugin supports the Android 16 Terminal Ferrochrome v4 image (build 4000000). Stage the image in setup, confirm the disk replacement in the system Terminal, shut down and reopen Terminal, forward port 2222, and verify the SSH host fingerprint. The installer keeps the previous disk for recovery. The PRoot plugin unpacks a native Debian filesystem in its own app storage and runs processes directly. Both images contain Python, Node/npm, Go, the .NET SDK, OpenJDK, GNU GCC, CMake and language servers for editor completion.
 
 ## Using Codex in a project
 
@@ -98,7 +104,7 @@ Install the host and plugin on an ARM64 device.
 
 ```sh
 adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk
-adb install -r build-support/android-plugin/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
+adb install -r plugins/android/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
 ```
 
 For another architecture, choose the corresponding Gradle flavor (`armeabiV7a`, `x86_64` or `x86`). `:app:assembleRelease` builds all four architectures.

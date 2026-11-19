@@ -1,0 +1,46 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.hcgstudio.pocketstudio.prootplugin'
+    compileSdk { version = release(37) }
+    defaultConfig {
+        applicationId 'com.hcgstudio.pocketstudio.prootplugin'
+        minSdk 26
+        // The private Debian filesystem contains both installed tools and user-built programs.
+        // This separate app uses Android's compatibility domain for executable app-private files.
+        targetSdk 28
+        testInstrumentationRunner 'com.hcgstudio.pocketstudio.prootplugin.RuntimeSmoke'
+        versionCode providers.environmentVariable('POCKETSTUDIO_VERSION_CODE').orElse(providers.gradleProperty('pluginVersionCode')).orElse('1').get().toInteger()
+        versionName providers.environmentVariable('POCKETSTUDIO_VERSION_NAME').orElse(providers.gradleProperty('pluginVersionName')).orElse('1.0.0').get()
+    }
+    flavorDimensions += 'architecture'
+    [arm64V8a: 'arm64-v8a', x86_64: 'x86_64'].each { flavor, abi ->
+        productFlavors.create(flavor) { dimension 'architecture'; ndk.abiFilters.add(abi) }
+        sourceSets.getByName(flavor).assets.srcDir(rootProject.file("build/linux-images/${abi}/proot/assets"))
+    }
+    sourceSets.main.java.srcDir('ipc/java')
+    sourceSets.main.aidl.srcDir('ipc/aidl')
+    sourceSets.main.assets.srcDir(rootProject.file('build-support/linux-editor'))
+    buildFeatures { aidl = true }
+    androidResources { noCompress += 'gz' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+apply from: rootProject.file('build-support/release-signing.gradle')
+dependencies { compileOnly project(':plugin-api') }
+
+android.packaging.jniLibs.useLegacyPackaging = true
+android.packaging.jniLibs.keepDebugSymbols += ['**/libproot_*.so', '**/libtalloc.so', '**/libandroid-shmem.so']
+
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    def abi = variant.productFlavors.first().second == 'arm64V8a' ? 'arm64-v8a' : 'x86_64'
+    def assetDir = rootProject.file("build/linux-images/${abi}/proot/assets")
+    tasks.matching { it.name == "merge${variant.name.capitalize()}Assets" }.configureEach {
+        doFirst {
+            if (!new File(assetDir, 'debian-rootfs.tar.gz').isFile() ||
+                !new File(assetDir, 'debian-rootfs.sha256').isFile()) {
+                throw new GradleException("Build the ${abi} Debian PRoot image before packaging: ${assetDir}")
+            }
+        }
+    }
+}

@@ -29,6 +29,7 @@ final class Project {
   static final int MAX_TEXT = 768 * 1024;
   final Context context;
   final Uri tree;
+  final LinuxProject linux;
   final Node root;
 
   static final class Node {
@@ -47,7 +48,11 @@ final class Project {
   Project(Context context, Uri tree) throws IOException {
     this.context = context;
     if (tree == null) throw new IOException(uiString(R.string.select_a_project_folder));
-    if ("file".equals(tree.getScheme())) {
+    linux = LinuxProjects.SCHEME.equals(tree.getScheme()) ? LinuxProjects.open(context, tree) : null;
+    if (linux != null) {
+      this.tree = linux.getLocation();
+      root = linux.node("", true);
+    } else if ("file".equals(tree.getScheme())) {
       this.tree = null;
       File home = new File(Objects.requireNonNull(tree.getPath())).getCanonicalFile();
       Path imports = new File(context.getFilesDir(), "imports").getCanonicalFile().toPath();
@@ -115,7 +120,8 @@ final class Project {
   List<Node> list(Node dir) throws IOException {
     List<Node> nodes = new ArrayList<>();
     String prefix = dir.path.isEmpty() ? "" : dir.path + "/";
-    if (tree == null) {
+    if (linux != null) nodes.addAll(linux.list(dir.path));
+    else if (tree == null) {
       File[] files = new File(dir.uri.getPath()).listFiles();
       if (files == null) throw new IOException(uiString(R.string.unable_to_read_directory_format, dir.name));
       for (File f : files)
@@ -157,7 +163,7 @@ final class Project {
       throw new IOException(uiString(R.string.invalid_file_name));
     String path = parent.path.isEmpty() ? name : parent.path + "/" + name;
     Node created = createDocument(parent, name, folder, path);
-    if (tree != null && !name.equals(documentName(created.uri))) {
+    if (linux == null && tree != null && !name.equals(documentName(created.uri))) {
       delete(created);
       throw new IOException(uiString(R.string.the_storage_provider_could_not_preserve_the_name_format, path));
     }
@@ -165,6 +171,12 @@ final class Project {
   }
 
   Node renameExact(Node node, String name) throws IOException {
+    if (linux != null) {
+      int slash = node.path.lastIndexOf('/');
+      if (name.isEmpty() || name.equals(".") || name.equals("..") || name.contains("/") || name.indexOf(0) >= 0)
+        throw new IOException(uiString(R.string.invalid_file_name));
+      return relocate(node, node.path.substring(0, slash + 1) + name, false);
+    }
     Uri renamed = DocumentsContract.renameDocument(context.getContentResolver(), node.uri, name);
     if (renamed == null) throw new IOException(uiString(R.string.the_storage_provider_did_not_finish_renaming_format, node.path));
     String actual = documentName(renamed);
@@ -175,6 +187,10 @@ final class Project {
 
   private Node createDocument(Node parent, String name, boolean folder, String path) throws IOException {
     Uri uri;
+    if (linux != null) {
+      linux.file(folder ? "mkdir" : "create", path);
+      return linux.node(path, folder);
+    }
     if (tree == null) {
       File f = new File(parent.uri.getPath(), name);
       if (!(folder ? f.mkdir() : f.createNewFile())) throw new IOException(uiString(R.string.unable_to_create_format, name));
@@ -197,7 +213,7 @@ final class Project {
   private String validateDestination(Node parent, String name, boolean folder) throws IOException {
     if (!parent.folder || name.trim().isEmpty() || name.equals(".") || name.equals("..")
         || name.contains("/") || name.indexOf(0) >= 0) throw new IOException(uiString(R.string.invalid_name_or_destination_directory));
-    if (!folder) {
+    if (!folder && linux == null) {
       AndroidEnvironment android = AndroidEnvironments.find(context);
       String problem = android == null ? null : android.resourceFileNameError(parent.path, name);
       if (problem != null) throw new IOException(problem);
@@ -221,6 +237,10 @@ final class Project {
     String name = path.substring(slash + 1);
     String target = validateDestination(dest, name, source.folder);
     if (source.folder && target.startsWith(source.path + "/")) throw new IOException(uiString(R.string.cannot_place_a_folder_inside_its_own_subfolder));
+    if (linux != null) {
+      linux.file(copy ? "copy" : "move", source.path, target);
+      return linux.node(target, source.folder);
+    }
     if (copy) return copyNode(source, dest, name);
     Uri moved;
     if (tree == null) {
@@ -258,11 +278,13 @@ final class Project {
 
   void delete(Node node) throws IOException {
     if (node.path.isEmpty()) throw new IOException(uiString(R.string.select_a_file_or_folder_in_the_project));
-    if (tree == null) removeTree(new File(node.uri.getPath()).toPath());
+    if (linux != null) linux.file("delete", node.path);
+    else if (tree == null) removeTree(new File(node.uri.getPath()).toPath());
     else if (!DocumentsContract.deleteDocument(context.getContentResolver(), node.uri)) throw new IOException(uiString(R.string.delete_failed));
   }
 
   Node resolve(String path) throws IOException {
+    if (linux != null && !path.isEmpty()) return linux.stat(path);
     Node dir = root;
     if (!path.isEmpty())
       for (String part : path.split("/")) {
@@ -279,6 +301,7 @@ final class Project {
   }
 
   InputStream input(Node n) throws IOException {
+    if (linux != null) return linux.input(n.path);
     InputStream in = context.getContentResolver().openInputStream(n.uri);
     if (in == null) throw new IOException(uiString(R.string.unable_to_read_format, n.name));
     return in;
@@ -303,6 +326,7 @@ final class Project {
   }
 
   void write(Node n, byte[] data) throws IOException {
+    if (linux != null) { linux.file("write", n.path, null, data); return; }
     if (tree == null) {
       File target = new File(n.uri.getPath());
       android.util.AtomicFile file = new android.util.AtomicFile(target);

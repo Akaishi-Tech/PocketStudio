@@ -143,7 +143,9 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
     override val context get() = w.app
     override val projectId = (p.tree ?: p.root.uri).toString()
     override val projectIdle get() = w.project === p && !w.running && !w.busy
-    override val tools get() = AgentProjectTools.tools.filter { it.name != "run_gradle" || w.androidAvailable }
+    override val tools get() = if (p.linux == null) {
+        AgentProjectTools.tools.filter { it.name != "run_gradle" || w.androidAvailable }
+    } else AgentProjectTools.tools.filterNot { it.name in setOf("run_gradle", "read_logcat", "inspect_device_ui") } + AgentProjectTools.shell
     override fun keepLoginAlive() = AgentLoginService.start(context)
     private var lastStatus: String? = null
     override fun reportStatus(status: String?) {
@@ -171,6 +173,20 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
                     require(limit is Int) { uiString(R.string.agent_log_line_range) }
                     w.devices.readLogcat(w.apk, if (args.has("packageName")) args.getString("packageName") else null, limit)
                 }
+                "run_shell" -> {
+                    val guest = requireNotNull(p.linux)
+                    val command = args.getString("command")
+                    require(command.isNotBlank())
+                    check(ask(uiString(R.string.linux_run_command), command)) { uiString(R.string.declined_by_the_user) }
+                    check(w.saveDocuments()) { uiString(R.string.resolve_editing_conflicts_first) }
+                    val tail = StringBuilder()
+                    val status = runLinuxProcess(guest, arrayOf("bash", "-c", command), false,
+                        { it.outputStream.close() }, { chunk -> withContext(Dispatchers.Main) {
+                            tail.append(chunk)
+                            if (tail.length > 100_000) tail.delete(0, tail.length - 100_000)
+                        } })
+                    json("exitCode" to status, "output" to tail.toString()).toString()
+                }
                 "run_gradle" -> {
                     check(w.androidAvailable) { uiString(R.string.android_environment_required) }
                     val tasks = args.getString("tasks")
@@ -193,7 +209,7 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
                 }
             }
         } finally {
-            if (name in setOf("write_file", "create_directory", "run_gradle", "delete_file", "move_file") && w.project === p)
+            if (name in setOf("write_file", "create_directory", "run_gradle", "run_shell", "delete_file", "move_file") && w.project === p)
                 w.refreshAfterExternalRun(p)
         }
     }

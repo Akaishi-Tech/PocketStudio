@@ -5,7 +5,10 @@ include ':app'
 include ':aosp-ddmlib'
 project(':aosp-ddmlib').projectDir = file('upstream')
 include ':plugin-api', ':agent-api', ':codex-plugin', ':codex-plugin-apk'
-project(':codex-plugin').projectDir = file('build-support/codex-plugin')
-project(':codex-plugin-apk').projectDir = file('build-support/codex-plugin/apk')
+project(':codex-plugin').projectDir = file('plugins/codex')
+project(':codex-plugin-apk').projectDir = file('plugins/codex/apk')
 include ':android-plugin'
-project(':android-plugin').projectDir = file('build-support/android-plugin')
+project(':android-plugin').projectDir = file('plugins/android')
+include ':linux-avf-plugin', ':linux-proot-plugin'
+project(':linux-avf-plugin').projectDir = file('plugins/avf')
+project(':linux-proot-plugin').projectDir = file('plugins/proot')

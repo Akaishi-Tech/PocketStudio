@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <queries>
+        <package android:name="com.hcgstudio.pocketstudio"/>
+        <intent><action android:name="android.virtualization.VM_TERMINAL"/></intent>
+    </queries>
+    <application android:label="@string/avf_name" android:icon="@android:drawable/ic_menu_manage"
+        android:allowBackup="false" android:theme="@android:style/Theme.Material.Light">
+        <service android:name=".AvfRuntimeService" android:exported="true" android:description="@string/avf_description">
+            <intent-filter><action android:name="com.hcgstudio.pocketstudio.PLUGIN"/></intent-filter>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY" android:value="development-environment"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER" android:value="Akaishi Tech"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.LINUX_API" android:value="1"/>
+            <meta-data android:name="com.hcgstudio.pocketstudio.LINUX_ENTRY" android:value="com.hcgstudio.pocketstudio.avfplugin.AvfEnvironment"/>
+        </service>
+        <activity android:name=".AvfSetupActivity" android:exported="true"/>
+    </application>
+</manifest>

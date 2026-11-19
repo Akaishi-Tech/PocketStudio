@@ -12,6 +12,8 @@ __pycache__/
 *.keystore
 /plugin-api/build/
 /agent-api/build/
-/build-support/codex-plugin/build/
-/build-support/codex-plugin/apk/build/
-/build-support/android-plugin/build/
+/plugins/codex/build/
+/plugins/codex/apk/build/
+/plugins/android/build/
+/plugins/avf/build/
+/plugins/proot/build/
