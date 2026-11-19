@@ -96,14 +96,15 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo chmod a+rw /dev/kvm
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           tools="$ANDROID_HOME/cmdline-tools/latest/bin"
           "$tools/sdkmanager" "platform-tools" "emulator" "system-images;android-36;google_apis;x86_64"
           printf 'no\n' | "$tools/avdmanager" create avd --name linux-ci --package "system-images;android-36;google_apis;x86_64"
           "$ANDROID_HOME/emulator/emulator" -avd linux-ci -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -partition-size 12288 > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator_pid=$!
-          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          trap 'rc=$?; kill "$emulator_pid" 2>/dev/null || true; if [ "$rc" -ne 0 ]; then tail -60 "$RUNNER_TEMP/emulator.log"; fi' EXIT
           ./gradlew :linux-proot-plugin:assembleX86_64Debug :linux-proot-plugin:assembleX86_64DebugAndroidTest
-          adb wait-for-device
+          timeout 300 adb wait-for-device
           timeout 300 sh -c 'until adb shell getprop sys.boot_completed | grep -q 1; do sleep 3; done'
           adb install -r plugins/proot/build/outputs/apk/x86_64/debug/*.apk
           adb install -r plugins/proot/build/outputs/apk/androidTest/x86_64/debug/*.apk
