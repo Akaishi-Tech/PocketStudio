@@ -36,16 +36,18 @@ groupadd -g "$uid" studio
 useradd -u "$uid" -g studio -s /bin/bash -m studio
 install -d -o studio -g studio /home/studio/projects
 install -d /opt/dotnet /opt/pocket-studio/typescript-language-server /opt/pocket-studio/typescript /opt/pocket-studio/jdtls /opt/pocket-studio/csharp-ls
-tar -xzf "/cache/$SDK_ARCHIVE" -C /opt/dotnet
+tar --no-same-owner -xzf "/cache/$SDK_ARCHIVE" -C /opt/dotnet
 ln -s /opt/dotnet/dotnet /usr/local/bin/dotnet
-tar -xzf /cache/typescript-language-server.tgz --strip-components=1 -C /opt/pocket-studio/typescript-language-server
-tar -xzf /cache/typescript.tgz --strip-components=1 -C /opt/pocket-studio/typescript
+tar --no-same-owner -xzf /cache/typescript-language-server.tgz --strip-components=1 -C /opt/pocket-studio/typescript-language-server
+tar --no-same-owner -xzf /cache/typescript.tgz --strip-components=1 -C /opt/pocket-studio/typescript
 ln -s /opt/pocket-studio/typescript/bin/tsc /usr/local/bin/tsc
 ln -s /opt/pocket-studio/typescript/bin/tsserver /usr/local/bin/tsserver
 mkdir -p /opt/pocket-studio/typescript-language-server/node_modules
 ln -s /opt/pocket-studio/typescript /opt/pocket-studio/typescript-language-server/node_modules/typescript
+chmod 0755 /opt/pocket-studio/typescript-language-server/lib/cli.mjs
 ln -s /opt/pocket-studio/typescript-language-server/lib/cli.mjs /usr/local/bin/typescript-language-server
-tar -xzf /cache/jdtls-1.48.0.tar.gz -C /opt/pocket-studio/jdtls
+tar --no-same-owner -xzf /cache/jdtls-1.48.0.tar.gz -C /opt/pocket-studio/jdtls
+chmod 0755 /opt/pocket-studio/jdtls/bin/jdtls
 ln -s /opt/pocket-studio/jdtls/bin/jdtls /usr/local/bin/jdtls
 unzip -q /cache/csharp-ls-0.27.0.nupkg -d /opt/pocket-studio/csharp-ls
 printf '#!/bin/sh\nexec /opt/dotnet/dotnet /opt/pocket-studio/csharp-ls/tools/net10.0/any/CSharpLanguageServer.dll "$@"\n' > /usr/local/bin/csharp-ls
