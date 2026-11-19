@@ -3,25 +3,31 @@ package com.hcgstudio.pocketstudio
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import com.hcgstudio.pocketstudio.build.EmbeddedBuilder
-import com.hcgstudio.pocketstudio.build.SdkPlatforms
-import com.hcgstudio.pocketstudio.build.KotlinTools
 import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.zip.ZipInputStream
 
+internal fun createAndroidTestProject(
+    context: Context, parent: Uri, name: String, packageName: String, template: String = "button",
+    language: String = "JAVA", minSdk: Int = 26, compileSdk: String? = null
+): Project {
+    val environment = AndroidEnvironments.require(context)
+    val sdk = compileSdk ?: environment.platforms().installed().firstOrNull() ?: android.os.Build.VERSION.SDK_INT.toString()
+    return Project.createProject(context, parent, name, environment.projectTemplate(template, name, packageName, language, minSdk, sdk))
+}
+
 /** Run with a writable SAF tree already granted to the IDE and SDK Platform 34 installed. */
 object ProjectCreationChecks {
     @JvmStatic fun installedCompileSdk(context: Context) {
-        val sdk = SdkPlatforms(context).installed().firstOrNull { it.substringBefore('.').toInt() > 34 } ?: return
+        val sdk = AndroidEnvironments.require(context).platforms().installed().firstOrNull { it.substringBefore('.').toInt() > 34 } ?: return
         val parent = File(context.filesDir, "imports/sdk-check-${UUID.randomUUID()}")
         check(parent.mkdirs())
         try {
-            val project = Project.createProject(context, Uri.fromFile(parent), "SDK Project", "org.example.sdk",
-                ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, 35, sdk)
+            val project = createAndroidTestProject(context, Uri.fromFile(parent), "SDK Project", "org.example.sdk",
+                "empty-views", "JAVA", 35, sdk)
             ProjectWorkspace.open(project).use { workspace ->
-                val apk = EmbeddedBuilder.build(context, workspace.directory.toFile()) {}
+                val apk = AndroidEnvironments.require(context).build(workspace.directory.toFile(), null) {}
                 val info = checkNotNull(context.packageManager.getPackageArchiveInfo(apk.path, 0)?.applicationInfo)
                 check(info.minSdkVersion == 35 && info.targetSdkVersion == sdk.substringBefore('.').toInt())
             }
@@ -32,7 +38,7 @@ object ProjectCreationChecks {
         val parent = Project(context, Uri.parse(tree))
         val name = "测试 & Studio " + UUID.randomUUID()
         val packageName = "org.example.projectcheck"
-        val project = Project.createProject(context, parent.tree, name, packageName)
+        val project = createAndroidTestProject(context, parent.tree, name, packageName)
         try {
             val reopened = Project(context, project.tree)
             check(reopened.root.name == name)
@@ -54,7 +60,7 @@ object ProjectCreationChecks {
             val asset = reopened.create(assetDir, "workspace-check.txt", false)
             reopened.write(asset, name.encodeToByteArray())
             ProjectWorkspace.open(reopened).use { work ->
-                EmbeddedBuilder.build(context, work.directory.toFile()) {}
+                AndroidEnvironments.require(context).build(work.directory.toFile(), null) {}
             }
             ZipInputStream(reopened.input(reopened.resolve("app/build/outputs/apk/debug/app-debug.apk"))).use { zip ->
                 var entry = zip.nextEntry
@@ -63,37 +69,37 @@ object ProjectCreationChecks {
             }
             check(reopened.read(activity) == edited) { "重新构建覆盖了编辑器所作的修改" }
             val siblings = parent.list(parent.root).map { it.name }
-            val duplicate = runCatching { Project.createProject(context, parent.tree, name, packageName) }
+            val duplicate = runCatching { createAndroidTestProject(context, parent.tree, name, packageName) }
             check(duplicate.exceptionOrNull() is IOException && reopened.read(activity) == edited)
-            val invalid = runCatching { Project.createProject(context, parent.tree, "$name invalid", "bad.class") }
+            val invalid = runCatching { createAndroidTestProject(context, parent.tree, "$name invalid", "bad.class") }
             check(invalid.isFailure && parent.list(parent.root).map { it.name } == siblings)
             for (sdk in listOf(23, 35)) {
                 val invalidSdk = runCatching {
-                    Project.createProject(context, parent.tree, "$name invalid", packageName, ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, sdk, "34")
+                    createAndroidTestProject(context, parent.tree, "$name invalid", packageName, "empty-views", "JAVA", sdk, "34")
                 }
                 check(invalidSdk.isFailure && parent.list(parent.root).map { it.name } == siblings)
             }
-            for (template in listOf(ProjectTemplate.EMPTY_VIEWS, ProjectTemplate.BUTTON)) {
+            for (template in listOf("empty-views", "button")) {
                 val reservedPackage = runCatching {
-                    Project.createProject(context, parent.tree, "$name invalid", "kotlin.example", template, ProjectLanguage.KOTLIN, 26)
+                    createAndroidTestProject(context, parent.tree, "$name invalid", "kotlin.example", template, "KOTLIN", 26)
                 }
                 check(reservedPackage.isFailure && parent.list(parent.root).map { it.name } == siblings)
             }
         } finally {
             parent.delete(parent.resolve(name))
         }
-        checkTemplate(context, parent, ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.JAVA, 24, "kotlin.example")
-        checkTemplate(context, parent, ProjectTemplate.EMPTY_VIEWS, ProjectLanguage.KOTLIN, 34, "org.example.when")
-        checkTemplate(context, parent, ProjectTemplate.BUTTON, ProjectLanguage.KOTLIN, 26)
-        checkTemplate(context, parent, ProjectTemplate.NO_ACTIVITY, ProjectLanguage.KOTLIN, 34, "kotlin.example")
+        checkTemplate(context, parent, "empty-views", "JAVA", 24, "kotlin.example")
+        checkTemplate(context, parent, "empty-views", "KOTLIN", 34, "org.example.when")
+        checkTemplate(context, parent, "button", "KOTLIN", 26)
+        checkTemplate(context, parent, "no-activity", "KOTLIN", 34, "kotlin.example")
     }
 
     private fun checkTemplate(
-        context: Context, parent: Project, template: ProjectTemplate, language: ProjectLanguage,
+        context: Context, parent: Project, template: String, language: String,
         minSdk: Int, packageName: String = "org.example.wizard",
     ) {
         val name = "Wizard-" + UUID.randomUUID()
-        val project = Project.createProject(context, parent.tree, name, packageName, template, language, minSdk)
+        val project = createAndroidTestProject(context, parent.tree, name, packageName, template, language, minSdk)
         try {
             ProjectWorkspace.open(Project(context, project.tree)).use { workspace ->
                 val root = workspace.directory.toFile()
@@ -101,23 +107,23 @@ object ProjectCreationChecks {
                 val main = module.resolve("src/main")
                 val sources = main.walkTopDown().filter { it.extension in setOf("java", "kt") }.toList()
                 val layouts = main.resolve("res/layout").listFiles().orEmpty()
-                val hasActivity = template != ProjectTemplate.NO_ACTIVITY
+                val hasActivity = template != "no-activity"
                 val manifest = main.resolve("AndroidManifest.xml").readText()
                 check(manifest.contains("android.intent.category.LAUNCHER") == hasActivity)
                 check(Regex("""\bminSdk\s*(?:=\s*)?$minSdk\b""").containsMatchIn(module.resolve("build.gradle").readText()))
                 if (hasActivity) {
                     val source = sources.single()
-                    val extension = if (language == ProjectLanguage.KOTLIN) "kt" else "java"
+                    val extension = if (language == "KOTLIN") "kt" else "java"
                     check(source.path.endsWith("/${packageName.replace('.', '/')}/MainActivity.$extension"))
                     val declaration = source.readLines().first { it.startsWith("package ") }
                     check(declaration.removePrefix("package ").removeSuffix(";").replace("`", "") == packageName)
                     if (packageName.endsWith(".when")) check("`when`" in declaration)
                     check(layouts.isNotEmpty())
-                    check(layouts.any { it.readText().contains("<Button") } == (template == ProjectTemplate.BUTTON))
+                    check(layouts.any { it.readText().contains("<Button") } == (template == "button"))
                 } else {
                     check(sources.isEmpty() && layouts.isEmpty())
                 }
-                if (!hasActivity || language == ProjectLanguage.JAVA || KotlinTools(context).installed()) {
+                if (!hasActivity || language == "JAVA" || AndroidEnvironments.require(context).kotlinTools().installed()) {
                     checkApk(context, root, name, packageName, minSdk, hasActivity)
                 }
             }
@@ -127,7 +133,7 @@ object ProjectCreationChecks {
     }
 
     private fun checkApk(context: Context, root: File, name: String, packageName: String, minSdk: Int, hasActivity: Boolean) {
-        val apk = EmbeddedBuilder.build(context, root) {}
+        val apk = AndroidEnvironments.require(context).build(root, null) {}
         val pm = context.packageManager
         val info = checkNotNull(pm.getPackageArchiveInfo(apk.path, PackageManager.GET_ACTIVITIES or PackageManager.GET_SIGNATURES))
         check(info.packageName == packageName && info.signatures?.size == 1)

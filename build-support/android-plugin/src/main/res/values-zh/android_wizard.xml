@@ -1,0 +1,21 @@
+<resources>
+    <string name="back">"返回"</string>
+    <string name="package_name">"包名"</string>
+    <string name="package_name_is_too_long">"包名过长"</string>
+    <string name="package_names_cannot_contain_java_keywords">"包名不能含有 Java 关键字"</string>
+    <string name="project_name">"项目名称"</string>
+    <string name="use_at_least_two_package_segments_start_each">"包名至少需要两段，每段以字母开头，只能包含字母、数字或下划线"</string>
+    <string name="wizard_select_template">选择项目模板</string>
+    <string name="wizard_empty_views">空白视图 Activity</string>
+    <string name="wizard_button_counter">按钮计数器</string>
+    <string name="wizard_no_activity">无 Activity</string>
+    <string name="wizard_next">下一步</string>
+    <string name="wizard_finish">完成</string>
+    <string name="wizard_save_location">保存位置</string>
+    <string name="wizard_choose_parent">选择父文件夹</string>
+    <string name="wizard_language">编程语言</string>
+    <string name="wizard_min_sdk">最低 SDK</string>
+    <string name="wizard_reserved_kotlin_package">请选择 kotlin 命名空间以外的包名</string>
+    <string name="wizard_compile_sdk">编译 SDK</string>
+    <string name="wizard_android_project">Android 项目</string>
+</resources>

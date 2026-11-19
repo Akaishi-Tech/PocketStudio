@@ -10,8 +10,9 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/classes"
 javac --release 11 -cp "$android_jar" -d "$work/classes" \
-  "$root"/app/src/main/java/com/hcgstudio/pocketstudio/protocol/*.java \
-  "$root"/app/src/main/java/com/hcgstudio/pocketstudio/adb/*.java \
+  "$root"/plugin-api/src/main/java/com/hcgstudio/pocketstudio/protocol/*.java \
+  "$root"/plugin-api/src/main/java/com/hcgstudio/pocketstudio/adb/*.java \
+  "$root"/build-support/android-plugin/src/main/java/com/hcgstudio/pocketstudio/adb/*.java \
   "$root"/tools/test/usb/*.java
 java -cp "$work/classes:$android_jar" com.hcgstudio.pocketstudio.adb.TransportCheck
 # Optional: exercise the real AndroidKeyStore signing provider and both AUTH responses.

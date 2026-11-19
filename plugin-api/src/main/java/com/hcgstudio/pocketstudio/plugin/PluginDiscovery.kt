@@ -12,6 +12,7 @@ object PluginDiscovery {
     const val CATEGORY = "com.hcgstudio.pocketstudio.PLUGIN_CATEGORY"
     const val DEVELOPER = "com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER"
     const val AGENT_CATEGORY = "agent"
+    const val DEVELOPMENT_ENVIRONMENT_CATEGORY = "development-environment"
 
     /** Returns compatible declarations, regardless of their category or the application's signer.
      * The host verifies signatures and the category-specific API before executing any provider. */

@@ -2,7 +2,7 @@
 
 [English](JDK.md) · 简体中文
 
-APK 随附 OpenJDK 17.0.21.0.2 的 Android/Bionic 构建，支持 arm64-v8a、armeabi-v7a、x86 和 x86_64。JDK 包含 HotSpot、javac、jar、jlink、jmod、标准模块和上游许可证。首次运行 Gradle 时，应用从 APK 展开对应 ABI 的 JDK。Android 的安装程序负责将原生启动器放到 APK 的可执行目录。项目 Wrapper 下载的 Gradle 发行版和项目声明的依赖另行缓存。
+Android 开发环境插件随附 OpenJDK 17.0.21.0.2 的 Android/Bionic 构建，支持 arm64-v8a、armeabi-v7a、x86 和 x86_64。JDK 包含 HotSpot、javac、jar、jlink、jmod、标准模块和上游许可证。首次运行 Gradle 时，应用从插件 APK 展开对应 ABI 的 JDK。Android 的安装程序负责将原生启动器放到插件 APK 的可执行目录。项目 Wrapper 下载的 Gradle 发行版和项目声明的依赖另行缓存。
 
 运行时采用 OpenJDK 的 GPLv2 和 Classpath Exception，第三方组件适用各自许可证。版本来源和 Android 补丁固定到以下构建。[OpenJDK 源码](https://github.com/openjdk/jdk17u/tree/jdk-17.0.21.0.2-ga) · [Android 构建脚本和补丁](https://github.com/MojoLauncher/android-openjdk-build-17-25/tree/1e90171cce3eca93c14c6ec59811bd88a9792f34) · [四种 ABI 的原始构建产物](https://github.com/MojoLauncher/android-openjdk-build-17-25/actions/runs/39842631198)
 

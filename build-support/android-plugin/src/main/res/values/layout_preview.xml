@@ -1,0 +1,26 @@
+<resources>
+    <string name="accepts_only_one_direct_child_format">"%1$s accepts only one direct child"</string>
+    <string name="attribute_android_format">"Attribute android:%1$s"</string>
+    <string name="attribute_format">"Attribute %1$s"</string>
+    <string name="children_are_arranged_vertically">" children are arranged vertically"</string>
+    <string name="children_could_not_be_displayed_format">"%1$s children could not be displayed"</string>
+    <string name="circular_reference_format">"Circular reference: %1$s"</string>
+    <string name="failed_to_parse_format">"%1$s failed to parse: %2$s"</string>
+    <string name="image_previews_are_limited_to_8_images">"Image previews are limited to 8 images"</string>
+    <string name="invalid_layout_weight">"Invalid layout_weight"</string>
+    <string name="layout_exceeds_the_preview_limit_of_400_views">"Layout exceeds the preview limit of 400 views or 32 levels"</string>
+    <string name="layout_has_no_root_element">"Layout has no root element"</string>
+    <string name="layout_resources_cannot_contain_a_dtd">"Layout resources cannot contain a DTD"</string>
+    <string name="shown_as_a_placeholder">" shown as a placeholder"</string>
+    <string name="some_content_could_not_be_previewed">"Some content could not be previewed"</string>
+    <string name="unresolved_alignment_format">"Unresolved alignment: %1$s"</string>
+    <string name="unresolved_color_format">"Unresolved color: %1$s"</string>
+    <string name="unresolved_dimension_format">"Unresolved dimension: %1$s"</string>
+    <string name="unresolved_image_format">"Unresolved image: %1$s"</string>
+    <string name="unresolved_scaletype_format">"Unresolved scaleType: %1$s"</string>
+    <string name="unresolved_text_format">"Unresolved text: %1$s"</string>
+    <string name="xml_exceeds_768_kib">"XML exceeds 768 KiB"</string>
+    <string name="back_to_preview">"Back to preview"</string>
+    <string name="layout_preview">"Layout preview"</string>
+    <string name="preview_diff">"Preview diff"</string>
+</resources>

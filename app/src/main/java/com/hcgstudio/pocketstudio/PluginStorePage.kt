@@ -174,8 +174,11 @@ internal fun PluginStorePage(devices: DeviceController, initialCategory: String?
 }
 
 @Composable
-private fun categoryLabel(value: String): String =
-    if (value == PluginDiscovery.AGENT_CATEGORY) stringResource(R.string.agents_tab_label) else value
+private fun categoryLabel(value: String): String = when (value) {
+    PluginDiscovery.AGENT_CATEGORY -> stringResource(R.string.agents_tab_label)
+    PluginDiscovery.DEVELOPMENT_ENVIRONMENT_CATEGORY -> stringResource(R.string.plugin_development_environment)
+    else -> value
+}
 
 @Composable
 private fun PluginEntry(store: PluginStore, pkg: String, plugin: StorePlugin?, local: InstalledPlugin?,

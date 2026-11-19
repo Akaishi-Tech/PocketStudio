@@ -1,0 +1,22 @@
+<resources>
+    <string name="could_not_create_the_app_s_private_debugging">"Could not create the app\'s private debugging socket"</string>
+    <string name="could_not_determine_the_apk_size">"Could not determine the APK size"</string>
+    <string name="could_not_start_the_app_s_private_wireless">"Could not start the app\'s private wireless debugging service"</string>
+    <string name="enter_a_valid_target_address_and_port">"Enter a valid target address and port"</string>
+    <string name="enter_the_six_digit_pairing_code_shown_on">"Enter the six-digit pairing code shown on the target device"</string>
+    <string name="installation_failed_format">"Installation failed: %1$s"</string>
+    <string name="invalid_adb_request">"Invalid ADB request"</string>
+    <string name="invalid_wireless_adb_message_length">"Invalid wireless ADB message length"</string>
+    <string name="pairing_did_not_finish_check_the_pairing_port">"Pairing did not finish. Check the pairing port and six-digit code."</string>
+    <string name="target_output_is_too_long">"Target output is too long"</string>
+    <string name="the_target_has_not_authorized_this_device_check">"The target has not authorized this device. Check the pairing record and connection port."</string>
+    <string name="the_wireless_adb_service_disconnected">"The wireless ADB service disconnected"</string>
+    <string name="the_wireless_adb_service_returned_an_invalid_status">"The wireless ADB service returned an invalid status"</string>
+    <string name="the_wireless_debugging_component_could_not_start_with">"The wireless debugging component could not start with this memory page size. Use USB debugging."</string>
+    <string name="the_wireless_debugging_component_is_unavailable_for_this">"The wireless debugging component is unavailable for this CPU architecture"</string>
+    <string name="the_wireless_debugging_service_closed">"The wireless debugging service closed"</string>
+    <string name="the_wireless_target_disconnected">"The wireless target disconnected"</string>
+    <string name="unexpected_end_of_apk_file">"Unexpected end of APK file"</string>
+    <string name="wireless_connection_failed_format">"Wireless connection failed: %1$s"</string>
+    <string name="wireless_pairing_requires_android_11_or_later_on">"Wireless pairing requires Android 11 or later on the host device"</string>
+</resources>

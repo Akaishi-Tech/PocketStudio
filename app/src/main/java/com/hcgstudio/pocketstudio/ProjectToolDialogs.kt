@@ -2,23 +2,19 @@ package com.hcgstudio.pocketstudio
 
 import androidx.compose.ui.res.stringResource
 
-import android.widget.FrameLayout
+import com.hcgstudio.pocketstudio.plugin.AndroidEnvironment
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -28,57 +24,15 @@ import java.security.MessageDigest
 import java.io.IOException
 
 @Composable
-internal fun LayoutPreviewDialog(project: Project, xml: String, path: String, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    var preview by remember(project, xml, path) { mutableStateOf<LayoutPreview?>(null) }
-    var error by remember(project, xml, path) { mutableStateOf("") }
-    var notes by remember(project, xml, path) { mutableStateOf(emptyList<String>()) }
-    var details by remember { mutableStateOf(false) }
-    LaunchedEffect(project, xml, path) {
-        try {
-            preview = runInterruptible(Dispatchers.IO) { LayoutPreview.load(context, project, xml, path) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            error = e.localizedMessage ?: e.javaClass.simpleName
+internal fun LayoutPreviewDialog(environment: AndroidEnvironment, project: Project, xml: String, path: String, dismiss: () -> Unit) {
+    val files = remember(project) {
+        object : AndroidEnvironment.LayoutFiles {
+            override fun list(directory: String) = project.list(project.resolve(directory)).map { it.name }
+            override fun read(path: String) = project.read(project.resolve(path))
+            override fun open(path: String) = project.input(project.resolve(path))
         }
     }
-    AlertDialog(
-        onDismissRequest = { if (details) details = false else onDismiss() },
-        title = { Text(if (details) uiString(R.string.preview_diff) else uiString(R.string.layout_preview)) },
-        text = {
-            val loaded = preview
-            when {
-                error.isNotEmpty() -> Text(error, color = MaterialTheme.colorScheme.error)
-                loaded == null -> CircularProgressIndicator()
-                else -> StudioPageTransition(details, { if (it) 1 else 0 }) { showDifferences ->
-                    if (showDifferences) Column(Modifier.verticalScroll(rememberScrollState())) {
-                        notes.forEach { Text(it, Modifier.padding(vertical = 4.dp)) }
-                    } else key(loaded) {
-                        AndroidView(
-                            factory = { ctx ->
-                                FrameLayout(ctx).apply {
-                                    try {
-                                        loaded.drawInto(this)
-                                        notes = loaded.differences()
-                                    } catch (e: RuntimeException) {
-                                        error = e.localizedMessage ?: e.javaClass.simpleName
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(.62f)
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onDismiss) { Text(stringResource(R.string.close)) } },
-        dismissButton = {
-            if (notes.isNotEmpty()) TextButton({ details = !details }) {
-                Text(if (details) uiString(R.string.back_to_preview) else uiString(R.string.preview_diff))
-            }
-        }
-    )
+    environment.ui().LayoutPreview(files, xml, path, dismiss)
 }
 
 private data class ReplaceResult(val changed: List<Project.Node>, val error: String?)

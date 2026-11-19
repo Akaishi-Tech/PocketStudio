@@ -9,13 +9,14 @@ import android.os.SystemClock;
 
 import java.io.IOException;
 import java.util.List;
-import com.hcgstudio.pocketstudio.adb.UsbAdb;
+import com.hcgstudio.pocketstudio.AndroidEnvironments;
+import com.hcgstudio.pocketstudio.adb.Target;
 
 /** Connects the production USB transport to the explicitly named emulator-only fixture. */
 final class UsbGadgetTarget {
-    static UsbAdb connect(Context context) throws IOException {
+    static Target connect(Context context) throws IOException {
         UsbManager manager = context.getSystemService(UsbManager.class);
-        List<UsbDevice> devices = UsbAdb.devices(manager);
+        List<UsbDevice> devices = AndroidEnvironments.require(context).usbDevices();
         if (devices.size() != 1) throw new IOException("Expected one emulated USB ADB interface");
         UsbDevice device = devices.get(0);
         if (device.getVendorId() != 0x18d1 || device.getProductId() != 0x4ee7)
@@ -29,7 +30,7 @@ final class UsbGadgetTarget {
                 SystemClock.sleep(100);
         }
         if (!manager.hasPermission(device)) throw new IOException("System USB permission was not granted");
-        UsbAdb adb = UsbAdb.connect(context, device);
+        Target adb = AndroidEnvironments.require(context).connectUsb(device);
         try {
             if (!"studio_usb_target".equals(adb.shell("getprop ro.boot.qemu.avd_name").trim()))
                 throw new IOException("USB bridge did not reach the expected AVD");

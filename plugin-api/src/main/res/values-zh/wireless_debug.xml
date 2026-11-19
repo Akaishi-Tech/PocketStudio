@@ -1,0 +1,22 @@
+<resources>
+    <string name="could_not_create_the_app_s_private_debugging">"无法创建应用私有调试套接字"</string>
+    <string name="could_not_determine_the_apk_size">"无法获取 APK 大小"</string>
+    <string name="could_not_start_the_app_s_private_wireless">"无法启动应用私有无线调试服务"</string>
+    <string name="enter_a_valid_target_address_and_port">"请输入有效的目标地址和端口"</string>
+    <string name="enter_the_six_digit_pairing_code_shown_on">"请输入目标设备显示的六位配对码"</string>
+    <string name="installation_failed_format">"安装失败：%1$s"</string>
+    <string name="invalid_adb_request">"无效的 ADB 请求"</string>
+    <string name="invalid_wireless_adb_message_length">"无线 ADB 消息长度无效"</string>
+    <string name="pairing_did_not_finish_check_the_pairing_port">"配对未完成，请检查配对端口与六位码"</string>
+    <string name="target_output_is_too_long">"目标输出过长"</string>
+    <string name="the_target_has_not_authorized_this_device_check">"目标尚未授权，请检查配对记录与连接端口"</string>
+    <string name="the_wireless_adb_service_disconnected">"无线 ADB 服务已断开"</string>
+    <string name="the_wireless_adb_service_returned_an_invalid_status">"无线 ADB 服务返回了无效状态"</string>
+    <string name="the_wireless_debugging_component_could_not_start_with">"无线调试组件未能在当前内存页配置上启动，请使用 USB 调试"</string>
+    <string name="the_wireless_debugging_component_is_unavailable_for_this">"当前 CPU 架构缺少无线调试组件"</string>
+    <string name="the_wireless_debugging_service_closed">"无线调试服务已关闭"</string>
+    <string name="the_wireless_target_disconnected">"无线目标设备已断开"</string>
+    <string name="unexpected_end_of_apk_file">"APK 文件提前结束"</string>
+    <string name="wireless_connection_failed_format">"无线连接失败：%1$s"</string>
+    <string name="wireless_pairing_requires_android_11_or_later_on">"无线配对要求主调试设备运行 Android 11 或更高版本"</string>
+</resources>

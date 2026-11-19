@@ -2,7 +2,7 @@
 
 English · [简体中文](JDK.zh-CN.md)
 
-Pocket Studio bundles OpenJDK 17.0.21.0.2 built for Android's Bionic C library on arm64-v8a, armeabi-v7a, x86 and x86_64. The JDK includes HotSpot, javac, jar, jlink, jmod, the standard modules and upstream licenses. On the first Gradle run, Studio extracts the JDK for the device's ABI from the APK. The Android package installer places the native launchers in the app's executable library directory. The project's Gradle distribution and dependencies are cached separately.
+The Android development environment plugin bundles OpenJDK 17.0.21.0.2 built for Android's Bionic C library on arm64-v8a, armeabi-v7a, x86 and x86_64. The JDK includes HotSpot, javac, jar, jlink, jmod, the standard modules and upstream licenses. On the first Gradle run, Studio extracts the JDK for the device's ABI from the APK. The Android package installer places the native launchers in the plugin's executable library directory. The project's Gradle distribution and dependencies are cached separately.
 
 The runtime uses OpenJDK's GPLv2 with the Classpath Exception. Third-party components retain their respective licenses. [OpenJDK source](https://github.com/openjdk/jdk17u/tree/jdk-17.0.21.0.2-ga) · [Pinned Android build scripts and patches](https://github.com/MojoLauncher/android-openjdk-build-17-25/tree/1e90171cce3eca93c14c6ec59811bd88a9792f34) · [Original builds for all four ABIs](https://github.com/MojoLauncher/android-openjdk-build-17-25/actions/runs/39842631198)
 

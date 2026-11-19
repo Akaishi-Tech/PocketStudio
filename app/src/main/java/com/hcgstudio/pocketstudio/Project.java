@@ -3,7 +3,8 @@ package com.hcgstudio.pocketstudio;
 import static com.hcgstudio.pocketstudio.StudioStrings.uiString;
 
 import android.content.Context;
-import com.hcgstudio.pocketstudio.build.SdkPlatforms;
+import com.hcgstudio.pocketstudio.plugin.AndroidEnvironment;
+import com.hcgstudio.pocketstudio.plugin.ProjectStarter;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.DocumentsContract;
@@ -26,11 +27,6 @@ final class Project {
   }
 
   static final int MAX_TEXT = 768 * 1024;
-  private static final Set<String> JAVA_KEYWORDS = new HashSet<>(Arrays.asList((
-      "abstract assert boolean break byte case catch char class const continue default do double else "
-      + "enum extends final finally float for goto if implements import instanceof int interface long "
-      + "native new package private protected public return short static strictfp super switch "
-      + "synchronized this throw throws transient try void volatile while true false null").split(" ")));
   final Context context;
   final Uri tree;
   final Node root;
@@ -84,44 +80,31 @@ final class Project {
     return null;
   }
 
-  static String packageNameError(String packageName) {
-    if (!packageName.matches("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+"))
-      return uiString(R.string.use_at_least_two_package_segments_start_each);
-    if (packageName.length() > 255) return uiString(R.string.package_name_is_too_long);
-    for (String part : packageName.split("\\."))
-      if (JAVA_KEYWORDS.contains(part)) return uiString(R.string.package_names_cannot_contain_java_keywords);
-    return null;
-  }
-
-  static Project createProject(Context context, Uri parentTree, String name, String packageName) throws IOException {
-    return createProject(context, parentTree, name, packageName, ProjectTemplate.BUTTON,
-        ProjectLanguage.JAVA, ProjectTemplate.DEFAULT_MIN_SDK);
-  }
-
-  static Project createProject(Context context, Uri parentTree, String name, String packageName,
-      ProjectTemplate template, ProjectLanguage language, int minSdk) throws IOException {
-    String sdk = new SdkPlatforms(context).installed().stream()
-        .findFirst().orElse(String.valueOf(android.os.Build.VERSION.SDK_INT));
-    return createProject(context, parentTree, name, packageName, template, language, minSdk, sdk);
-  }
-
-  static Project createProject(Context context, Uri parentTree, String name, String packageName,
-      ProjectTemplate template, ProjectLanguage language, int minSdk, String compileSdk) throws IOException {
-    name = name.trim();
-    packageName = packageName.trim();
+  static Project createProject(Context context, Uri parentTree, String name, ProjectStarter starter) throws IOException {
     String problem = projectNameError(name);
-    if (problem == null) problem = template.packageNameError(packageName, language);
     if (problem != null) throw new IOException(problem);
-    if (!compileSdk.matches("[1-9][0-9]{0,2}(?:\\.[0-9]{1,2})?") || minSdk < ProjectTemplate.MIN_SDK ||
-        minSdk > Integer.parseInt(compileSdk.split("\\.")[0]))
-      throw new IOException(uiString(R.string.invalid_sdk_platform_number));
-
     Project parent = new Project(context, parentTree);
     Node child = parent.create(parent.root, name, true);
     try {
       Project project = new Project(context, child.uri);
       if (!name.equals(project.root.name)) throw new IOException(uiString(R.string.a_project_with_that_name_already_exists_or));
-      template.writeFiles(project, name, packageName, language, minSdk, compileSdk);
+      Map<String, Node> directories = new HashMap<>();
+      starter.writeFiles((path, content) -> {
+        String[] parts = path.split("/", -1);
+        Node dir = project.root;
+        StringBuilder prefix = new StringBuilder();
+        for (int i = 0; i < parts.length - 1; i++) {
+          prefix.append(parts[i]).append('/');
+          String key = prefix.toString();
+          Node next = directories.get(key);
+          if (next == null) {
+            next = project.createExact(dir, parts[i], true);
+            directories.put(key, next);
+          }
+          dir = next;
+        }
+        project.write(project.createExact(dir, parts[parts.length - 1], false), content);
+      });
       return project;
     } catch (IOException | RuntimeException e) {
       try { parent.delete(child); } catch (Exception cleanup) { e.addSuppressed(cleanup); }
@@ -215,7 +198,8 @@ final class Project {
     if (!parent.folder || name.trim().isEmpty() || name.equals(".") || name.equals("..")
         || name.contains("/") || name.indexOf(0) >= 0) throw new IOException(uiString(R.string.invalid_name_or_destination_directory));
     if (!folder) {
-      String problem = com.hcgstudio.pocketstudio.upstream.FileResourceNameValidator.errorForFile(parent.path, name);
+      AndroidEnvironment android = AndroidEnvironments.find(context);
+      String problem = android == null ? null : android.resourceFileNameError(parent.path, name);
       if (problem != null) throw new IOException(problem);
     }
     for (Node node : list(parent)) if (node.name.equals(name)) throw new IOException(uiString(R.string.name_already_exists, name));

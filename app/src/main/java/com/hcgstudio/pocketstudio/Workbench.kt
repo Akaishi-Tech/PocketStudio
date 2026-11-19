@@ -50,21 +50,21 @@ private fun Brand(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, clone: () -> Unit, sdk: () -> Unit,
+internal fun Welcome(w: Workspace, newProject: () -> Unit, open: () -> Unit, importZip: () -> Unit, clone: () -> Unit, plugins: () -> Unit,
                      licenses: () -> Unit, settings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().background(colors.surface)) {
         BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            val showSdkLabel = maxWidth >= 360.dp * (LocalDensity.current.fontScale * LocalStudioSettings.current.uiFontSize / 14f)
+            val showStoreLabel = maxWidth >= 360.dp * (LocalDensity.current.fontScale * LocalStudioSettings.current.uiFontSize / 14f)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Brand(Modifier.weight(1f))
-                if (showSdkLabel) {
-                    OutlinedButton(sdk, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                if (showStoreLabel) {
+                    OutlinedButton(plugins, contentPadding = PaddingValues(horizontal = 14.dp)) {
                         Symbol(R.drawable.studio_inventory_2, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.sdk_manager))
+                        Text(stringResource(R.string.plugin_store))
                     }
-                } else StudioIconButton(R.drawable.studio_inventory_2, stringResource(R.string.sdk_manager), onClick = sdk)
+                } else StudioIconButton(R.drawable.studio_inventory_2, stringResource(R.string.plugin_store), onClick = plugins)
                 StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = settings)
             }
         }
@@ -124,7 +124,7 @@ private fun WelcomeButtons(enabled: Boolean, newProject: () -> Unit, open: () ->
 }
 
 private data class ToolItem(val tool: Tool, @get:StringRes val label: Int, val icon: Int)
-private val tools = listOf(
+private val workspaceTools = listOf(
     ToolItem(Tool.Project, R.string.project, R.drawable.studio_account_tree),
     ToolItem(Tool.Editor, R.string.editor, R.drawable.studio_code),
     ToolItem(Tool.Agents, R.string.agents_tab_label, R.drawable.studio_chat),
@@ -135,6 +135,7 @@ private val tools = listOf(
 @Composable
 internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean, setTree: (Boolean) -> Unit, className: String, openEntry: (Project.Node) -> Unit, openAgentAccount: () -> Unit) {
     val p = w.project ?: return
+    val tools = workspaceTools.filter { it.tool != Tool.Output || w.androidAvailable }
     val colors = MaterialTheme.colorScheme
     val settings = LocalStudioSettings.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -165,7 +166,9 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                             else StudioIconButton(item.icon, stringResource(item.label), onClick = action)
                         }
                         Spacer(Modifier.weight(1f))
-                        StudioIconButton(R.drawable.studio_inventory_2, uiString(R.string.sdk_manager), onClick = actions.first { it.id == "sdk" }.run)
+                        actions.firstOrNull { it.id == "sdk" }?.let {
+                            StudioIconButton(R.drawable.studio_inventory_2, it.label, onClick = it.run)
+                        }
                         StudioIconButton(R.drawable.studio_settings, stringResource(R.string.settings), onClick = actions.first { it.id == "settings" }.run)
                     }
                     VerticalDivider(color = colors.outlineVariant)
@@ -185,8 +188,8 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                             }
                             Tool.Project -> ProjectPane(w, actions, Modifier.fillMaxSize(), openEntry)
                             Tool.Agents -> AgentPane(w, openAgentAccount)
-                            Tool.Devices -> DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1)
-                            Tool.Output -> OutputPane(w, actions, Modifier.fillMaxSize())
+                            Tool.Devices -> DeviceToolWindow(w.devices, w.androidEnvironment, className, w.active?.editor?.line ?: 1)
+                            Tool.Output -> if (w.androidAvailable) OutputPane(w, actions, Modifier.fillMaxSize())
                         }
                     }
                     if (wide) {
@@ -195,8 +198,8 @@ internal fun Workbench(w: Workspace, actions: List<StudioAction>, tree: Boolean,
                             if (pane != null) Column {
                                 HorizontalDivider()
                                 val panel = Modifier.fillMaxWidth().height((height * .39f).coerceIn(120.dp, 370.dp))
-                                if (pane == Tool.Devices) DeviceToolWindow(w.devices, className, w.active?.editor?.line ?: 1, panel)
-                                else OutputPane(w, actions, panel)
+                                if (pane == Tool.Devices) DeviceToolWindow(w.devices, w.androidEnvironment, className, w.active?.editor?.line ?: 1, panel)
+                                else if (w.androidAvailable) OutputPane(w, actions, panel)
                             }
                         }
                     }
@@ -235,7 +238,7 @@ private fun WorkspaceBar(w: Workspace, actions: List<StudioAction>, desktop: Boo
         TopAppBar(
             title = { Text(projectName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             actions = {
-                if (settings.showMainToolbarActions) RunOptions(actions)
+                if (settings.showMainToolbarActions && w.androidAvailable) RunOptions(actions)
                 Box {
                     var open by remember { mutableStateOf(false) }
                     StudioIconButton(R.drawable.studio_more_vert, stringResource(R.string.main_menu)) { open = true }
@@ -269,7 +272,7 @@ private fun WorkspaceBar(w: Workspace, actions: List<StudioAction>, desktop: Boo
         Text(projectName, Modifier.weight(1f).padding(horizontal = 12.dp), maxLines = 1,
             overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
         if (settings.showMainToolbarActions) {
-            RunOptions(actions)
+            if (w.androidAvailable) RunOptions(actions)
             StudioIconButton(R.drawable.studio_search, stringResource(R.string.find_action), onClick = actions.first { it.id == "palette" }.run)
         }
     }

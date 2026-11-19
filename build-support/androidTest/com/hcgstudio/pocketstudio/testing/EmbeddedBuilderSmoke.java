@@ -6,9 +6,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.util.Log;
 
-import com.hcgstudio.pocketstudio.build.EmbeddedBuilder;
-import com.hcgstudio.pocketstudio.build.SdkPlatforms;
-import com.hcgstudio.pocketstudio.upstream.FileResourceNameValidator;
+import com.hcgstudio.pocketstudio.AndroidEnvironments;
+import com.hcgstudio.pocketstudio.plugin.AndroidEnvironment;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -24,7 +23,8 @@ public final class EmbeddedBuilderSmoke {
         Path project = Files.createTempDirectory(context.getCacheDir().toPath(), "build-smoke-");
         try {
             fixture(project);
-            SdkPlatforms sdk = new SdkPlatforms(context);
+            AndroidEnvironment environment = AndroidEnvironments.require(context);
+            AndroidEnvironment.Platforms sdk = environment.platforms();
             if (!sdk.installed().contains("34")) {
                 File archive = new File(context.getCacheDir(), "platform-34-test.zip");
                 try (InputStream input = new FileInputStream(archive)) {
@@ -59,13 +59,13 @@ public final class EmbeddedBuilderSmoke {
             assertRejectedConfig(context, project, config, script.replace("'com.android.application'", "'com.android.library'"), "Gradle");
             // An IDE override must use the selected JAR without rewriting the build script or targetSdk.
             Files.write(config, script.replace("compileSdk 34", "compileSdk 999").getBytes(StandardCharsets.UTF_8));
-            File overridden = EmbeddedBuilder.build(context, project.toFile(), "34", message -> {});
+            File overridden = AndroidEnvironments.require(context).build(project.toFile(), "34", message -> {});
             require(pm.getPackageArchiveInfo(overridden.toString(), 0).applicationInfo.targetSdkVersion == 34, "compile SDK override");
             if (sdk.installed().contains("37.0")) {
                 Path source = project.resolve("app/src/main/java/example/hello/NewApi.java");
                 write(project, project.relativize(source).toString(),
                         "package example.hello; class NewApi { int level = android.os.Build.VERSION_CODES.VANILLA_ICE_CREAM; }");
-                EmbeddedBuilder.build(context, project.toFile(), "37.0", message -> {});
+                AndroidEnvironments.require(context).build(project.toFile(), "37.0", message -> {});
                 Files.delete(source);
             }
             Files.write(config, original);
@@ -73,9 +73,9 @@ public final class EmbeddedBuilderSmoke {
             Files.createFile(kotlin);
             reject(context, project, "Unexpected.scala");
             Files.delete(kotlin);
-            require(FileResourceNameValidator.errorForFile("app/src/main/res/drawable-night", "icon.9.png") == null, "九宫格资源");
-            require(FileResourceNameValidator.errorForFile("app/src/main/res/layout", "My_view.xml") != null, "资源字符");
-            require(FileResourceNameValidator.errorForFile("app/src/main/res/raw", "class.json") != null, "关键字");
+            require(environment.resourceFileNameError("app/src/main/res/drawable-night", "icon.9.png") == null, "九宫格资源");
+            require(environment.resourceFileNameError("app/src/main/res/layout", "My_view.xml") != null, "资源字符");
+            require(environment.resourceFileNameError("app/src/main/res/raw", "class.json") != null, "关键字");
         } finally {
             try (Stream<Path> paths = Files.walk(project)) {
                 paths.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
@@ -84,7 +84,7 @@ public final class EmbeddedBuilderSmoke {
     }
 
     private static File build(Context context, Path root) throws Exception {
-        return EmbeddedBuilder.build(context, root.toFile(), message -> Log.i("EmbeddedBuildTest", message));
+        return AndroidEnvironments.require(context).build(root.toFile(), null, message -> Log.i("EmbeddedBuildTest", message));
     }
 
     private static void assertRejectedConfig(Context c, Path project, Path config, String text, String message) throws Exception {

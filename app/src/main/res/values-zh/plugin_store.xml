@@ -1,5 +1,7 @@
 <resources>
     <string name="plugin_store">插件商店</string>
+    <string name="plugin_development_environment">开发环境</string>
+    <string name="android_environment_required">安装 Android 开发环境即可使用 Android 项目工具。</string>
     <string name="plugin_install">安装</string>
     <string name="plugin_cannot_install">此设备无法安装这个版本的插件。</string>
     <string name="plugin_catalog_invalid">无法验证插件目录。</string>

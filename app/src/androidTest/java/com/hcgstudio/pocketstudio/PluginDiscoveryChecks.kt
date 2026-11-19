@@ -7,6 +7,20 @@ import com.hcgstudio.pocketstudio.agent.AgentPlugin
 import com.hcgstudio.pocketstudio.plugin.PluginDiscovery
 
 object PluginDiscoveryChecks {
+    @JvmStatic fun androidEnvironment(context: Context, installed: Boolean): String {
+        check(AndroidEnvironments.available(context) == installed)
+        if (installed) {
+            val plugin = discoverPlugins(context).single { it.packageName == AndroidEnvironments.PACKAGE }
+            check(plugin.category == PluginDiscovery.DEVELOPMENT_ENVIRONMENT_CATEGORY && plugin.trusted)
+            val provider = AndroidEnvironments.require(context)
+            check(provider === AndroidEnvironments.require(context))
+            check(provider.buildTools().version().isNotBlank())
+        } else {
+            check(runCatching { AndroidEnvironments.require(context) }.isFailure)
+        }
+        return "PASS Android environment discovery and loading (installed=$installed)"
+    }
+
     /** Run against either the previously published Codex APK or the current marker declaration. */
     @JvmStatic fun run(context: Context, legacy: Boolean, trusted: Boolean): String {
         val pm = context.packageManager

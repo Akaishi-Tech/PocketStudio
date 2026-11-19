@@ -60,10 +60,17 @@ case "$host_abi" in
     x86_64) flavor=x86_64; variant=X86_64 ;;
     *) echo "Unsupported host ABI: $host_abi" >&2; exit 1 ;;
 esac
-"$root/gradlew" --offline -p "$root" ":app:assemble${variant}Debug" ":app:assemble${variant}DebugAndroidTest"
+(
+    set -- ":app:assemble${variant}Debug" ":app:assemble${variant}DebugAndroidTest"
+    if [ "$local_device" = false ]; then set -- "$@" ":android-plugin:assemble${variant}Debug"; fi
+    "$root/gradlew" --offline -p "$root" "$@"
+)
 debug_key=${ANDROID_USER_HOME:-"$HOME/.android"}/debug.keystore
 "$build_tools/apksigner" sign --ks "$debug_key" --ks-pass pass:android "$work/target.apk"
 adb -s "$host" install -r "$root/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+if [ "$local_device" = false ]; then
+    adb -s "$host" install -r "$root/build-support/android-plugin/build/outputs/apk/$flavor/debug/android-plugin-$flavor-debug.apk"
+fi
 adb -s "$host" install -r "$root/app/build/outputs/apk/androidTest/$flavor/debug/app-$flavor-debug-androidTest.apk"
 adb -s "$host" shell run-as com.hcgstudio.pocketstudio mkdir -p files
 fixture_copied=true

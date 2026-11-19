@@ -10,9 +10,11 @@ Pocket Studio runs on Android 8.0 or later. The interface follows the device lan
 
 ## Getting started
 
-Install the `PocketStudio-<abi>.apk` matching your device (arm64-v8a, armeabi-v7a, x86_64 or x86) from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Choose **New project** on the welcome screen. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder, compile SDK and minimum SDK. The new project uses the compile SDK as its target SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest. On phones, the workspace’s top-right menu includes **Find action** for looking up commands. Wide screens also have a menu bar.
+Install the `PocketStudio-<abi>.apk` matching your device (arm64-v8a, armeabi-v7a, x86_64 or x86) from [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) or [build it from source](#building-pocket-studio). Open **Plugin store → Development environment** on the welcome screen and install **Android**. This adds Android project templates, SDK Manager, layout preview, build tools and debugging for a second device. The built-in local debugger can install plugins on this device.
 
-On Android 11 or later, install the project's Android SDK Platform in SDK Manager to build a debug APK. To use another installed platform for quick builds and Gradle, open **Output → Output options → Build SDK**. The selection applies to the current project. For quick builds of Kotlin projects, also install Kotlin / D8.
+Choose **New project → Android project**. Select **Empty Views Activity**, **Button Counter**, or **No Activity**, then choose **Next**. Set the project name, package name, parent folder, compile SDK and minimum SDK. The new project uses the compile SDK as its target SDK. For an Activity, choose Java or Kotlin. **Finish** creates the project in its own folder and opens the Activity source or, for **No Activity**, the manifest. On phones, the workspace’s top-right menu includes **Find action** for looking up commands. Wide screens also have a menu bar.
+
+On Android 11 or later, install the project's Android SDK Platform in **Settings → Gradle and SDK → SDK Manager** to build a debug APK. To use another installed platform for quick builds and Gradle, open **Output → Output options → Build SDK**. The selection applies to the current project. For quick builds of Kotlin projects, also install Kotlin / D8.
 
 | Workspace | What you can do |
 | --- | --- |
@@ -40,7 +42,7 @@ Choose **Output → Output options → Build debug APK** to run the quick builde
 
 ## Using Codex in a project
 
-Open **Agents → Plugin store** to browse agent plugins, or **Settings → Plugin store** to see all categories. Open a plugin to see its icon, developer and description. Choose **Install** on Codex Plugin to use Codex in the current project. Studio selects the APK matching the device, verifies its size, SHA-256, package, version and signing certificate, and uses local debugging to install it when available. Otherwise Android's package installer opens. The plugin repository publishes separate Codex APKs for ARM64 and x86_64. [Plugin releases](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
+Open **Agents → Plugin store** to browse agent plugins, or open **Plugin store** from the welcome screen to see all categories. Open a plugin to see its icon, developer and description. Choose **Install** on Codex Plugin to use Codex in the current project. Studio selects the APK matching the device, verifies its size, SHA-256, package, version and signing certificate, and uses local debugging to install it when available. Otherwise Android's package installer opens. The plugin repository publishes separate Codex APKs for ARM64 and x86_64. [Plugin releases](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
 
 Open **Account and usage** in the top-right corner of Agents and choose **Sign in with Codex CLI**. Studio opens the browser on this device. Sign in to ChatGPT there, then return to Studio.
 
@@ -85,14 +87,21 @@ Pocket Studio uses the AOSP release tag `studio-2026.2.2`. Android Studio's plug
 
 ## Building Pocket Studio
 
-Install JDK 17 or 21, Android SDK Platform 37 and matching Build Tools on your development machine. Set `ANDROID_HOME` or put `sdk.dir` in `local.properties`. From the checkout root, initialize the AOSP tools dependency, then run the build.
+Install JDK 17 or 21, Android SDK Platform 37 and matching Build Tools on your development machine. Set `ANDROID_HOME` or put `sdk.dir` in `local.properties`. From the checkout root, initialize the AOSP tools dependency, then build the host and Android plugin for your device.
 
 ```sh
 git submodule update --init --depth 1 -- upstream/release/tools/base
-./gradlew :app:assembleArm64V8aDebug :app:lintArm64V8aDebug
+./gradlew :app:assembleArm64V8aDebug :android-plugin:assembleArm64V8aDebug :app:lintArm64V8aDebug
 ```
 
-For an ARM64 device, install the resulting APK with `adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk`. For another architecture, choose the corresponding Gradle flavor (`armeabiV7a`, `x86_64` or `x86`). `:app:assembleRelease` builds all four architectures.
+Install the host and plugin on an ARM64 device.
+
+```sh
+adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk
+adb install -r build-support/android-plugin/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
+```
+
+For another architecture, choose the corresponding Gradle flavor (`armeabiV7a`, `x86_64` or `x86`). `:app:assembleRelease` builds all four architectures.
 
 The two-device tests also use ADB and two running test emulators. They install a sample on the target and exercise Logcat, process discovery, breakpoints, stack inspection, variables, stepping, resuming and detaching. The USB tests cover packet framing, disconnects, concurrency and Android Keystore signatures. A separate end-to-end test uses Android's USB Host permission dialog and virtual bulk endpoints on two independent emulators. Physical OTG cables, role negotiation and vendor drivers still need testing on real devices. [USB test setup and results](docs/usb-verification.md)
 

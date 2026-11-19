@@ -1,5 +1,7 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
+        workspace.refreshEnvironment()
         workspace.agents.setActivityResumed(true)
         if (workspace.settings.autoUpdate) workspace.updates.check(automatic = true)
     }
@@ -214,27 +217,29 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         add(act("prevTab", context.getString(R.string.previous_tab), R.string.navigate, "Alt+Left", w.tabs.size > 1) { switchTab(-1) })
         add(act("project", context.getString(R.string.project_files), R.string.view, "Alt+1", canEdit) { showTree = true; w.tool = Tool.Project })
         add(act("devices", context.getString(R.string.devices_and_debugging), R.string.view, "Alt+5", canEdit) { w.tool = Tool.Devices })
-        add(act("output", context.getString(R.string.build_output), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
-        add(act("preview", context.getString(R.string.preview_layout), R.string.view, enabled = active?.node?.path?.contains(Regex("(^|/)res/layout[^/]*/[^/]+\\.xml$")) == true) { dialog = "preview" })
-        add(act("build", context.getString(R.string.build_debug_apk), R.string.build, "Ctrl+F9", idle) { w.build() })
-        fun runOnDevice(debug: Boolean) {
-            if (w.devices.connected) w.build(runOnDevice = true, debug = debug)
-            else w.tool = Tool.Devices
-        }
-        add(act("run", context.getString(R.string.run_app), R.string.build, "Shift+F10", idle && !w.devices.busy) { runOnDevice(false) })
-        add(act("debugRun", context.getString(R.string.debug_run), R.string.debug, "Shift+F9", idle && !w.devices.busy) { runOnDevice(true) })
-        add(act("buildSdk", context.getString(R.string.build_sdk), R.string.build, enabled = idle) { dialog = "buildSdk" })
-        add(act("openApk", context.getString(R.string.install_apk_on_this_device), R.string.build, enabled = idle && w.apk != null) {
-            w.apk?.let { openApk(Uri.fromFile(it)) }
-        })
-        add(act("exportApk", context.getString(R.string.export_apk), R.string.build, enabled = idle && w.apk != null) { exportFile(true) })
-        add(act("install", context.getString(R.string.install_on_device), R.string.build, enabled = idle && w.apk != null && w.devices.connected && !w.devices.busy) {
-            w.tool = Tool.Devices; w.apk?.let { w.devices.install(it) }
-        })
-        for (task in listOf("assembleDebug", "test", "lint", "tasks", "")) {
-            add(act("gradle-$task", if (task.isEmpty()) context.getString(R.string.custom_gradle_tasks) else "Gradle · $task", R.string.build, enabled = idle) {
-                gradleTask = task; savedDialog("gradle")
+        if (w.androidAvailable) {
+            add(act("output", context.getString(R.string.build_output), R.string.view, "Alt+4", canEdit) { w.tool = Tool.Output })
+            add(act("preview", context.getString(R.string.preview_layout), R.string.view, enabled = active?.node?.path?.contains(Regex("(^|/)res/layout[^/]*/[^/]+\\.xml$")) == true) { dialog = "preview" })
+            add(act("build", context.getString(R.string.build_debug_apk), R.string.build, "Ctrl+F9", idle) { w.build() })
+            fun runOnDevice(debug: Boolean) {
+                if (w.devices.connected) w.build(runOnDevice = true, debug = debug)
+                else w.tool = Tool.Devices
+            }
+            add(act("run", context.getString(R.string.run_app), R.string.build, "Shift+F10", idle && !w.devices.busy) { runOnDevice(false) })
+            add(act("debugRun", context.getString(R.string.debug_run), R.string.debug, "Shift+F9", idle && !w.devices.busy) { runOnDevice(true) })
+            add(act("buildSdk", context.getString(R.string.build_sdk), R.string.build, enabled = idle) { dialog = "buildSdk" })
+            add(act("openApk", context.getString(R.string.install_apk_on_this_device), R.string.build, enabled = idle && w.apk != null) {
+                w.apk?.let { openApk(Uri.fromFile(it)) }
             })
+            add(act("exportApk", context.getString(R.string.export_apk), R.string.build, enabled = idle && w.apk != null) { exportFile(true) })
+            add(act("install", context.getString(R.string.install_on_device), R.string.build, enabled = idle && w.apk != null && w.devices.connected && !w.devices.busy) {
+                w.tool = Tool.Devices; w.apk?.let { w.devices.install(it) }
+            })
+            for (task in listOf("assembleDebug", "test", "lint", "tasks", "")) {
+                add(act("gradle-$task", if (task.isEmpty()) context.getString(R.string.custom_gradle_tasks) else "Gradle · $task", R.string.build, enabled = idle) {
+                    gradleTask = task; savedDialog("gradle")
+                })
+            }
         }
         add(act("attach", context.getString(R.string.attach_debugger), R.string.debug, "Ctrl+Alt+F5", w.devices.connected) { w.tool = Tool.Devices; w.devices.processes() })
         add(act("breakpoint", context.getString(R.string.toggle_line_breakpoint), R.string.debug, "Ctrl+F8", className.isNotEmpty() && editorVisible) {
@@ -247,10 +252,12 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
             add(act(id, label, R.string.debug, enabled = canEdit && enabled) { w.tool = Tool.Devices; run() })
         }
         deviceAction("localDevice", context.getString(R.string.debug_this_device), !devices.connected && !devices.busy, devices::localDevice)
-        deviceAction("usb", context.getString(R.string.connect_usb), !devices.connected && !devices.busy, devices::chooseUsb)
-        deviceAction("wifiPair", context.getString(R.string.pair_over_wi_fi), !devices.connected && !devices.busy) { devices.network(DeviceController.Connection.PAIR) }
-        deviceAction("wifiConnect", context.getString(R.string.connect_paired_device), !devices.connected && !devices.busy) { devices.network(DeviceController.Connection.WIRELESS) }
-        deviceAction("tcpConnect", context.getString(R.string.connect_over_adb_tcp), !devices.connected && !devices.busy) { devices.network(DeviceController.Connection.TCP) }
+        if (w.androidAvailable) {
+            deviceAction("usb", context.getString(R.string.connect_usb), !devices.connected && !devices.busy, devices::chooseUsb)
+            deviceAction("wifiPair", context.getString(R.string.pair_over_wi_fi), !devices.connected && !devices.busy) { devices.network(RemoteConnection.PAIR) }
+            deviceAction("wifiConnect", context.getString(R.string.connect_paired_device), !devices.connected && !devices.busy) { devices.network(RemoteConnection.WIRELESS) }
+            deviceAction("tcpConnect", context.getString(R.string.connect_over_adb_tcp), !devices.connected && !devices.busy) { devices.network(RemoteConnection.TCP) }
+        }
         deviceAction("disconnect", context.getString(R.string.disconnect_device), devices.connected, devices::disconnect)
         deviceAction("deviceShell", context.getString(R.string.target_device_shell), devices.connected && !devices.busy, devices::shell)
         deviceAction("logcat", if (devices.logging) context.getString(R.string.stop_logcat) else context.getString(R.string.start_logcat), devices.connected, devices::toggleLog)
@@ -273,7 +280,7 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         add(act("git-clone", context.getString(R.string.git_clone_action), R.string.git, enabled = idle) { dialog = "gitClone" })
         add(act("licenses", context.getString(R.string.open_source_licenses), R.string.tools) { dialog = "licenses" })
         add(act("keymap", context.getString(R.string.keyboard_shortcuts), R.string.tools) { dialog = "keymap" })
-        add(act("sdk", context.getString(R.string.sdk_manager), R.string.tools) { dialog = "sdk" })
+        if (w.androidAvailable) add(act("sdk", context.getString(R.string.sdk_manager), R.string.tools) { dialog = "sdk" })
         add(act("palette", context.getString(R.string.find_action), R.string.tools, "Ctrl+Shift+A") { dialog = "palette" })
     }
     val actions = defaults.map(keymap::apply)
@@ -317,7 +324,7 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
             StudioPageTransition(page, StudioPage::depth, Modifier.fillMaxSize().then(pageModifier)) { destination ->
                 when (destination) {
                     StudioPage.Welcome -> Welcome(w, newProject, openTree, importZip, { dialog = "gitClone" },
-                        { dialog = "sdk" }, { dialog = "licenses" }, { showSettings = true })
+                        { dialog = "plugins" }, { dialog = "licenses" }, { showSettings = true })
                     StudioPage.Workbench -> workbenchState.SaveableStateProvider("workbench") {
                         Workbench(w, actions, showTree, { showTree = it }, className, ::openEntry) {
                             if (w.agents.session == null) dialog = "agentPlugins"
@@ -325,8 +332,8 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
                         }
                     }
                     StudioPage.Settings -> SettingsPage(LocalStudioSettings.current, w::updateSettings, { showSettings = false },
-                        { dialog = "keymap" }, { dialog = "sdk" }, { w.updates.check(automatic = false) }, { dialog = "plugins" })
-                    StudioPage.NewProject -> NewProjectPage(w)
+                        { dialog = "keymap" }, if (w.androidAvailable) ({ dialog = "sdk" }) else null, { w.updates.check(automatic = false) }, { dialog = "plugins" })
+                    StudioPage.NewProject -> NewProjectPage(w) { dialog = "environmentPlugins" }
                     StudioPage.Git -> git?.let { GitPage(it) }
                     StudioPage.AgentAccount -> if (w.agents.session == null) {
                         LaunchedEffect(Unit) { showAgentAccount = false }
@@ -341,14 +348,20 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         }
     }
     val dismiss = { dialog = "" }
+    if (!w.androidAvailable && dialog in listOf("sdk", "buildSdk", "gradle", "preview")) {
+        LaunchedEffect(dialog) { dismiss() }
+    }
     when (dialog) {
         "gitClone" -> GitCloneDialog(dismiss) { directory -> dismiss(); w.openProject(Uri.fromFile(directory)) }
         "licenses" -> LicensePage(dismiss)
         "keymap" -> KeymapDialog(actions, defaults, keymap, dismiss)
-        "plugins", "agentPlugins" -> PluginStorePage(w.devices,
-            initialCategory = if (dialog == "agentPlugins") PluginDiscovery.AGENT_CATEGORY else null, dismiss = dismiss)
-        "sdk" -> SdkManager(dismiss)
-        "buildSdk" -> if (p != null) BuildSdkDialog(w, dismiss)
+        "plugins", "agentPlugins", "environmentPlugins" -> PluginStorePage(w.devices, initialCategory = when (dialog) {
+            "agentPlugins" -> PluginDiscovery.AGENT_CATEGORY
+            "environmentPlugins" -> PluginDiscovery.DEVELOPMENT_ENVIRONMENT_CATEGORY
+            else -> null
+        }, dismiss = dismiss)
+        "sdk" -> w.androidEnvironment?.ui()?.SdkManager(dismiss)
+        "buildSdk" -> if (w.androidAvailable && p != null) BuildSdkDialog(w, dismiss)
         "palette" -> ActionPalette(actions, dismiss)
         "file", "folder" -> if (p != null) NameDialog(dialog == "folder", w.selectedDir?.path.orEmpty().ifEmpty { p.root.name }, dismiss) { name ->
             w.create(name, dialog == "folder"); dismiss()
@@ -359,12 +372,12 @@ private fun StudioApp(w: Workspace, notificationPage: String?, consumeNotificati
         "findFile" -> if (p != null) FindFile(p, dismiss) { openEntry(it); dismiss() }
         "findProject", "replaceProject" -> if (p != null) ProjectSearchDialog(p, onOpen = { node, line -> dismiss(); w.openFile(node, line) },
             onDismiss = dismiss, replace = dialog == "replaceProject", beforeReplace = { w.saveDocuments() }, onChanged = w::reloadChanged)
-        "preview" -> if (p != null && active != null) LayoutPreviewDialog(p, active.editor.text, active.node.path, dismiss)
-        "gradle" -> if (p != null) GradleTaskDialog(p, gradleTask, dismiss, { w.tool = Tool.Output; w.log(it) }, w::recordApk) { w.action { w.refreshAfterExternalRun(p) } }
+        "preview" -> if (p != null && active != null) w.androidEnvironment?.let { LayoutPreviewDialog(it, p, active.editor.text, active.node.path, dismiss) }
+        "gradle" -> if (p != null) w.androidEnvironment?.ui()?.GradleDialog(gradleTask, { LocalGradle(p) }, dismiss, { w.tool = Tool.Output; w.log(it) }, w::recordApk) { w.action { w.refreshAfterExternalRun(p) } }
     }
     if (p != null) {
         if (w.tool == Tool.Agents || showAgentAccount) AgentToolApproval(w.agents)
     }
-    DeviceDialogs(w.devices)
+    DeviceDialogs(w.devices, w.androidEnvironment)
     AppUpdateDialog(w.updates)
 }

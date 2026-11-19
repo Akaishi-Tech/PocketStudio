@@ -60,7 +60,7 @@ internal fun SettingsPage(
     onChange: (StudioSettings) -> Unit,
     dismiss: () -> Unit,
     onKeymap: () -> Unit,
-    onSdk: () -> Unit,
+    onSdk: (() -> Unit)?,
     onCheckUpdates: () -> Unit,
     onPlugins: () -> Unit
 ) {
@@ -421,10 +421,10 @@ private fun themeLabel(theme: StudioThemeMode) = when (theme) {
 
 private fun settingsGroups(
     s: StudioSettings, palette: Map<EditorColorRole, Color>, change: (StudioSettings) -> Unit,
-    keymap: () -> Unit, sdk: () -> Unit, checkUpdates: () -> Unit, plugins: () -> Unit
+    keymap: () -> Unit, sdk: (() -> Unit)?, checkUpdates: () -> Unit, plugins: () -> Unit
 ): List<SettingsGroup> {
     val sp: (Int) -> String = { "$it sp" }
-    return listOf(
+    return listOfNotNull(
         SettingsGroup(R.string.settings_appearance, listOf(
             choice(R.string.settings_theme, s.theme, StudioThemeMode.entries, ::themeLabel) { change(s.copy(theme = it)) },
             fontChoice(R.string.settings_ui_font, s.uiFont) { change(s.copy(uiFont = it)) },
@@ -479,12 +479,12 @@ private fun settingsGroups(
             toggle(R.string.settings_trim, s.trimTrailingSpaces) { change(s.copy(trimTrailingSpaces = it)) },
             toggle(R.string.settings_final_newline, s.ensureFinalNewline) { change(s.copy(ensureFinalNewline = it)) }
         )),
-        SettingsGroup(R.string.settings_build_tools, listOf(
+        sdk?.let { SettingsGroup(R.string.settings_build_tools, listOf(
             toggle(R.string.settings_offline, s.gradleOffline) { change(s.copy(gradleOffline = it)) },
             toggle(R.string.settings_stacktrace, s.gradleStacktrace) { change(s.copy(gradleStacktrace = it)) },
             numeric(R.string.settings_workers, s.gradleWorkers, 1..8) { change(s.copy(gradleWorkers = it)) },
-            link(R.string.sdk_manager, sdk)
-        )),
+            link(R.string.sdk_manager, it)
+        )) },
         SettingsGroup(R.string.settings_console, listOf(
             numeric(R.string.settings_console_size, s.consoleFontSize, 10..32, sp) { change(s.copy(consoleFontSize = it)) },
             toggle(R.string.settings_console_wraps, s.consoleSoftWraps) { change(s.copy(consoleSoftWraps = it)) }

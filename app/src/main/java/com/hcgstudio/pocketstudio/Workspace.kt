@@ -1,6 +1,9 @@
 package com.hcgstudio.pocketstudio
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -11,7 +14,10 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
-import com.hcgstudio.pocketstudio.build.EmbeddedBuilder
+import androidx.core.content.ContextCompat
+import com.hcgstudio.pocketstudio.plugin.AndroidEnvironment
+import com.hcgstudio.pocketstudio.plugin.ProjectStarter
+import com.hcgstudio.pocketstudio.plugin.ProjectWizardHost
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,7 +38,7 @@ internal class OpenFile(
     val dirty get() = editor.text != saved
 }
 
-internal class Workspace(val app: Application, state: SavedStateHandle) : AndroidViewModel(app) {
+internal class Workspace(val app: Application, state: SavedStateHandle) : AndroidViewModel(app), ProjectWizardHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val storage = Mutex()
     private val prefs = app.getSharedPreferences("studio", 0)
@@ -42,6 +48,28 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         private set
     val updates = AppUpdates(app, scope)
     val devices = DeviceController(app)
+    var androidEnvironment by mutableStateOf<AndroidEnvironment?>(null)
+        private set
+    val androidAvailable get() = androidEnvironment != null
+    private var discovery: Job? = null
+    private val packageChanges = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.data?.schemeSpecificPart == AndroidEnvironments.PACKAGE) refreshEnvironment()
+        }
+    }
+    fun refreshEnvironment() {
+        discovery?.cancel()
+        discovery = scope.launch {
+            androidEnvironment = try {
+                withContext(Dispatchers.IO) { AndroidEnvironments.find(app) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { report(e); null }
+            catch (e: LinkageError) { report(e); null }
+            if (!androidAvailable) devices.closeRemoteConnection()
+            if (!androidAvailable && tool == Tool.Output) tool = Tool.Editor
+        }
+    }
+
     val agents = Agents(this, scope)
     var project by mutableStateOf<Project?>(null)
         private set
@@ -55,7 +83,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
     var selectedNode by mutableStateOf<Project.Node?>(null)
     var selectedDir by mutableStateOf<Project.Node?>(null)
     val recent = mutableStateListOf<Pair<String, String>>()
-    var busy by mutableStateOf(false)
+    override var busy by mutableStateOf(false)
         private set
     var running by mutableStateOf(false)
         private set
@@ -66,10 +94,18 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         private set
     var message by mutableStateOf<String?>(null)
     val newProjectVisible = state.getMutableStateFlow("newProjectVisible", false)
-    var creationError by mutableStateOf<String?>(null)
+    override var creationError by mutableStateOf<String?>(null)
     private var openVersion = 0
     private val drafts = mutableMapOf<String, Job>()
     init {
+        val packages = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
+        ContextCompat.registerReceiver(app, packageChanges, packages, ContextCompat.RECEIVER_EXPORTED)
         val entries = JSONArray(prefs.getString("recentProjects", "[]"))
         for (i in 0 until entries.length()) {
             entries.optJSONArray(i)?.let { recent.add(it.getString(0) to it.getString(1)) }
@@ -163,16 +199,16 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         }
     }
 
-    fun createProject(
-        parent: Uri, name: String, packageName: String,
-        template: ProjectTemplate, language: ProjectLanguage, minSdk: Int, compileSdk: String
-    ) {
-        switchProject(template.entryPath(packageName, language), creating = true) {
+    override fun projectNameError(name: String): String? = Project.projectNameError(name)
+
+    override fun createProject(parent: Uri, name: String, starter: ProjectStarter) {
+        switchProject(starter.entryPath, creating = true) {
+            check(AndroidEnvironments.available(app)) { app.getString(R.string.android_environment_required) }
             if (parent.scheme == "content") {
                 app.contentResolver.takePersistableUriPermission(parent,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
-            Project.createProject(app, parent, name, packageName, template, language, minSdk, compileSdk)
+            Project.createProject(app, parent, name, starter)
         }
     }
 
@@ -455,7 +491,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
 
     fun build(runOnDevice: Boolean = false, debug: Boolean = false) {
         val p = project ?: return
-        if (running || busy || agents.working || git != null) return
+        if (!androidAvailable || running || busy || agents.working || git != null) return
         val targetId = if (runOnDevice && devices.connected && !devices.busy) devices.connectionId else null
         running = true; output = ""; tool = Tool.Output
         action {
@@ -463,7 +499,7 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
                 if (!saveDocuments()) return@action
                 val result = withContext(Dispatchers.IO) {
                     ProjectWorkspace.open(p).use { workspace ->
-                        val built = EmbeddedBuilder.build(app, workspace.directory.toFile(), selectedBuildSdk(p)) { msg -> scope.launch { log(msg) } }
+                        val built = AndroidEnvironments.require(app).build(workspace.directory.toFile(), selectedBuildSdk(p)) { msg -> scope.launch { log(msg) } }
                         copyResult(p, built)
                     }
                 }
@@ -486,5 +522,5 @@ internal class Workspace(val app: Application, state: SavedStateHandle) : Androi
         val p = project ?: return
         action { val node = io { p.resolve(path) }; if (project === p) openFile(node, line) }
     }
-    override fun onCleared() { agents.reset(); devices.close(); scope.cancel(); super.onCleared() }
+    override fun onCleared() { app.unregisterReceiver(packageChanges); agents.reset(); devices.close(); scope.cancel(); super.onCleared() }
 }

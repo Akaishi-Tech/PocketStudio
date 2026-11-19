@@ -3,7 +3,6 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
-def signingFile = providers.environmentVariable('ANDROID_KEYSTORE_PATH').orNull
 def distributionVersion = providers.environmentVariable('POCKETSTUDIO_VERSION_NAME')
         .orElse(providers.gradleProperty('pocketStudioBaseVersion')).get()
 def distributionCode = providers.environmentVariable('POCKETSTUDIO_VERSION_CODE')
@@ -29,26 +28,14 @@ android {
             dimension 'architecture'
             ndk.abiFilters.add(abi)
         }
-        sourceSets.getByName(flavor).assets.srcDir("../build-support/abi-assets/${abi}")
-    }
-    if (signingFile != null) {
-        signingConfigs {
-            distribution {
-                storeFile rootProject.file(signingFile)
-                storePassword providers.environmentVariable('ANDROID_KEYSTORE_PASSWORD').get()
-                keyAlias providers.environmentVariable('ANDROID_KEY_ALIAS').get()
-                keyPassword providers.environmentVariable('ANDROID_KEY_PASSWORD').get()
-            }
-        }
-        buildTypes.release.signingConfig = signingConfigs.distribution
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    sourceSets.main.java.srcDir '../upstream/portable'
 }
+apply from: rootProject.file('build-support/release-signing.gradle')
 apply from: 'embedded.gradle'
 apply from: 'licenses.gradle'
 

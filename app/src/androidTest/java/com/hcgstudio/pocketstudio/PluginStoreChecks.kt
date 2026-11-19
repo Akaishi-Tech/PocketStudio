@@ -1,5 +1,7 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
+
 import android.content.Context
 import android.content.Intent
 import kotlinx.coroutines.Dispatchers
@@ -33,31 +35,34 @@ object PluginStoreChecks {
     }
 
     /** The test emulator exposes its own adbd on the supplied loopback port. */
-    @JvmStatic fun installLocally(context: Context, port: Int): String = runBlocking {
-        val fixture = File(context.cacheDir, "codex-release-test")
+    @JvmStatic fun installLocally(context: Context, port: Int, androidEnvironment: Boolean): String = runBlocking {
+        val fixture = File(context.cacheDir, if (androidEnvironment) "android-release-test" else "codex-release-test")
+        val packageName = if (androidEnvironment) AndroidEnvironments.PACKAGE else "com.hcgstudio.pocketstudio.codexplugin"
         val store = PluginStore(context)
-        val plugin = store.parse(File(fixture, "plugin-store.json").readText()).single()
+        val plugin = store.parse(File(fixture, "plugin-store.json").readText()).single { it.packageName == packageName }
         val artifact = checkNotNull(plugin.artifact())
         val release = plugin.release(artifact)
         val apk = File(fixture, artifact.file)
         ReleaseApkInstaller(context, plugin.packageName, plugin.packageName).verifyArchive(apk, release)
         withContext(Dispatchers.Main) {
             DeviceController(context).use { devices ->
-                if (port == 5555) {
-                    context.getSharedPreferences("studio", Context.MODE_PRIVATE).edit().remove("localAdbTcpPort").apply()
-                    check(devices.installPluginLocally(apk))
-                }
-                devices.network(DeviceController.Connection.TCP)
-                (devices.dialog as DeviceDialog.Form).submit(listOf("127.0.0.1", port.toString()))
-                withTimeout(20_000) { while (!devices.connected || devices.busy) delay(100) }
+                val prefs = context.getSharedPreferences("studio", Context.MODE_PRIVATE)
+                if (port == 5555) prefs.edit().remove("localAdbTcpPort").apply()
+                else prefs.edit().putInt("localAdbTcpPort", port).apply()
                 check(devices.installPluginLocally(apk))
-                devices.disconnect()
+                if (AndroidEnvironments.available(context)) {
+                    devices.connectRemote(RemoteConnection.TCP, "127.0.0.1", port)
+                    withTimeout(20_000) { while (!devices.connected || devices.busy) delay(100) }
+                    check(devices.installPluginLocally(apk))
+                    devices.disconnect()
+                }
                 check(devices.installPluginLocally(apk))
             }
         }
         val installed = store.installed(emptyList())[plugin.packageName]
         check(installed?.trusted == true && installed.versionCode == plugin.versionCode)
-        "PASS installed through unconfigured local adbd, active connection and reconnection"
+        if (androidEnvironment) check(AndroidEnvironments.require(context).buildTools().version().isNotBlank())
+        "PASS verified plugin installation through local debugging and reconnection"
     }
 
     @JvmStatic fun run(context: Context, scenario: String): String {

@@ -100,14 +100,14 @@ internal object AgentProjectTools {
     }
 
     suspend fun gradle(project: Project, tasks: String): String = coroutineScope {
-        val gradle = LocalGradle()
+        val gradle = LocalGradle(project)
         val output = StringBuilder()
         val stop = launch(start = CoroutineStart.UNDISPATCHED) {
             try { awaitCancellation() } finally { gradle.cancel() }
         }
         try {
             runInterruptible(Dispatchers.IO) {
-                gradle.run(project, tasks) { line ->
+                gradle.run(tasks) { line ->
                     output.appendLine(line)
                     if (output.length > 20000) output.delete(0, output.length - 16000)
                 }

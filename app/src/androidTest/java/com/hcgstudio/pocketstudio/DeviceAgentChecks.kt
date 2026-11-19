@@ -1,5 +1,7 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
+
 import android.content.Context
 import android.util.Log
 import com.hcgstudio.pocketstudio.adb.Target
@@ -96,8 +98,7 @@ object DeviceAgentChecks {
             val devices = DeviceController(context)
             try {
                 check(runCatching { devices.inspectDeviceUi() }.exceptionOrNull() is IOException)
-                devices.network(DeviceController.Connection.TCP)
-                (devices.dialog as DeviceDialog.Form).submit(listOf("127.0.0.1", port.toString()))
+                devices.connectRemote(RemoteConnection.TCP, "127.0.0.1", port)
                 withTimeout(45_000) {
                     while (devices.busy) delay(100)
                 }

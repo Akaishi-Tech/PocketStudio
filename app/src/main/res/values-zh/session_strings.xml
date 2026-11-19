@@ -2,7 +2,6 @@
     <string name="agent_run_channel">Agent 运行中</string>
     <string name="debug_running">运行中</string>
     <string name="debug_paused">已暂停</string>
-    <string name="project_sdk">项目配置的 SDK</string>
     <string name="debug_process_missing">调试器未找到启动的进程。</string>
     <string name="wizard_compile_sdk">编译 SDK</string>
 </resources>

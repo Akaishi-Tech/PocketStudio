@@ -1,0 +1,15 @@
+def signingFile = providers.environmentVariable('ANDROID_KEYSTORE_PATH').orNull
+
+android {
+    if (signingFile != null) {
+        signingConfigs {
+            distribution {
+                storeFile rootProject.file(signingFile)
+                storePassword providers.environmentVariable('ANDROID_KEYSTORE_PASSWORD').get()
+                keyAlias providers.environmentVariable('ANDROID_KEY_ALIAS').get()
+                keyPassword providers.environmentVariable('ANDROID_KEY_PASSWORD').get()
+            }
+        }
+        buildTypes.release.signingConfig = signingConfigs.distribution
+    }
+}

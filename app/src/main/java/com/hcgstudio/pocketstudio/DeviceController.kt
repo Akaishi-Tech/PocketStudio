@@ -16,12 +16,12 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.runtime.*
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
 import com.hcgstudio.pocketstudio.adb.Target
 import com.hcgstudio.pocketstudio.adb.UsbAdb
 import com.hcgstudio.pocketstudio.debug.JdwpSession
 import com.android.ddmlib.Log.LogLevel
 import com.hcgstudio.pocketstudio.wireless.LocalWirelessAdb
-import com.hcgstudio.pocketstudio.wireless.WirelessAdb
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.File
@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal sealed interface DeviceDialog {
+    data class Network(val mode: RemoteConnection) : DeviceDialog
     data object LocalSetup : DeviceDialog
     data class Message(@get:StringRes val text: Int) : DeviceDialog
     data class ListPicker(@get:StringRes val title: Int, val items: List<String>, val select: (Int) -> Unit) : DeviceDialog
@@ -66,6 +67,7 @@ internal class DeviceController(context: Context) : Closeable {
     private var debugger by mutableStateOf<JdwpSession?>(null)
     private var waitingUsb: UsbDevice? = null
     private var localTarget = false
+    private var remoteConnection = false
     private val pairingResult = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == LocalPairingService.CONNECT_PENDING) consumePairingResult()
     }
@@ -193,12 +195,17 @@ internal class DeviceController(context: Context) : Closeable {
         }
     }
 
+    fun closeRemoteConnection() {
+        if (remoteConnection && !localTarget) disconnect()
+    }
+
     fun disconnect() {
         generation++
         activeJob?.cancel(true)
         activeJob = null
         busy = false
         waitingUsb = null
+        remoteConnection = false
         localTarget = false
         if (!closed) stopLocalPairing()
         stopLog()
@@ -234,6 +241,7 @@ internal class DeviceController(context: Context) : Closeable {
 
     fun localDevice() {
         if (busy || connected) return
+        remoteConnection = false
         if (Build.VERSION.SDK_INT < 30) {
             dialog = DeviceDialog.Message(R.string.wireless_debugging_on_this_device_requires_android_11)
             return
@@ -300,7 +308,12 @@ internal class DeviceController(context: Context) : Closeable {
 
     fun chooseUsb() {
         stopLocalPairing()
-        val devices = UsbAdb.devices(usb)
+        val devices = try { AndroidEnvironments.require(app).usbDevices() }
+            catch (e: Exception) {
+                statusMessage = deviceStatus(e.localizedMessage ?: app.getString(R.string.android_environment_required))
+                return
+            }
+        remoteConnection = true
         when (devices.size) {
             0 -> statusMessage = deviceStatus(R.string.no_adb_device_found_connect_the_target_phone)
             1 -> requestUsb(devices.first())
@@ -328,51 +341,36 @@ internal class DeviceController(context: Context) : Closeable {
         }
     }
 
-    private fun connect(device: UsbDevice) = job(deviceStatus(R.string.waiting_for_the_target_phone_to_authorize_usb), { UsbAdb.connect(app, device) }, ::identify)
+    private fun connect(device: UsbDevice) = job(deviceStatus(R.string.waiting_for_the_target_phone_to_authorize_usb), { AndroidEnvironments.require(app).connectUsb(device) }, ::identify)
 
-    enum class Connection { TCP, PAIR, WIRELESS }
-    fun network(mode: Connection) {
+    fun network(mode: RemoteConnection) {
+        if (busy || connected) return
+        remoteConnection = true
         stopLocalPairing()
-        val pair = mode == Connection.PAIR
-        val tcp = mode == Connection.TCP
-        val key = if (tcp) "adbHost" else "wirelessHost"
-        val title = when (mode) {
-            Connection.PAIR -> R.string.pair_wireless_device
-            Connection.WIRELESS -> R.string.connect_paired_device
-            Connection.TCP -> R.string.connect_over_adb_tcp
-        }
-        val fields = mutableListOf(
-            DeviceDialog.Field(R.string.host_or_ip_address, prefs.getString(key, "").orEmpty()),
-            DeviceDialog.Field(if (pair) R.string.pairing_port else R.string.connection_port,
-                if (tcp) "5555" else if (pair) "" else prefs.getString("wirelessPort", "").orEmpty(), true)
-        )
-        if (pair) fields += DeviceDialog.Field(R.string.six_digit_pairing_code, numeric = true, secret = true)
-        dialog = DeviceDialog.Form(title, fields, if (pair) R.string.pair else R.string.connect) { values ->
-            val address = values[0].trim()
-            val port = values[1].toIntOrNull()
-            require(address.isNotEmpty() && port != null && port in 1..65535) { app.getString(R.string.enter_a_valid_address_and_port) }
-            prefs.edit().putString(key, address).apply()
-            if (pair) {
-                val digits = values[2]
-                require(digits.matches(Regex("[0-9]{6}"))) { app.getString(R.string.enter_the_six_digit_pairing_code) }
-                job(deviceStatus(R.string.pairing), { WirelessAdb.pair(app, address, port, digits) }) {
-                    statusMessage = deviceStatus(R.string.paired_successfully)
-                    network(Connection.WIRELESS)
-                }
-            } else {
-                if (!tcp) prefs.edit().putString("wirelessPort", port.toString()).apply()
-                job(deviceStatus(R.string.connecting_to, address), {
-                    if (tcp) UsbAdb.connectTcp(app, address, port) else WirelessAdb.connect(app, address, port)
-                }) { adb ->
-                    localTarget = address.equals("localhost", ignoreCase = true) ||
-                        (android.util.Patterns.IP_ADDRESS.matcher(address.removeSurrounding("[", "]")).matches() &&
-                            runCatching {
-                                val ip = java.net.InetAddress.getByName(address.removeSurrounding("[", "]"))
-                                ip.isLoopbackAddress || java.net.NetworkInterface.getByInetAddress(ip) != null
-                            }.getOrDefault(false))
-                    if (localTarget && tcp) prefs.edit().putInt("localAdbTcpPort", port).apply()
-                    identify(adb)
-                }
+        dialog = DeviceDialog.Network(mode)
+    }
+
+    fun connectRemote(mode: RemoteConnection, address: String, port: Int, code: String = "") {
+        if (busy || connected) return
+        remoteConnection = true
+        val tcp = mode == RemoteConnection.TCP
+        if (mode == RemoteConnection.PAIR) {
+            job(deviceStatus(R.string.pairing), { AndroidEnvironments.require(app).pairRemote(address, port, code) }) {
+                statusMessage = deviceStatus(R.string.paired_successfully)
+                network(RemoteConnection.WIRELESS)
+            }
+        } else {
+            job(deviceStatus(R.string.connecting_to, address), {
+                AndroidEnvironments.require(app).connectRemote(address, port, tcp)
+            }) { adb ->
+                localTarget = address.equals("localhost", ignoreCase = true) ||
+                    (android.util.Patterns.IP_ADDRESS.matcher(address.removeSurrounding("[", "]")).matches() &&
+                        runCatching {
+                            val ip = java.net.InetAddress.getByName(address.removeSurrounding("[", "]"))
+                            ip.isLoopbackAddress || java.net.NetworkInterface.getByInetAddress(ip) != null
+                        }.getOrDefault(false))
+                if (localTarget && tcp) prefs.edit().putInt("localAdbTcpPort", port).apply()
+                identify(adb)
             }
         }
     }

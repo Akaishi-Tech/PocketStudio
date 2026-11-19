@@ -20,8 +20,7 @@ import java.util.regex.Pattern;
 
 import com.hcgstudio.pocketstudio.adb.Target;
 import com.hcgstudio.pocketstudio.wireless.LocalWirelessAdb;
-import com.hcgstudio.pocketstudio.wireless.WirelessAdb;
-import com.hcgstudio.pocketstudio.adb.UsbAdb;
+import com.hcgstudio.pocketstudio.AndroidEnvironments;
 import com.hcgstudio.pocketstudio.debug.JdwpSession;
 
 /** The host app debugs the fixture on the selected disposable emulator. */
@@ -44,11 +43,15 @@ public final class DeviceDebugTest extends Instrumentation {
                 result.putString("result", com.hcgstudio.pocketstudio.PluginDiscoveryChecks.run(getTargetContext(),
                         Boolean.parseBoolean(arguments.getString("legacy", "false")),
                         Boolean.parseBoolean(arguments.getString("trusted", "true"))));
+            } else if ("androidEnvironment".equals(arguments.getString("scenario"))) {
+                result.putString("result", com.hcgstudio.pocketstudio.PluginDiscoveryChecks.androidEnvironment(
+                        getTargetContext(), Boolean.parseBoolean(arguments.getString("installed", "true"))));
             } else if ("pluginCatalog".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.PluginStoreChecks.catalog(getTargetContext()));
             } else if ("pluginLocalInstall".equals(arguments.getString("scenario"))) {
                 result.putString("result", com.hcgstudio.pocketstudio.PluginStoreChecks.installLocally(getTargetContext(),
-                        Integer.parseInt(arguments.getString("port"))));
+                        Integer.parseInt(arguments.getString("port")),
+                        Boolean.parseBoolean(arguments.getString("androidEnvironment", "false"))));
             } else if ("apkOpen".equals(arguments.getString("scenario"))) {
                 com.hcgstudio.pocketstudio.ApkInstallerChecks.run(getTargetContext());
                 result.putString("result", "PASS APK snapshots and provider scope");
@@ -133,10 +136,10 @@ public final class DeviceDebugTest extends Instrumentation {
             connection = LocalWirelessAdb.connect(getTargetContext(), port);
         } else if ("wireless".equals(arguments.getString("scenario"))) {
             int pairingPort = Integer.parseInt(arguments.getString("pairPort"));
-            WirelessAdb.pair(getTargetContext(), "10.0.2.2", pairingPort, arguments.getString("code"));
-            connection = WirelessAdb.connect(getTargetContext(), "10.0.2.2", port);
+            AndroidEnvironments.require(getTargetContext()).pairRemote("10.0.2.2", pairingPort, arguments.getString("code"));
+            connection = AndroidEnvironments.require(getTargetContext()).connectRemote("10.0.2.2", port, false);
         } else {
-            connection = UsbAdb.connectTcp(getTargetContext(), "10.0.2.2", port);
+            connection = AndroidEnvironments.require(getTargetContext()).connectRemote("10.0.2.2", port, true);
         }
         try (Target adb = connection) {
             // The runner must point only to the disposable emulator named by the caller.

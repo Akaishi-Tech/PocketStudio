@@ -8,9 +8,11 @@
 
 ## 开始使用
 
-在欢迎页点「新建项目」，选择「空白视图 Activity」「按钮计数器」或「无 Activity」，然后点「下一步」。填写项目名称和包名，选择父文件夹、编译 SDK 和最低 SDK。新项目使用所选的编译 SDK 作为目标 SDK。含 Activity 的模板还可选择 Java 或 Kotlin。点「完成」后，Studio 会创建同名文件夹并打开 Activity 源文件。选择「无 Activity」时会打开清单文件。在手机工作区，打开右上角菜单中的「查找操作」可搜索命令，宽屏还提供分组菜单栏。
+在欢迎页打开「插件商店 → 开发环境」，安装「Android」插件，即可使用 Android 项目模板、SDK Manager、布局预览、构建工具和外部设备调试。内置的本机调试功能可直接在当前设备安装插件。
 
-在 Android 11 及以上设备上，通过 SDK Manager 安装与项目匹配的 SDK Platform，即可构建调试 APK。要为当前项目的快速构建和 Gradle 任务改用其他已安装的平台，在「输出 → 输出选项 → 构建 SDK」中选择。快速构建 Kotlin 项目还需安装 Kotlin / D8。
+点「新建项目 → Android 项目」，选择「空白视图 Activity」「按钮计数器」或「无 Activity」，然后点「下一步」。填写项目名称和包名，选择父文件夹、编译 SDK 和最低 SDK。新项目使用所选的编译 SDK 作为目标 SDK。含 Activity 的模板还可选择 Java 或 Kotlin。点「完成」后，Studio 会创建同名文件夹并打开 Activity 源文件。选择「无 Activity」时会打开清单文件。在手机工作区，打开右上角菜单中的「查找操作」可搜索命令，宽屏还提供分组菜单栏。
+
+在 Android 11 及以上设备上，通过「设置 → Gradle 与 SDK → SDK Manager」安装与项目匹配的 SDK Platform，即可构建调试 APK。要为当前项目的快速构建和 Gradle 任务改用其他已安装的平台，在「输出 → 输出选项 → 构建 SDK」中选择。快速构建 Kotlin 项目还需安装 Kotlin / D8。
 
 可从 [GitHub Releases](https://github.com/Akaishi-Tech/PocketStudio/releases) 下载与设备架构对应的 `PocketStudio-<abi>.apk`，可选 arm64-v8a、armeabi-v7a、x86_64 或 x86，也可以[从源码构建](#从源码构建及验证)。
 
@@ -38,7 +40,7 @@
 
 ## 在项目中使用智能体
 
-首次打开「智能体」时，点「插件商店」即可浏览智能体插件。「设置 → 插件商店」显示全部类别。点开插件可查看图标、开发者和介绍。安装 Codex 插件后即可在当前项目中使用它。商店自动选择与设备架构匹配的 APK，并核对大小、SHA-256、包名、版本和签名。本机调试可用时优先使用它安装，否则打开系统安装器。独立插件仓库提供 ARM64 和 x86_64 两种 Codex APK。[插件发行页](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
+首次打开「智能体」时，点「插件商店」即可浏览智能体插件。欢迎页的「插件商店」显示全部类别。点开插件可查看图标、开发者和介绍。安装 Codex 插件后即可在当前项目中使用它。商店自动选择与设备架构匹配的 APK，并核对大小、SHA-256、包名、版本和签名。本机调试可用时优先使用它安装，否则打开系统安装器。独立插件仓库提供 ARM64 和 x86_64 两种 Codex APK。[插件发行页](https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/tag/plugin-store)
 
 在「智能体」右上角打开「账户与用量」，点「通过 Codex CLI 登录」。Studio 会打开本机浏览器。在浏览器中登录 ChatGPT，完成后返回 Studio 即可使用该账户。
 
@@ -85,14 +87,21 @@
 
 ## 从源码构建及验证
 
-构建掌上 Studio 本身需要 JDK 17 或 21、Android SDK Platform 37 和相应的 Build Tools。设置 `ANDROID_HOME` 或在 `local.properties` 中填写 `sdk.dir`。在项目根目录初始化 AOSP 工具子模块并按设备架构构建。
+构建掌上 Studio 本身需要 JDK 17 或 21、Android SDK Platform 37 和相应的 Build Tools。设置 `ANDROID_HOME` 或在 `local.properties` 中填写 `sdk.dir`。在项目根目录初始化 AOSP 工具子模块并按设备架构构建主应用和 Android 插件。
 
 ~~~sh
 git submodule update --init --depth 1 -- upstream/release/tools/base
-./gradlew :app:assembleArm64V8aDebug :app:lintArm64V8aDebug
+./gradlew :app:assembleArm64V8aDebug :android-plugin:assembleArm64V8aDebug :app:lintArm64V8aDebug
 ~~~
 
-对于 ARM64 设备，使用 `adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk` 安装。其他架构使用对应的 Gradle 变体（`armeabiV7a`、`x86_64` 或 `x86`）。运行 `:app:assembleRelease` 可生成全部四个架构的 APK。
+在 ARM64 设备上执行以下命令安装主应用和插件。
+
+~~~sh
+adb install -r app/build/outputs/apk/arm64V8a/debug/app-arm64V8a-debug.apk
+adb install -r build-support/android-plugin/build/outputs/apk/arm64V8a/debug/android-plugin-arm64V8a-debug.apk
+~~~
+
+其他架构使用对应的 Gradle 变体（`armeabiV7a`、`x86_64` 或 `x86`）。运行 `:app:assembleRelease` 可生成全部四个架构的 APK。
 
 双设备回归另外需要 ADB 和两台启动完成的测试模拟器。脚本会把示例安装到指定的目标模拟器，覆盖 Logcat、进程发现、断点、栈、变量、单步、恢复和分离。USB 测试覆盖分帧、断线、并发和 Android Keystore 签名。两台独立模拟器还通过系统 USB Host 授权弹窗和虚拟 USB 批量端点完成了安装及断点调试。实体 OTG 数据线、角色协商和厂商驱动仍待双真机验收。[USB 测试拓扑与复核步骤](docs/usb-verification.zh-CN.md)
 

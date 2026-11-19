@@ -1,5 +1,7 @@
 <resources>
     <string name="plugin_store">Plugin store</string>
+    <string name="plugin_development_environment">Development environments</string>
+    <string name="android_environment_required">Install the Android development environment to use Android project tools.</string>
     <string name="plugin_install">Install</string>
     <string name="plugin_cannot_install">This plugin version cannot be installed on this device.</string>
     <string name="plugin_catalog_invalid">The plugin catalog could not be verified.</string>

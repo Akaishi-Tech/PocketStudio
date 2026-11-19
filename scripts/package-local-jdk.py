@@ -68,7 +68,7 @@ def main():
                         help="Use unpacked, locally rebuilt JDKs in directory/<Android ABI>/")
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)
-    assets = ROOT / "build-support/assets/local-jdk"
+    assets = ROOT / "build-support/android-plugin/src/main/assets/local-jdk"
     assets.mkdir(parents=True, exist_ok=True)
     abi_assets = {abi: ROOT / "build-support/abi-assets" / abi / "local-jdk" for abi in IMAGES}
     for folder in abi_assets.values():
@@ -79,7 +79,7 @@ def main():
         for name in ("bin/java", "bin/javac", "bin/jlink", "lib/modules", "jmods/java.base.jmod"):
             if not (image / name).is_file():
                 raise ValueError(f"Incomplete JDK: {image / name}")
-        native = ROOT / "app/src/main/jniLibs" / abi
+        native = ROOT / "build-support/android-plugin/src/main/jniLibs" / abi
         native.mkdir(parents=True, exist_ok=True)
         files = {}
         links = []

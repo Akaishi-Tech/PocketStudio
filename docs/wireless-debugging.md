@@ -2,7 +2,7 @@
 
 English · [简体中文](wireless-debugging.zh-CN.md)
 
-Install Pocket Studio on the host and use a target running Android 11 or later. Connect both devices to the same Wi-Fi network with peer-to-peer traffic allowed.
+Install Pocket Studio and its Android development environment plugin on the host. Use a target running Android 11 or later. Connect both devices to the same Wi-Fi network with peer-to-peer traffic allowed.
 
 1. On the target, enable **Developer options → Wireless debugging** and approve the network when prompted. Write down the IP address and the **connection port** on this screen.
 2. Tap **Pair device with pairing code**. Leave the dialog open and note the six-digit code and the **pairing port** shown with it.

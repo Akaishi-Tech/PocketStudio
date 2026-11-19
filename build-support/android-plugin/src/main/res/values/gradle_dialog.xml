@@ -1,0 +1,12 @@
+<resources>
+    <string name="close">"Close"</string>
+    <string name="gradle_tasks">"Gradle tasks"</string>
+    <string name="gradle_tasks_completed">"Gradle tasks completed"</string>
+    <string name="install_the_matching_sdk_platform_and_build_tools">"Install the matching SDK Platform and Build Tools %1$s in SDK Manager for Android projects."</string>
+    <string name="preparing_gradle_on_this_device">"Preparing Gradle on this device…"</string>
+    <string name="run_on_this_device">"Run on this device"</string>
+    <string name="select_build_output">"Select build output"</string>
+    <string name="separate_multiple_tasks_with_spaces">"Separate multiple tasks with spaces"</string>
+    <string name="stop">"Stop"</string>
+    <string name="task_names">"Task names"</string>
+</resources>

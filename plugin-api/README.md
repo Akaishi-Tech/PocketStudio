@@ -21,3 +21,18 @@ Declare one marker service per package. Its intent filter advertises `com.hcgstu
 `PluginDiscovery.query(packageManager)` returns compatible registrations and their category and display metadata through Android's package manager. Discovery reads the installed manifest without starting the marker service. The marker can implement `Service.onBind` by returning `null`. A new category may be discovered and displayed before Studio implements a runtime for it. Studio checks the installed package's signing certificate before loading a provider. [Discovery contract](src/main/java/com/hcgstudio/pocketstudio/plugin/PluginDiscovery.kt)
 
 The `agent` category uses an additional versioned entry point for login and messages. Implement that contract and add the agent API metadata to the same service. Studio also recognizes the earlier agent-only registration in already installed Codex plugins. [Agent API](../agent-api/README.md) · [Codex implementation](../build-support/codex-plugin/apk/src/main/AndroidManifest.xml)
+
+## Android development environment
+
+The Android plugin uses the package ID `com.hcgstudio.pocketstudio.androidplugin` and the store category `development-environment`. Its marker service declares the discovery action and version above, with these additional values. [Android plugin manifest](../build-support/android-plugin/src/main/AndroidManifest.xml)
+
+```xml
+<meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY"
+    android:value="development-environment" />
+<meta-data android:name="com.hcgstudio.pocketstudio.ANDROID_ENVIRONMENT_API"
+    android:value="1" />
+<meta-data android:name="com.hcgstudio.pocketstudio.ANDROID_ENVIRONMENT_ENTRY"
+    android:value="com.hcgstudio.pocketstudio.androidplugin.AndroidDevelopment" />
+```
+
+Studio loads the installed, signed provider through its public constructor `(Context host, Context plugin)`. Use the host context for project access and persistent storage, and the plugin context for the APK’s resources, templates and native tools. The Android project type becomes available when Studio loads the provider. Its `ui().NewProject` composable owns the wizard and passes a `ProjectStarter` to the host to write files to the selected folder. The same provider supplies the SDK manager, Gradle and quick builds, layout preview and remote device connections. Local device debugging and plugin installation run in the host. [Environment API](src/main/java/com/hcgstudio/pocketstudio/plugin/AndroidEnvironment.java) · [Wizard host API](src/main/java/com/hcgstudio/pocketstudio/plugin/ProjectWizardHost.kt)

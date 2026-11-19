@@ -1,13 +1,4 @@
 <resources>
-    <string name="wizard_select_template">Choose a project template</string>
-    <string name="wizard_empty_views">Empty Views Activity</string>
-    <string name="wizard_button_counter">Button Counter</string>
-    <string name="wizard_no_activity">No Activity</string>
-    <string name="wizard_next">Next</string>
-    <string name="wizard_finish">Finish</string>
-    <string name="wizard_save_location">Save location</string>
-    <string name="wizard_choose_parent">Choose a parent folder</string>
-    <string name="wizard_language">Language</string>
-    <string name="wizard_min_sdk">Minimum SDK</string>
-    <string name="wizard_reserved_kotlin_package">Choose a package name outside the kotlin namespace.</string>
+    <string name="wizard_project_type">Choose a project type</string>
+    <string name="wizard_install_environment">Install a development environment plugin to create a project.</string>
 </resources>

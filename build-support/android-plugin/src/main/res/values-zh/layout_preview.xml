@@ -1,0 +1,26 @@
+<resources>
+    <string name="accepts_only_one_direct_child_format">"%1$s 只接受一个直接子控件"</string>
+    <string name="attribute_android_format">"属性 android:%1$s"</string>
+    <string name="attribute_format">"属性 %1$s"</string>
+    <string name="children_are_arranged_vertically">" 的子控件按纵向排列"</string>
+    <string name="children_could_not_be_displayed_format">"%1$s 的子控件未能显示"</string>
+    <string name="circular_reference_format">"循环引用 %1$s"</string>
+    <string name="failed_to_parse_format">"%1$s 解析失败：%2$s"</string>
+    <string name="image_previews_are_limited_to_8_images">"图片预览最多 8 张"</string>
+    <string name="invalid_layout_weight">"无效的 layout_weight"</string>
+    <string name="layout_exceeds_the_preview_limit_of_400_views">"布局超过预览上限（400 个控件、32 层）"</string>
+    <string name="layout_has_no_root_element">"没有布局根元素"</string>
+    <string name="layout_resources_cannot_contain_a_dtd">"布局资源不能包含 DTD"</string>
+    <string name="shown_as_a_placeholder">" 显示为占位符"</string>
+    <string name="some_content_could_not_be_previewed">"还有其他未预览的内容"</string>
+    <string name="unresolved_alignment_format">"未解析对齐方式 %1$s"</string>
+    <string name="unresolved_color_format">"未解析颜色 %1$s"</string>
+    <string name="unresolved_dimension_format">"未解析尺寸 %1$s"</string>
+    <string name="unresolved_image_format">"未解析图片 %1$s"</string>
+    <string name="unresolved_scaletype_format">"未解析 scaleType %1$s"</string>
+    <string name="unresolved_text_format">"未解析文本 %1$s"</string>
+    <string name="xml_exceeds_768_kib">"XML 超过 768 KiB"</string>
+    <string name="back_to_preview">"返回预览"</string>
+    <string name="layout_preview">"布局预览"</string>
+    <string name="preview_diff">"预览差异"</string>
+</resources>

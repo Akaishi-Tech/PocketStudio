@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="@string/android_plugin_name" android:icon="@drawable/android_plugin_icon"
+        android:allowBackup="false">
+        <service android:name=".AndroidPluginMarker" android:exported="true"
+            android:description="@string/android_plugin_description">
+            <intent-filter><action android:name="com.hcgstudio.pocketstudio.PLUGIN" /></intent-filter>
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_API" android:value="1" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_CATEGORY" android:value="development-environment" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.PLUGIN_DEVELOPER" android:value="Akaishi Tech" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.ANDROID_ENVIRONMENT_API" android:value="1" />
+            <meta-data android:name="com.hcgstudio.pocketstudio.ANDROID_ENVIRONMENT_ENTRY"
+                android:value="com.hcgstudio.pocketstudio.androidplugin.AndroidDevelopment" />
+        </service>
+    </application>
+</manifest>

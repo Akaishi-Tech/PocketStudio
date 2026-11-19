@@ -1,0 +1,21 @@
+<resources>
+    <string name="back">"Back"</string>
+    <string name="package_name">"Package name"</string>
+    <string name="package_name_is_too_long">"Package name is too long"</string>
+    <string name="package_names_cannot_contain_java_keywords">"Package names cannot contain Java keywords"</string>
+    <string name="project_name">"Project name"</string>
+    <string name="use_at_least_two_package_segments_start_each">"Use at least two package segments. Start each with a letter and use only letters, digits or underscores."</string>
+    <string name="wizard_select_template">Choose a project template</string>
+    <string name="wizard_empty_views">Empty Views Activity</string>
+    <string name="wizard_button_counter">Button Counter</string>
+    <string name="wizard_no_activity">No Activity</string>
+    <string name="wizard_next">Next</string>
+    <string name="wizard_finish">Finish</string>
+    <string name="wizard_save_location">Save location</string>
+    <string name="wizard_choose_parent">Choose a parent folder</string>
+    <string name="wizard_language">Language</string>
+    <string name="wizard_min_sdk">Minimum SDK</string>
+    <string name="wizard_reserved_kotlin_package">Choose a package name outside the kotlin namespace.</string>
+    <string name="wizard_compile_sdk">Compile SDK</string>
+    <string name="wizard_android_project">Android project</string>
+</resources>

@@ -5,8 +5,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
-import com.hcgstudio.pocketstudio.build.LocalAndroidSdk
-import com.hcgstudio.pocketstudio.build.SdkPlatforms
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
@@ -17,7 +15,7 @@ object LocalGradleChecks {
         if (androidTemplate) prepareAndroidSdk(context)
         if (tree != null) {
             val parent = Project(context, Uri.parse(tree))
-            val project = Project.createProject(context, parent.tree, "Gradle Check ${UUID.randomUUID()}", "org.example.gradlecheck")
+            val project = createAndroidTestProject(context, parent.tree, "Gradle Check ${UUID.randomUUID()}", "org.example.gradlecheck")
             try {
                 if (androidTemplate) checkTemplate(context, project, tasks) else checkSelectedFolder(project)
             } finally { parent.delete(parent.resolve(project.root.name)) }
@@ -26,7 +24,7 @@ object LocalGradleChecks {
         val imports = File(context.filesDir, "imports").apply { mkdirs() }
         val parent = Files.createTempDirectory(imports.toPath(), "gradle-check-").toFile()
         try {
-            val project = Project.createProject(context, Uri.fromFile(parent), "Gradle Check", "org.example.gradlecheck")
+            val project = createAndroidTestProject(context, Uri.fromFile(parent), "Gradle Check", "org.example.gradlecheck")
             if (androidTemplate) checkTemplate(context, project, tasks) else exerciseTasks(project, parent)
         } finally {
             Project.removeTree(parent.toPath())
@@ -52,7 +50,7 @@ object LocalGradleChecks {
         project.create(project.root, "obsolete.txt", false)
         for (value in listOf("first", "second")) {
             project.write(input, value.encodeToByteArray())
-            LocalGradle().run(project, "verifyWorkspace", ::log)
+            LocalGradle(project).run("verifyWorkspace", ::log)
             check(project.read(project.resolve("build/reports/check.txt")) == value)
             check(project.read(project.resolve("generated.txt")) == value)
         }
@@ -60,12 +58,12 @@ object LocalGradleChecks {
     }
 
     private fun prepareAndroidSdk(context: Context) {
-        val platforms = SdkPlatforms(context)
+        val platforms = AndroidEnvironments.require(context).platforms()
         val platformZip = File(context.cacheDir, "platform-34-test.zip")
         if ("34" !in platforms.installed() && platformZip.isFile) {
             platformZip.inputStream().use { check(platforms.importArchive(it) == "34") }
         }
-        val tools = LocalAndroidSdk(context)
+        val tools = AndroidEnvironments.require(context).buildTools()
         val toolsZip = File(context.cacheDir, "build-tools-test.zip")
         if (!tools.installed() && toolsZip.isFile) toolsZip.inputStream().use { tools.install(it, ::log) }
     }
@@ -79,7 +77,7 @@ object LocalGradleChecks {
         val token = UUID.randomUUID().toString()
         try {
             if (marks != null) addUnitTest(project, marks, token)
-            val apk = LocalGradle().run(project, tasks, ::log).single()
+            val apk = LocalGradle(project).run(tasks, ::log).single()
             try {
                 val info = checkNotNull(context.packageManager.getPackageArchiveInfo(apk.path, PackageManager.GET_ACTIVITIES))
                 check(info.packageName == "org.example.gradlecheck") { "Unexpected APK: ${apk.path}" }
@@ -170,7 +168,7 @@ object LocalGradleChecks {
         """.trimIndent())
 
         var sawOutput = false
-        val apk = LocalGradle().run(project, "tasks :app:writeFixture") { line ->
+        val apk = LocalGradle(project).run("tasks :app:writeFixture") { line ->
             log(line)
             if (line.contains("LOCAL_GRADLE_OUTPUT")) sawOutput = true
         }.single()
@@ -182,12 +180,12 @@ object LocalGradleChecks {
             apk.delete()
         }
 
-        val run = LocalGradle()
+        val run = LocalGradle(project)
         val stopper = Executors.newSingleThreadExecutor()
         var started = 0L
         try {
             val failure = runCatching {
-                run.run(project, ":app:cancelFixture") { line ->
+                run.run(":app:cancelFixture") { line ->
                     log(line)
                     if (line.contains("LOCAL_GRADLE_WAITING") && started == 0L) {
                         started = SystemClock.elapsedRealtime()
@@ -204,7 +202,7 @@ object LocalGradleChecks {
 
         var sawFailure = false
         val failure = runCatching {
-            LocalGradle().run(project, ":app:failFixture") { line ->
+            LocalGradle(project).run(":app:failFixture") { line ->
                 log(line)
                 if (line.contains("LOCAL_GRADLE_FAILURE")) sawFailure = true
             }

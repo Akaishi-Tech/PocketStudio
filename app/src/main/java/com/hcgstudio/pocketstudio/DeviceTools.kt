@@ -1,12 +1,11 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.plugin.AndroidEnvironment
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -33,7 +32,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +46,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 internal fun DeviceToolWindow(
     controller: DeviceController,
+    environment: AndroidEnvironment?,
     className: String,
     line: Int,
     modifier: Modifier = Modifier
@@ -77,14 +76,14 @@ internal fun DeviceToolWindow(
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!controller.connected) {
-                if (wide) {
+                if (wide && environment != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         LocalDeviceButton(controller, Modifier.weight(1f))
-                        RemoteDeviceList(controller, Modifier.weight(1.35f))
+                        Box(Modifier.weight(1.35f)) { environment.ui().RemoteDevices(!controller.busy, controller::chooseUsb, controller::network) }
                     }
                 } else {
                     LocalDeviceButton(controller, Modifier.fillMaxWidth())
-                    RemoteDeviceList(controller, Modifier.fillMaxWidth())
+                    environment?.ui()?.RemoteDevices(!controller.busy, controller::chooseUsb, controller::network)
                 }
             } else if (controller.output.isNotEmpty() || controller.logging) {
                 val scroll = rememberScrollState()
@@ -121,45 +120,6 @@ private fun LocalDeviceButton(controller: DeviceController, modifier: Modifier) 
         Text(stringResource(R.string.debug_this_device), Modifier.weight(1f).padding(horizontal = 16.dp),
             style = MaterialTheme.typography.titleMedium)
         Symbol(R.drawable.studio_chevron_right, null, Modifier.size(20.dp))
-    }
-}
-
-@Composable
-private fun RemoteDeviceList(controller: DeviceController, modifier: Modifier) {
-    val enabled = !controller.busy
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.other_devices), Modifier.semantics { heading() },
-            style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column {
-                ConnectionRow(R.drawable.studio_usb, R.string.connect_usb, enabled, controller::chooseUsb)
-                ConnectionRow(R.drawable.studio_wifi, R.string.pair_over_wi_fi, enabled) {
-                    controller.network(DeviceController.Connection.PAIR)
-                }
-                ConnectionRow(R.drawable.studio_link, R.string.connect_paired_device, enabled) {
-                    controller.network(DeviceController.Connection.WIRELESS)
-                }
-                ConnectionRow(R.drawable.studio_lan, R.string.connect_over_adb_tcp, enabled) {
-                    controller.network(DeviceController.Connection.TCP)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConnectionRow(@DrawableRes icon: Int, @StringRes label: Int, enabled: Boolean, action: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val tint = if (enabled) colors.onSurfaceVariant else colors.onSurface.copy(alpha = .38f)
-    Row(
-        Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = action)
-            .heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically
-    ) {
-        Symbol(icon, null, Modifier.size(24.dp), tint)
-        Text(stringResource(label), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) colors.onSurface else tint)
-        Symbol(R.drawable.studio_chevron_right, null, Modifier.size(20.dp), tint)
     }
 }
 
@@ -238,11 +198,15 @@ private fun ConnectedDevice(controller: DeviceController, className: String, lin
 }
 
 @Composable
-internal fun DeviceDialogs(controller: DeviceController) {
+internal fun DeviceDialogs(controller: DeviceController, environment: AndroidEnvironment?) {
     val dialog = controller.dialog ?: return
     val dismiss = { controller.dialog = null }
     key(dialog) {
         when (dialog) {
+            is DeviceDialog.Network -> environment?.ui()?.RemoteDeviceDialog(dialog.mode, { address, port, code ->
+                dismiss()
+                controller.connectRemote(dialog.mode, address, port, code)
+            }, dismiss)
             DeviceDialog.LocalSetup -> LocalDeviceDialog(controller)
             is DeviceDialog.Message -> AlertDialog(onDismissRequest = dismiss, text = { Text(stringResource(dialog.text)) },
                 confirmButton = { TextButton(dismiss) { Text(stringResource(R.string.close)) } })

@@ -34,8 +34,10 @@ internal fun discoverPlugins(context: Context): List<DiscoveredPlugin> {
         val info = pm.signedPackageInfo(pkg) ?: return@mapNotNull null
         val app = info.applicationInfo ?: return@mapNotNull null
         if (app.sourceDir != service.applicationInfo.sourceDir) return@mapNotNull null
+        val localDebugBuild = BuildConfig.DEBUG && pkg == AndroidEnvironments.PACKAGE &&
+            pm.checkSignatures(context.packageName, pkg) == PackageManager.SIGNATURE_MATCH
         DiscoveredPlugin(pkg, service.loadLabel(pm).toString(), item.category, info.versionName.orEmpty(),
-            packageVersionCode(info), app.sourceDir, info.hasReleaseSigner(signer), item.developer,
+            packageVersionCode(info), app.sourceDir, info.hasReleaseSigner(signer) || localDebugBuild, item.developer,
             item.description, service)
     }.sortedBy { it.label }
 }

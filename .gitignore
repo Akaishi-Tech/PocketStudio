@@ -14,3 +14,4 @@ __pycache__/
 /agent-api/build/
 /build-support/codex-plugin/build/
 /build-support/codex-plugin/apk/build/
+/build-support/android-plugin/build/

@@ -143,7 +143,7 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
     override val context get() = w.app
     override val projectId = (p.tree ?: p.root.uri).toString()
     override val projectIdle get() = w.project === p && !w.running && !w.busy
-    override val tools get() = AgentProjectTools.tools
+    override val tools get() = AgentProjectTools.tools.filter { it.name != "run_gradle" || w.androidAvailable }
     override fun keepLoginAlive() = AgentLoginService.start(context)
     private var lastStatus: String? = null
     override fun reportStatus(status: String?) {
@@ -172,6 +172,7 @@ internal class WorkspaceAgentHost(private val w: Workspace, private val p: Proje
                     w.devices.readLogcat(w.apk, if (args.has("packageName")) args.getString("packageName") else null, limit)
                 }
                 "run_gradle" -> {
+                    check(w.androidAvailable) { uiString(R.string.android_environment_required) }
                     val tasks = args.getString("tasks")
                     check(ask(uiString(R.string.run_gradle_tasks), tasks)) { uiString(R.string.build_declined_by_the_user) }
                     check(w.saveDocuments()) { uiString(R.string.resolve_editing_conflicts_first) }

@@ -3,7 +3,6 @@ abstract class PrepareLicenseAssets extends DefaultTask {
     @InputFile abstract RegularFileProperty getProjectLicense()
     @InputFile abstract RegularFileProperty getDdmlibNotice()
     @InputFile abstract RegularFileProperty getAnnotationsNotice()
-    @InputFile abstract RegularFileProperty getJdkArchive()
     @OutputDirectory abstract DirectoryProperty getOutputDirectory()
 
     @TaskAction
@@ -14,20 +13,6 @@ abstract class PrepareLicenseAssets extends DefaultTask {
          'AOSP-annotations.txt': annotationsNotice].each { name, source ->
             new File(notices, name).bytes = source.get().asFile.bytes
         }
-        // Many JDK modules carry identical license files. List their paths,
-        // then show each distinct text once in the reader.
-        new java.util.zip.ZipFile(jdkArchive.get().asFile).withCloseable { zip ->
-            def byText = [:].withDefault { [] }
-            zip.entries().findAll { !it.directory && it.name.startsWith('legal/') }.each { entry ->
-                def text = zip.getInputStream(entry).withCloseable { it.getText('UTF-8') }
-                byText[text] << entry.name
-            }
-            new File(notices, 'OpenJDK.txt').withWriter('UTF-8') { writer ->
-                byText.each { text, paths ->
-                    writer << paths.join('\n') << '\n\n' << text << '\n\n'
-                }
-            }
-        }
     }
 }
 
@@ -37,7 +22,6 @@ androidComponents.onVariants(androidComponents.selector().all()) { variant ->
         projectLicense.set(root.file('LICENSE'))
         ddmlibNotice.set(root.file('upstream/release/tools/base/ddmlib/NOTICE'))
         annotationsNotice.set(root.file('upstream/release/tools/base/annotations/NOTICE'))
-        jdkArchive.set(root.file('build-support/assets/local-jdk/common.zip'))
     }
     variant.sources.assets.addGeneratedSourceDirectory(notices) { it.outputDirectory }
 }

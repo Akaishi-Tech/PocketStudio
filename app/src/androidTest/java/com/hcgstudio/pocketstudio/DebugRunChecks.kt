@@ -1,5 +1,7 @@
 package com.hcgstudio.pocketstudio
 
+import com.hcgstudio.pocketstudio.plugin.RemoteConnection
+
 import android.app.Instrumentation
 import android.app.Notification
 import android.app.NotificationManager
@@ -37,8 +39,7 @@ internal object DebugRunChecks {
                 check(controller.markersFor(cls).isEmpty())
                 controller.selectBreakpointProject(path)
                 check(line in controller.markersFor(cls))
-                controller.network(DeviceController.Connection.TCP)
-                (controller.dialog as DeviceDialog.Form).submit(listOf("127.0.0.1", port))
+                controller.connectRemote(RemoteConnection.TCP, "127.0.0.1", port.toInt())
             }
             waitFor("ADB connection") { controller.connected && !controller.busy }
             main { controller.install(File(context.filesDir, "studio-test-target.apk"), true, debug = true) }

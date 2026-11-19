@@ -1,0 +1,14 @@
+<resources>
+    <string name="connect">"Connect"</string>
+    <string name="connect_over_adb_tcp">"Connect over ADB TCP"</string>
+    <string name="connect_paired_device">"Connect paired device"</string>
+    <string name="other_devices">Other devices</string>
+    <string name="connect_usb">"Connect USB"</string>
+    <string name="connection_port">"Connection port"</string>
+    <string name="host_or_ip_address">"Host or IP address"</string>
+    <string name="pair">"Pair"</string>
+    <string name="pair_over_wi_fi">"Pair over Wi-Fi"</string>
+    <string name="pair_wireless_device">"Pair wireless device"</string>
+    <string name="pairing_port">"Pairing port"</string>
+    <string name="six_digit_pairing_code">"Six-digit pairing code"</string>
+</resources>
