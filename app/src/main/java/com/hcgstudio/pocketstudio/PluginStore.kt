@@ -56,15 +56,7 @@ internal class PluginStore(context: Context) {
     }
 
     fun catalog(): List<StorePlugin> {
-        val release = JSONObject(fetch(RELEASE_API, 2_000_000).toString(Charsets.UTF_8))
-        if (release.getBoolean("draft") || release.getString("tag_name") != "plugin-store") throw invalidCatalog()
-        val lines = release.optString("body").lineSequence().filter { it.startsWith("PocketStudio-Catalog:") }.toList()
-        if (lines.size > 1) throw invalidCatalog()
-        val pointer = lines.singleOrNull()?.let { CATALOG_POINTER.matchEntire(it) ?: throw invalidCatalog() }
-        val bytes = fetch(BASE_URL + (pointer?.groupValues?.get(1) ?: "plugin-store.json"), 262_144)
-        if (pointer != null && MessageDigest.getInstance("SHA-256").digest(bytes)
-                .joinToString("") { "%02x".format(it) } != pointer.groupValues[2]) throw invalidCatalog()
-        val json = bytes.toString(Charsets.UTF_8)
+        val json = fetch(BASE_URL + "plugin-store.json", 262_144).toString(Charsets.UTF_8)
         return parse(json).also { prefs.edit().putString("catalog", json).apply() }
     }
 
@@ -192,8 +184,6 @@ internal class PluginStore(context: Context) {
     }
 
     companion object {
-        private val CATALOG_POINTER = Regex("""PocketStudio-Catalog: (plugin-store-v[1-9][0-9]*\.json) sha256=([0-9a-f]{64})""")
-        private const val RELEASE_API = "https://api.github.com/repos/Akaishi-Tech/PocketStudio-Plugins/releases/tags/plugin-store"
         private const val BASE_URL = "https://github.com/Akaishi-Tech/PocketStudio-Plugins/releases/download/plugin-store/"
         private val PACKAGE = Regex("""[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+""")
         private val APK = Regex("""[A-Za-z0-9][A-Za-z0-9._-]*\.apk""")

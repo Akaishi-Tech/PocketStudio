@@ -23,18 +23,10 @@ def sha(path):
 
 def current_entry(package):
     release = json.loads(subprocess.check_output(["gh", "api", f"{STORE}/tags/plugin-store"]))
-    lines = [line for line in (release["body"] or "").splitlines() if line.startswith("PocketStudio-Catalog:")]
-    name = "plugin-store.json"
-    if lines:
-        match = re.fullmatch(r"PocketStudio-Catalog: (plugin-store-v[1-9][0-9]*\.json) sha256=([0-9a-f]{64})",
-                             lines[0])
-        if len(lines) != 1 or not match:
-            raise ValueError("Invalid published catalog pointer")
-        name = match[1]
-    item, = [a for a in release["assets"] if a["name"] == name]
+    item, = [asset for asset in release["assets"] if asset["name"] == "plugin-store.json"]
     data = subprocess.check_output(["gh", "api", "-H", "Accept: application/octet-stream", f"{STORE}/assets/{item['id']}"])
     digest = hashlib.sha256(data).hexdigest()
-    if item["digest"] != f"sha256:{digest}" or (lines and match[2] != digest):
+    if item["digest"] != f"sha256:{digest}":
         raise ValueError("Published plugin catalog digest mismatch")
     return next((p for p in json.loads(data)["plugins"] if p["package"] == package), {})
 
