@@ -107,6 +107,10 @@ def build_proot(cache, stage, sdk, digest, ca):
             tar.stdout.close()
             if tar.wait() != 0:
                 raise RuntimeError('Cannot archive Debian rootfs')
+        with tarfile.open(archive, 'r|gz') as image:
+            root = image.next()
+            if root is None or root.name != '.' or not root.isdir() or (root.mode & 0o700) != 0o700:
+                raise RuntimeError('Debian archive root must allow its owner to extract files on Android')
         (stage / 'debian-rootfs.sha256').write_text(checksum(archive) + '\n')
     finally:
         subprocess.run(['podman', 'rm', '--time', '0', '-f', cid], check=True)

@@ -63,6 +63,8 @@ if [ "$variant" = avf ]; then
   usermod -p '*' studio
   rm -f /etc/ssh/ssh_host_* /etc/pocket-studio/ssh_host_*
 else
+  # Android's toybox tar applies the root entry's mode before extracting its children.
+  chmod u+w /
   # Name service uses the runtime's bind-mounted resolver configuration.
   command -v sshd && exit 1
 fi
